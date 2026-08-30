@@ -1,0 +1,12 @@
+{
+  "id": "demo-fr-v1",
+  "version": "1.0",
+  "title": "Entretien de démonstration",
+  "questions": [
+    {"id": "Q01", "text": "Pouvez-vous vous présenter en quelques phrases ?"},
+    {"id": "Q02", "text": "Quel est le projet ou le sujet dont vous souhaitez parler aujourd'hui ?"},
+    {"id": "Q03", "text": "Qu'est-ce qui a été le plus difficile dans cette expérience ?"},
+    {"id": "Q04", "text": "Qu'est-ce qui a particulièrement bien fonctionné ?"},
+    {"id": "Q05", "text": "Si vous deviez recommencer, que feriez-vous différemment ?"}
+  ]
+}
