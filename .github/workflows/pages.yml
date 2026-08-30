@@ -1,0 +1,46 @@
+name: Validate and deploy Offline Interview POC
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Parse JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/sw.js
+      - name: Parse JSON assets
+        run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/interview.json')); JSON.parse(require('fs').readFileSync('offline-interview/manifest.webmanifest'))"
+      - name: Verify required files
+        run: test -f offline-interview/index.html && test -f offline-interview/styles.css && test -f offline-interview/icon.svg
+
+  deploy:
+    needs: validate
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: offline-interview
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
