@@ -1,8 +1,15 @@
 name: Validate and deploy Offline Interview POC
 
 on:
+  pull_request:
+    paths:
+      - 'offline-interview/**'
+      - '.github/workflows/pages.yml'
   push:
     branches: [main]
+    paths:
+      - 'offline-interview/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -11,7 +18,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -30,6 +37,7 @@ jobs:
         run: test -f offline-interview/index.html && test -f offline-interview/styles.css && test -f offline-interview/icon.svg
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: validate
     environment:
       name: github-pages
