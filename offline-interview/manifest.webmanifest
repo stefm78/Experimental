@@ -1,0 +1,14 @@
+{
+  "name": "Interview hors ligne",
+  "short_name": "Interview",
+  "description": "Interview vocale avec transcription locale sur l'appareil.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#eef2f7",
+  "theme_color": "#172554",
+  "icons": [
+    {"src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}
+  ]
+}

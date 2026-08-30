@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#172554">
+  <meta name="description" content="Prototype d'interview vocale hors ligne avec transcription locale.">
+  <title>Interview hors ligne</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div><p class="eyebrow">PROTOTYPE LOCAL-FIRST</p><h1>Interview hors ligne</h1></div>
+      <span id="networkBadge" class="badge">…</span>
+    </header>
+
+    <section id="setupView" class="card">
+      <h2>Préparer cet appareil</h2>
+      <p class="lead">Les questions, le moteur de transcription et vos réponses restent utilisables localement après la préparation initiale.</p>
+      <div class="privacy-callout"><strong>Confidentialité du POC</strong><span>L'audio est transcrit sur l'appareil puis supprimé de la mémoire. Seul le texte est sauvegardé dans le navigateur.</span></div>
+      <div class="status-grid" aria-live="polite">
+        <div><span>Application</span><strong id="swStatus">Vérification…</strong></div>
+        <div><span>Stockage</span><strong id="storageStatus">Vérification…</strong></div>
+        <div><span>Moteur STT</span><strong id="modelStatus">Non chargé</strong></div>
+      </div>
+      <div id="progressBlock" class="progress-block hidden">
+        <div class="progress-row"><span id="progressLabel">Chargement…</span><span id="progressValue"></span></div>
+        <progress id="modelProgress" max="100" value="0"></progress>
+        <p class="hint">La première préparation télécharge le modèle Whisper et ses composants. Les suivantes réutilisent le cache local.</p>
+      </div>
+      <p id="setupError" class="error hidden" role="alert"></p>
+      <button id="prepareBtn" class="primary">Préparer le mode hors ligne</button>
+      <button id="resumeBtn" class="secondary hidden">Reprendre l'entretien en cours</button>
+      <p class="hint">Conseil : une fois « prêt », activez le mode avion, fermez la page, rouvrez-la puis poursuivez l'entretien.</p>
+    </section>
+
+    <section id="interviewView" class="card hidden">
+      <div class="interview-head">
+        <div><p id="interviewTitle" class="eyebrow">ENTRETIEN</p><h2 id="questionCounter">Question 1 / 5</h2></div>
+        <button id="homeBtn" class="ghost small">Accueil</button>
+      </div>
+      <progress id="questionProgress" max="5" value="1"></progress>
+      <p id="questionText" class="question"></p>
+      <div class="recorder-panel">
+        <div id="recordState" class="record-state">Prêt à enregistrer</div>
+        <div id="timer" class="timer">00:00</div>
+        <button id="recordBtn" class="record" aria-pressed="false">🎤 Répondre</button>
+        <button id="stopBtn" class="danger hidden">■ Terminer</button>
+      </div>
+      <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Transcription locale en cours…</span></div>
+      <label for="answerText">Réponse transcrite</label>
+      <textarea id="answerText" rows="8" placeholder="Votre réponse apparaîtra ici. Vous pouvez aussi la saisir ou la corriger au clavier."></textarea>
+      <p id="answerMeta" class="hint"></p>
+      <p id="interviewError" class="error hidden" role="alert"></p>
+      <div class="actions">
+        <button id="prevBtn" class="ghost">← Précédente</button>
+        <button id="retryBtn" class="secondary">Recommencer la réponse</button>
+        <button id="validateBtn" class="primary">Valider et continuer →</button>
+      </div>
+    </section>
+
+    <section id="doneView" class="card hidden">
+      <p class="eyebrow">ENTRETIEN TERMINÉ</p>
+      <h2>Les réponses sont enregistrées localement.</h2>
+      <p id="doneSummary" class="lead"></p>
+      <div class="actions stack-mobile">
+        <button id="reviewBtn" class="secondary">Relire les réponses</button>
+        <button id="exportTxtBtn" class="primary">Exporter TXT</button>
+        <button id="exportJsonBtn" class="primary">Exporter JSON</button>
+      </div>
+      <button id="newSessionBtn" class="danger-outline">Effacer et recommencer</button>
+    </section>
+
+    <section class="card compact diagnostics">
+      <details>
+        <summary>Diagnostic technique</summary>
+        <dl>
+          <div><dt>Connexion</dt><dd id="diagNetwork">—</dd></div>
+          <div><dt>Service worker</dt><dd id="diagSw">—</dd></div>
+          <div><dt>Stockage persistant</dt><dd id="diagPersist">—</dd></div>
+          <div><dt>Modèle</dt><dd id="diagModel">onnx-community/whisper-tiny · q4 · WASM</dd></div>
+        </dl>
+      </details>
+    </section>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>
