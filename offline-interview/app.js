@@ -583,6 +583,7 @@ async function startRecording() {
     ui.recordState.textContent = 'Enregistrement en cours…';
     timerHandle = setInterval(() => { ui.timer.textContent = formatTime((performance.now() - startedRecordingAt) / 1000); }, 250);
   } catch (error) {
+    diagError('microphone.start', error);
     showError(ui.interviewError, `Accès au microphone impossible : ${error.message || error}`);
   }
 }
@@ -642,6 +643,7 @@ async function handleRecordingStopped() {
     ui.answerMeta.textContent = `Transcription locale · ${Math.round(lastRecordingDuration)} s d'enregistrement`;
     ui.recordState.textContent = 'Transcription terminée';
   } catch (error) {
+    diagError('transcription', error);
     showError(ui.interviewError, `La transcription a échoué : ${error.message || error}`);
     ui.recordState.textContent = 'Transcription en échec';
   } finally {
@@ -752,17 +754,37 @@ async function resetSession() {
 }
 
 async function init() {
+  ui.diagBuild.textContent = BUILD_ID;
+  diagEvent('boot', 'START', BUILD_ID);
   updateNetwork();
-  window.addEventListener('online', updateNetwork);
-  window.addEventListener('offline', updateNetwork);
+  window.addEventListener('online', () => {
+    updateNetwork();
+    diagEvent('network', 'ONLINE');
+  });
+  window.addEventListener('offline', () => {
+    updateNetwork();
+    diagEvent('network', 'OFFLINE');
+  });
+
+  diagEvent('interview.load', 'START');
   interview = await fetch('./interview.json').then(r => { if (!r.ok) throw new Error('Questionnaire introuvable'); return r.json(); });
+  diagEvent('interview.load', 'PASS', `${interview.id}; questions=${interview.questions.length}`);
+
+  diagEvent('indexeddb.open', 'START');
   db = await openDb();
+  diagEvent('indexeddb.open', 'PASS', DB_NAME);
+
   session = await dbGet(STATE_KEY);
   if (session && session.interviewId === interview.id) {
     ui.resumeBtn.textContent = session.completed ? 'Voir le dernier entretien' : `Reprendre · question ${session.currentIndex + 1}/${interview.questions.length}`;
     show(ui.resumeBtn, true);
+    diagEvent('session.restore', 'PASS', `completed=${session.completed}; currentIndex=${session.currentIndex}`);
+  } else {
+    diagEvent('session.restore', 'EMPTY');
   }
-  await Promise.allSettled([registerServiceWorker(), requestPersistentStorage()]);
+
+  const results = await Promise.allSettled([registerServiceWorker(), requestPersistentStorage()]);
+  diagEvent('boot', 'PASS', results.map(x => x.status).join(','));
 }
 
 ui.prepareBtn.addEventListener('click', async () => {
@@ -785,8 +807,10 @@ ui.reviewBtn.addEventListener('click', () => { session.completed = false; sessio
 ui.exportTxtBtn.addEventListener('click', exportTxt);
 ui.exportJsonBtn.addEventListener('click', exportJson);
 ui.newSessionBtn.addEventListener('click', resetSession);
+ui.copyDiagBtn.addEventListener('click', copyDiagnosticReport);
 
 init().catch(error => {
+  diagError('init', error);
   ui.swStatus.textContent = 'Erreur initialisation';
   showError(ui.setupError, `Initialisation impossible : ${error.message || error}`);
 });
