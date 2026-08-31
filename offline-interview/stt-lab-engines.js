@@ -1,22 +1,108 @@
 export const TRANSFORMERS_VERSION = '4.2.0';
 export const TRANSFORMERS_URL = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_VERSION}`;
 
-const MODEL_IDS = {
-  tiny: 'onnx-community/whisper-tiny',
-  base: 'onnx-community/whisper-base',
-  small: 'onnx-community/whisper-small'
+const MODELS = {
+  baseLegacy: 'onnx-community/whisper-base',
+  smallLegacy: 'onnx-community/whisper-small',
+  baseV4: 'onnx-community/whisper-base-ONNX',
+  smallV4: 'onnx-community/whisper-small-ONNX'
 };
 
+function engine(key, modelId, dtype, device, label, extra = {}) {
+  return { key, modelId, dtype, device, label, ...extra };
+}
+
 export const ENGINES = {
-  tinyQ8Wasm: { key: 'tinyQ8Wasm', model: 'tiny', dtype: 'q8', device: 'wasm', label: 'Tiny q8 · WASM' },
-  baseQ4Wasm: { key: 'baseQ4Wasm', model: 'base', dtype: 'q4', device: 'wasm', label: 'Base q4 · WASM' },
-  baseQ8Wasm: { key: 'baseQ8Wasm', model: 'base', dtype: 'q8', device: 'wasm', label: 'Base q8 · WASM' },
-  smallQ4Wasm: { key: 'smallQ4Wasm', model: 'small', dtype: 'q4', device: 'wasm', label: 'Small q4 · WASM' },
-  smallQ8Wasm: { key: 'smallQ8Wasm', model: 'small', dtype: 'q8', device: 'wasm', label: 'Small q8 · WASM' },
-  baseQ4Gpu: { key: 'baseQ4Gpu', model: 'base', dtype: 'q4', device: 'webgpu', label: 'Base q4 · WebGPU' },
-  baseFp16Gpu: { key: 'baseFp16Gpu', model: 'base', dtype: 'fp16', device: 'webgpu', label: 'Base fp16 · WebGPU', requiresFp16: true },
-  smallQ4Gpu: { key: 'smallQ4Gpu', model: 'small', dtype: 'q4', device: 'webgpu', label: 'Small q4 · WebGPU' },
-  smallFp16Gpu: { key: 'smallFp16Gpu', model: 'small', dtype: 'fp16', device: 'webgpu', label: 'Small fp16 · WebGPU', requiresFp16: true }
+  // v4-era ONNX exports. These are the primary candidates.
+  baseV4Q8Wasm: engine(
+    'baseV4Q8Wasm',
+    MODELS.baseV4,
+    { encoder_model: 'q8', decoder_model_merged: 'q8' },
+    'wasm',
+    'Base ONNX · q8/q8 · WASM'
+  ),
+  smallV4Q8Wasm: engine(
+    'smallV4Q8Wasm',
+    MODELS.smallV4,
+    { encoder_model: 'q8', decoder_model_merged: 'q8' },
+    'wasm',
+    'Small ONNX · q8/q8 · WASM'
+  ),
+  baseV4Fp32Wasm: engine(
+    'baseV4Fp32Wasm',
+    MODELS.baseV4,
+    { encoder_model: 'fp32', decoder_model_merged: 'fp32' },
+    'wasm',
+    'Base ONNX · fp32/fp32 · WASM'
+  ),
+
+  // Known practical WebGPU profile for Whisper: accurate encoder + compact decoder.
+  baseV4HybridGpu: engine(
+    'baseV4HybridGpu',
+    MODELS.baseV4,
+    { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+    'webgpu',
+    'Base ONNX · fp32/q4 · WebGPU'
+  ),
+  smallV4HybridGpu: engine(
+    'smallV4HybridGpu',
+    MODELS.smallV4,
+    { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+    'webgpu',
+    'Small ONNX · fp32/q4 · WebGPU'
+  ),
+
+  // Newer compact WebGPU exports. q4f16 is specifically useful on shader-f16 hardware.
+  baseV4CompactGpu: engine(
+    'baseV4CompactGpu',
+    MODELS.baseV4,
+    { encoder_model: 'fp16', decoder_model_merged: 'q4f16' },
+    'webgpu',
+    'Base ONNX · fp16/q4f16 · WebGPU',
+    { requiresFp16: true }
+  ),
+  smallV4CompactGpu: engine(
+    'smallV4CompactGpu',
+    MODELS.smallV4,
+    { encoder_model: 'fp16', decoder_model_merged: 'q4f16' },
+    'webgpu',
+    'Small ONNX · fp16/q4f16 · WebGPU',
+    { requiresFp16: true }
+  ),
+  baseV4Fp16Gpu: engine(
+    'baseV4Fp16Gpu',
+    MODELS.baseV4,
+    { encoder_model: 'fp16', decoder_model_merged: 'fp16' },
+    'webgpu',
+    'Base ONNX · fp16/fp16 · WebGPU',
+    { requiresFp16: true }
+  ),
+  smallV4Fp16Gpu: engine(
+    'smallV4Fp16Gpu',
+    MODELS.smallV4,
+    { encoder_model: 'fp16', decoder_model_merged: 'fp16' },
+    'webgpu',
+    'Small ONNX · fp16/fp16 · WebGPU',
+    { requiresFp16: true }
+  ),
+
+  // Legacy controls: useful only to determine whether the new export is the fix.
+  baseLegacyHybridGpu: engine(
+    'baseLegacyHybridGpu',
+    MODELS.baseLegacy,
+    { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+    'webgpu',
+    'Base legacy · fp32/q4 · WebGPU',
+    { legacy: true }
+  ),
+  smallLegacyHybridGpu: engine(
+    'smallLegacyHybridGpu',
+    MODELS.smallLegacy,
+    { encoder_model: 'fp32', decoder_model_merged: 'q4' },
+    'webgpu',
+    'Small legacy · fp32/q4 · WebGPU',
+    { legacy: true }
+  )
 };
 
 function e(id, pack, engineKey, transformKey, decode, label) {
@@ -24,28 +110,31 @@ function e(id, pack, engineKey, transformKey, decode, label) {
 }
 
 export const EXPERIMENTS = [
-  e('base-q4-raw', 'essential', 'baseQ4Wasm', 'raw', 'greedy', 'Base q4 · brut'),
-  e('base-q8-raw', 'essential', 'baseQ8Wasm', 'raw', 'greedy', 'Base q8 · brut'),
-  e('small-q4-raw', 'essential', 'smallQ4Wasm', 'raw', 'greedy', 'Small q4 · brut'),
-  e('small-q8-raw', 'essential', 'smallQ8Wasm', 'raw', 'greedy', 'Small q8 · brut'),
-  e('base-q8-vad', 'essential', 'baseQ8Wasm', 'vad', 'greedy', 'Base q8 · VAD'),
-  e('small-q8-vad', 'essential', 'smallQ8Wasm', 'vad', 'greedy', 'Small q8 · VAD'),
+  // Essential: establish compatible engines first.
+  e('base-v4-q8-wasm-raw', 'essential', 'baseV4Q8Wasm', 'raw', 'greedy', 'Base ONNX q8 WASM · brut'),
+  e('small-v4-q8-wasm-raw', 'essential', 'smallV4Q8Wasm', 'raw', 'greedy', 'Small ONNX q8 WASM · brut'),
+  e('base-v4-fp32-wasm-raw', 'essential', 'baseV4Fp32Wasm', 'raw', 'greedy', 'Base ONNX fp32 WASM · contrôle'),
+  e('base-v4-hybrid-gpu-raw', 'essential', 'baseV4HybridGpu', 'raw', 'greedy', 'Base ONNX fp32/q4 WebGPU · brut'),
+  e('small-v4-hybrid-gpu-raw', 'essential', 'smallV4HybridGpu', 'raw', 'greedy', 'Small ONNX fp32/q4 WebGPU · brut'),
 
-  e('base-q8-direct', 'deep', 'baseQ8Wasm', 'raw', 'direct', 'Base q8 · direct sans chunk'),
-  e('base-q8-guard', 'deep', 'baseQ8Wasm', 'raw', 'guarded', 'Base q8 · anti-répétition'),
-  e('base-q8-beam3', 'deep', 'baseQ8Wasm', 'raw', 'beam3', 'Base q8 · beam-3'),
-  e('small-q8-speed115', 'deep', 'smallQ8Wasm', 'speed115', 'greedy', 'Small q8 · WSOLA 1,15×'),
-  e('small-q8-speed125', 'deep', 'smallQ8Wasm', 'speed125', 'greedy', 'Small q8 · WSOLA 1,25×'),
-  e('small-q8-vad-speed115', 'deep', 'smallQ8Wasm', 'vadSpeed115', 'greedy', 'Small q8 · VAD + 1,15×'),
-  e('base-q4-webgpu', 'deep', 'baseQ4Gpu', 'raw', 'greedy', 'Base q4 · WebGPU'),
-  e('base-fp16-webgpu', 'deep', 'baseFp16Gpu', 'raw', 'greedy', 'Base fp16 · WebGPU'),
+  // Deep: once a compatible engine exists, test preprocessing and decoding.
+  e('base-v4-q8-wasm-vad', 'deep', 'baseV4Q8Wasm', 'vad', 'greedy', 'Base ONNX q8 WASM · VAD'),
+  e('small-v4-q8-wasm-vad', 'deep', 'smallV4Q8Wasm', 'vad', 'greedy', 'Small ONNX q8 WASM · VAD'),
+  e('base-v4-q8-wasm-direct', 'deep', 'baseV4Q8Wasm', 'raw', 'direct', 'Base ONNX q8 WASM · direct'),
+  e('base-v4-q8-wasm-guard', 'deep', 'baseV4Q8Wasm', 'raw', 'guarded', 'Base ONNX q8 WASM · anti-répétition'),
+  e('base-v4-q8-wasm-beam3', 'deep', 'baseV4Q8Wasm', 'raw', 'beam3', 'Base ONNX q8 WASM · beam-3'),
+  e('small-v4-hybrid-gpu-vad', 'deep', 'smallV4HybridGpu', 'vad', 'greedy', 'Small ONNX fp32/q4 WebGPU · VAD'),
+  e('small-v4-hybrid-gpu-speed115', 'deep', 'smallV4HybridGpu', 'speed115', 'greedy', 'Small ONNX fp32/q4 WebGPU · WSOLA 1,15×'),
+  e('small-v4-hybrid-gpu-speed125', 'deep', 'smallV4HybridGpu', 'speed125', 'greedy', 'Small ONNX fp32/q4 WebGPU · WSOLA 1,25×'),
 
-  e('tiny-q8-guard', 'exhaustive', 'tinyQ8Wasm', 'raw', 'guarded', 'Tiny q8 · anti-répétition'),
-  e('small-q8-beam3', 'exhaustive', 'smallQ8Wasm', 'raw', 'beam3', 'Small q8 · beam-3'),
-  e('small-q4-webgpu', 'exhaustive', 'smallQ4Gpu', 'raw', 'greedy', 'Small q4 · WebGPU'),
-  e('small-fp16-webgpu', 'exhaustive', 'smallFp16Gpu', 'raw', 'greedy', 'Small fp16 · WebGPU'),
-  e('base-fp16-webgpu-vad', 'exhaustive', 'baseFp16Gpu', 'vad', 'greedy', 'Base fp16 · WebGPU · VAD'),
-  e('small-fp16-webgpu-vad', 'exhaustive', 'smallFp16Gpu', 'vad', 'greedy', 'Small fp16 · WebGPU · VAD')
+  // Exhaustive: compact fp16/q4f16, full fp16 and legacy controls.
+  e('base-v4-compact-gpu-raw', 'exhaustive', 'baseV4CompactGpu', 'raw', 'greedy', 'Base ONNX fp16/q4f16 WebGPU · brut'),
+  e('small-v4-compact-gpu-raw', 'exhaustive', 'smallV4CompactGpu', 'raw', 'greedy', 'Small ONNX fp16/q4f16 WebGPU · brut'),
+  e('base-v4-fp16-gpu-raw', 'exhaustive', 'baseV4Fp16Gpu', 'raw', 'greedy', 'Base ONNX fp16 WebGPU · brut'),
+  e('small-v4-fp16-gpu-raw', 'exhaustive', 'smallV4Fp16Gpu', 'raw', 'greedy', 'Small ONNX fp16 WebGPU · brut'),
+  e('small-v4-compact-gpu-vad-speed115', 'exhaustive', 'smallV4CompactGpu', 'vadSpeed115', 'greedy', 'Small ONNX fp16/q4f16 WebGPU · VAD + 1,15×'),
+  e('base-legacy-hybrid-gpu-raw', 'exhaustive', 'baseLegacyHybridGpu', 'raw', 'greedy', 'Base legacy fp32/q4 WebGPU · contrôle'),
+  e('small-legacy-hybrid-gpu-raw', 'exhaustive', 'smallLegacyHybridGpu', 'raw', 'greedy', 'Small legacy fp32/q4 WebGPU · contrôle')
 ];
 
 const PACK_ORDER = { essential: 0, deep: 1, exhaustive: 2 };
@@ -100,14 +189,12 @@ export async function loadEngine(spec, onProgress) {
     AutomaticSpeechRecognitionPipeline
   } = await getModule();
 
-  const modelId = MODEL_IDS[spec.model];
   const opts = { progress_callback: x => onProgress?.(x) };
-  const tokenizer = await AutoTokenizer.from_pretrained(modelId, opts);
-  const processor = await AutoProcessor.from_pretrained(modelId, opts);
-
+  const tokenizer = await AutoTokenizer.from_pretrained(spec.modelId, opts);
+  const processor = await AutoProcessor.from_pretrained(spec.modelId, opts);
   if (!processor?.feature_extractor) throw new Error('feature_extractor absent');
 
-  const model = await WhisperForConditionalGeneration.from_pretrained(modelId, {
+  const model = await WhisperForConditionalGeneration.from_pretrained(spec.modelId, {
     device: spec.device,
     dtype: spec.dtype,
     progress_callback: x => onProgress?.(x)
@@ -128,5 +215,11 @@ export async function loadEngine(spec, onProgress) {
 }
 
 export function modelIdFor(spec) {
-  return MODEL_IDS[spec.model];
+  return spec.modelId;
+}
+
+export function dtypeLabel(spec) {
+  return typeof spec.dtype === 'string'
+    ? spec.dtype
+    : Object.entries(spec.dtype).map(([k, v]) => `${k}=${v}`).join(',');
 }
