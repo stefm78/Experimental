@@ -48,15 +48,15 @@
       <div class="pack-choices">
         <label class="model-choice">
           <input type="radio" name="pack" value="essential">
-          <span><strong>Essentiel</strong><small>q4 vs q8, Base vs Small, VAD.</small></span>
+          <span><strong>Essentiel</strong><small>Compatibilité v4 : nouveaux exports ONNX, WASM q8, WebGPU hybride.</small></span>
         </label>
         <label class="model-choice recommended">
           <input type="radio" name="pack" value="deep" checked>
-          <span><strong>Approfondi</strong><small>Ajoute décodage, WSOLA et WebGPU Base.</small></span>
+          <span><strong>Approfondi</strong><small>Ajoute VAD, décodage et WSOLA sur les moteurs compatibles.</small></span>
         </label>
         <label class="model-choice">
           <input type="radio" name="pack" value="exhaustive">
-          <span><strong>Exhaustif</strong><small>Ajoute Tiny q8, Small beam search et WebGPU Small. Long et volumineux.</small></span>
+          <span><strong>Exhaustif</strong><small>Ajoute q4f16/fp16 et contrôles legacy. Peut être volumineux.</small></span>
         </label>
       </div>
 
@@ -68,7 +68,7 @@
 
       <div class="benchmark-reference">
         <span class="eyebrow">FAMILLES TESTÉES</span>
-        <p class="hint"><strong>Modèle/dtype :</strong> Tiny/Base/Small, q4/q8. <strong>Prétraitement :</strong> brut, VAD compact, WSOLA 1,15× et 1,25×. <strong>Décodage :</strong> greedy, direct, anti-répétition, beam-3. <strong>Backend :</strong> WASM et WebGPU quand disponible.</p>
+        <p class="hint"><strong>Profils Whisper :</strong> dtypes séparés encoder/decoder. <strong>WASM :</strong> q8 sur exports ONNX v4. <strong>WebGPU :</strong> fp32/q4, fp16/q4f16 et fp16. <strong>Prétraitement :</strong> brut, VAD, WSOLA. <strong>Décodage :</strong> greedy, direct, anti-répétition, beam-3.</p>
       </div>
 
       <p id="runError" class="error hidden" role="alert"></p>
@@ -144,6 +144,6 @@
     </section>
   </main>
 
-  <script type="module" src="./stt-deep-benchmark.js?v=1"></script>
+  <script type="module" src="./stt-deep-benchmark.js?v=2"></script>
 </body>
 </html>
