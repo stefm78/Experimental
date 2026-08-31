@@ -30,11 +30,11 @@ jobs:
         with:
           node-version: '22'
       - name: Parse JavaScript
-        run: node --check offline-interview/app.js && node --check offline-interview/sw.js
+        run: node --check offline-interview/app.js && node --check offline-interview/stt-benchmark.js && node --check offline-interview/sw.js
       - name: Parse JSON assets
         run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/interview.json')); JSON.parse(require('fs').readFileSync('offline-interview/manifest.webmanifest'))"
       - name: Verify required files
-        run: test -f offline-interview/index.html && test -f offline-interview/styles.css && test -f offline-interview/icon.svg
+        run: test -f offline-interview/index.html && test -f offline-interview/stt-benchmark.html && test -f offline-interview/styles.css && test -f offline-interview/icon.svg
 
   deploy:
     if: github.event_name != 'pull_request'
