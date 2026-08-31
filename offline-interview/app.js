@@ -1,4 +1,4 @@
-const BUILD_ID = '2026-08-31.android-diag-v4';
+const BUILD_ID = '2026-08-31.android-diag-v5';
 const DIAGNOSTIC_SCHEMA = 'offline-interview.diagnostic.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
 const TRANSFORMERS_URL = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_VERSION}`;
@@ -319,9 +319,9 @@ async function registerServiceWorker() {
     return false;
   }
 
-  diagEvent('service-worker', 'START', './sw.js?v=4');
+  diagEvent('service-worker', 'START', './sw.js?v=5');
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=4', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=5', { scope: './' });
     try { await reg.update(); } catch {}
 
     const candidate = reg.installing || reg.waiting;
@@ -339,7 +339,7 @@ async function registerServiceWorker() {
 
     await navigator.serviceWorker.ready;
 
-    if (!navigator.serviceWorker.controller?.scriptURL?.includes('v=4')) {
+    if (!navigator.serviceWorker.controller?.scriptURL?.includes('v=5')) {
       await new Promise(resolve => {
         const timeout = setTimeout(resolve, 6000);
         navigator.serviceWorker.addEventListener('controllerchange', () => {
@@ -351,8 +351,8 @@ async function registerServiceWorker() {
 
     const controllerUrl = navigator.serviceWorker.controller?.scriptURL || null;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = controllerUrl?.includes('v=4') ? 'actif · v4' : (reg.active ? 'actif' : 'installé');
-    diagEvent('service-worker', controllerUrl?.includes('v=4') ? 'PASS' : 'WARN', controllerUrl || 'no controller');
+    ui.diagSw.textContent = controllerUrl?.includes('v=5') ? 'actif · v5' : (reg.active ? 'actif' : 'installé');
+    diagEvent('service-worker', controllerUrl?.includes('v=5') ? 'PASS' : 'WARN', controllerUrl || 'no controller');
     return true;
   } catch (error) {
     ui.swStatus.textContent = 'Erreur';
@@ -420,7 +420,7 @@ async function prepareModel() {
   try {
     diagEvent('prepare', 'START', `online=${navigator.onLine}`);
 
-    // Ensure the fixed v4 service worker is controlling before Transformers
+    // Ensure the fixed v5 service worker is controlling before Transformers
     // performs metadata Range requests.
     await registerServiceWorker();
 
