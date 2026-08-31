@@ -31,11 +31,28 @@ self.addEventListener('fetch', event => {
   if (request.headers.has('range')) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).then(response => {
-      const copy = response.clone();
-      caches.open(SHELL_CACHE).then(cache => cache.put('./index.html', copy)).catch(() => {});
-      return response;
-    }).catch(() => caches.match('./index.html')));
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response?.ok) {
+          try {
+            const cache = await caches.open(SHELL_CACHE);
+            await cache.put(request, response.clone());
+          } catch (error) {
+            console.warn('offline-interview navigation cache write skipped', error);
+          }
+        }
+        return response;
+      } catch {
+        const exact = await caches.match(request, { ignoreSearch: true });
+        if (exact) return exact;
+
+        const fallback = url.pathname.endsWith('/stt-benchmark.html')
+          ? await caches.match('./stt-benchmark.html')
+          : await caches.match('./index.html');
+        return fallback;
+      }
+    })());
     return;
   }
 

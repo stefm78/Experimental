@@ -444,6 +444,7 @@ async function runBenchmark() {
   ui.modelBase.disabled = true;
   ui.modelSmall.disabled = true;
   show(ui.cancelBtn, true);
+  ui.cancelBtn.disabled = false;
   runAbortRequested = false;
   ui.runStatus.textContent = 'En cours';
 
