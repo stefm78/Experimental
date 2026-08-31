@@ -78,14 +78,21 @@
       <details>
         <summary>Diagnostic technique</summary>
         <dl>
+          <div><dt>Build</dt><dd id="diagBuild">—</dd></div>
           <div><dt>Connexion</dt><dd id="diagNetwork">—</dd></div>
           <div><dt>Service worker</dt><dd id="diagSw">—</dd></div>
           <div><dt>Stockage persistant</dt><dd id="diagPersist">—</dd></div>
           <div><dt>Modèle</dt><dd id="diagModel">onnx-community/whisper-tiny · q4 · WASM</dd></div>
+          <div><dt>Étape STT</dt><dd id="diagStage">—</dd></div>
         </dl>
+        <p class="hint">Le rapport ne contient ni audio ni texte de vos réponses.</p>
+        <button id="copyDiagBtn" class="secondary">Copier le diagnostic complet</button>
+        <p id="copyDiagStatus" class="hint" aria-live="polite"></p>
+        <label for="diagnosticOutput">Rapport complet</label>
+        <textarea id="diagnosticOutput" rows="18" readonly class="hidden" spellcheck="false"></textarea>
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js"></script>
+  <script type="module" src="./app.js?v=3"></script>
 </body>
 </html>
