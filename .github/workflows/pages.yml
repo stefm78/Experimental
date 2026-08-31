@@ -30,7 +30,7 @@ jobs:
         with:
           node-version: '22'
       - name: Parse JavaScript
-        run: node --check offline-interview/app.js && node --check offline-interview/stt-benchmark.js && node --check offline-interview/stt-deep-benchmark.js && node --check offline-interview/stt-lab-audio.js && node --check offline-interview/stt-lab-engines.js && node --check offline-interview/sw.js
+        run: node --check offline-interview/app.js && node --check offline-interview/stt-benchmark.js && node --check offline-interview/stt-deep-benchmark.js && node --check offline-interview/stt-lab-audio.js && node --check offline-interview/stt-lab-engines.js && node --check offline-interview/stt-lab-fixtures.js && node --check offline-interview/sw.js
       - name: Parse JSON assets
         run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/interview.json')); JSON.parse(require('fs').readFileSync('offline-interview/manifest.webmanifest'))"
       - name: Verify required files

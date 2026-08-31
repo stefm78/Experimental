@@ -71,6 +71,20 @@ export const ENGINES = {
     'wasm',
     'Small ONNX · uint8/uint8 · WASM'
   ),
+  baseLegacyQ4Wasm: engine(
+    'baseLegacyQ4Wasm',
+    MODELS.baseLegacy,
+    { encoder_model: 'q4', decoder_model_merged: 'q4' },
+    'wasm',
+    'Base legacy · q4/q4 · WASM'
+  ),
+  smallLegacyQ4Wasm: engine(
+    'smallLegacyQ4Wasm',
+    MODELS.smallLegacy,
+    { encoder_model: 'q4', decoder_model_merged: 'q4' },
+    'wasm',
+    'Small legacy · q4/q4 · WASM'
+  ),
   baseV4Q8WasmAggressive: engine(
     'baseV4Q8WasmAggressive',
     MODELS.baseV4,
@@ -154,37 +168,34 @@ function e(id, pack, engineKey, transformKey, decode, label) {
 }
 
 export const EXPERIMENTS = [
-  // Essential: establish compatible engines first.
+  // Essential: useful cross-device candidates only.
   e('base-v4-q8-wasm-raw', 'essential', 'baseV4Q8Wasm', 'raw', 'greedy', 'Base ONNX q8 WASM · brut'),
-  e('small-v4-q8-wasm-raw', 'essential', 'smallV4Q8Wasm', 'raw', 'greedy', 'Small ONNX q8 WASM · brut'),
-  e('base-v4-fp32-wasm-raw', 'essential', 'baseV4Fp32Wasm', 'raw', 'greedy', 'Base ONNX fp32 WASM · contrôle'),
   e('base-v4-int8-wasm-raw', 'essential', 'baseV4Int8Wasm', 'raw', 'greedy', 'Base ONNX int8 WASM · brut'),
-  e('base-v4-uint8-wasm-raw', 'essential', 'baseV4Uint8Wasm', 'raw', 'greedy', 'Base ONNX uint8 WASM · brut'),
+  e('base-v4-fp32-wasm-raw', 'essential', 'baseV4Fp32Wasm', 'raw', 'greedy', 'Base ONNX fp32 WASM · brut'),
   e('base-v4-hybrid-gpu-raw', 'essential', 'baseV4HybridGpu', 'raw', 'greedy', 'Base ONNX fp32/q4 WebGPU · brut'),
-  e('small-v4-hybrid-gpu-raw', 'essential', 'smallV4HybridGpu', 'raw', 'greedy', 'Small ONNX fp32/q4 WebGPU · brut'),
+  e('small-legacy-q4-wasm-raw', 'essential', 'smallLegacyQ4Wasm', 'raw', 'greedy', 'Small legacy q4 WASM · brut'),
+  e('small-legacy-hybrid-gpu-raw', 'essential', 'smallLegacyHybridGpu', 'raw', 'greedy', 'Small legacy fp32/q4 WebGPU · brut'),
 
-  // Deep: once a compatible engine exists, test preprocessing and decoding.
+  // Deep: preprocessing and decoding on engines that actually run.
   e('base-v4-q8-wasm-vad', 'deep', 'baseV4Q8Wasm', 'vad', 'greedy', 'Base ONNX q8 WASM · VAD'),
-  e('small-v4-q8-wasm-vad', 'deep', 'smallV4Q8Wasm', 'vad', 'greedy', 'Small ONNX q8 WASM · VAD'),
   e('base-v4-q8-wasm-direct', 'deep', 'baseV4Q8Wasm', 'raw', 'direct', 'Base ONNX q8 WASM · direct'),
   e('base-v4-q8-wasm-guard', 'deep', 'baseV4Q8Wasm', 'raw', 'guarded', 'Base ONNX q8 WASM · anti-répétition'),
   e('base-v4-q8-wasm-beam3', 'deep', 'baseV4Q8Wasm', 'raw', 'beam3', 'Base ONNX q8 WASM · beam-3'),
-  e('small-v4-hybrid-gpu-vad', 'deep', 'smallV4HybridGpu', 'vad', 'greedy', 'Small ONNX fp32/q4 WebGPU · VAD'),
-  e('small-v4-hybrid-gpu-speed115', 'deep', 'smallV4HybridGpu', 'speed115', 'greedy', 'Small ONNX fp32/q4 WebGPU · WSOLA 1,15×'),
-  e('small-v4-hybrid-gpu-speed125', 'deep', 'smallV4HybridGpu', 'speed125', 'greedy', 'Small ONNX fp32/q4 WebGPU · WSOLA 1,25×'),
-  e('small-v4-int8-wasm-raw', 'deep', 'smallV4Int8Wasm', 'raw', 'greedy', 'Small ONNX int8 WASM · brut'),
-  e('small-v4-uint8-wasm-raw', 'deep', 'smallV4Uint8Wasm', 'raw', 'greedy', 'Small ONNX uint8 WASM · brut'),
+  e('base-v4-int8-wasm-vad', 'deep', 'baseV4Int8Wasm', 'vad', 'greedy', 'Base ONNX int8 WASM · VAD'),
+  e('base-v4-hybrid-gpu-vad', 'deep', 'baseV4HybridGpu', 'vad', 'greedy', 'Base ONNX fp32/q4 WebGPU · VAD'),
+  e('small-legacy-q4-wasm-vad', 'deep', 'smallLegacyQ4Wasm', 'vad', 'greedy', 'Small legacy q4 WASM · VAD'),
+  e('small-legacy-q4-wasm-speed115', 'deep', 'smallLegacyQ4Wasm', 'speed115', 'greedy', 'Small legacy q4 WASM · WSOLA 1,15×'),
+  e('small-legacy-q4-wasm-speed125', 'deep', 'smallLegacyQ4Wasm', 'speed125', 'greedy', 'Small legacy q4 WASM · WSOLA 1,25×'),
+  e('small-legacy-q4-wasm-vad-speed115', 'deep', 'smallLegacyQ4Wasm', 'vadSpeed115', 'greedy', 'Small legacy q4 WASM · VAD + 1,15×'),
 
-  // Exhaustive: compact fp16/q4f16, full fp16, legacy controls and one ORT aggressive control.
-  e('base-v4-compact-gpu-raw', 'exhaustive', 'baseV4CompactGpu', 'raw', 'greedy', 'Base ONNX fp16/q4f16 WebGPU · brut'),
-  e('small-v4-compact-gpu-raw', 'exhaustive', 'smallV4CompactGpu', 'raw', 'greedy', 'Small ONNX fp16/q4f16 WebGPU · brut'),
-  e('base-v4-fp16-gpu-raw', 'exhaustive', 'baseV4Fp16Gpu', 'raw', 'greedy', 'Base ONNX fp16 WebGPU · brut'),
-  e('small-v4-fp16-gpu-raw', 'exhaustive', 'smallV4Fp16Gpu', 'raw', 'greedy', 'Small ONNX fp16 WebGPU · brut'),
-  e('small-v4-compact-gpu-vad-speed115', 'exhaustive', 'smallV4CompactGpu', 'vadSpeed115', 'greedy', 'Small ONNX fp16/q4f16 WebGPU · VAD + 1,15×'),
-  e('base-legacy-hybrid-gpu-raw', 'exhaustive', 'baseLegacyHybridGpu', 'raw', 'greedy', 'Base legacy fp32/q4 WebGPU · contrôle'),
-  e('small-legacy-hybrid-gpu-raw', 'exhaustive', 'smallLegacyHybridGpu', 'raw', 'greedy', 'Small legacy fp32/q4 WebGPU · contrôle'),
+  // Exhaustive: secondary quantization, legacy comparison and ORT control.
+  e('base-v4-uint8-wasm-raw', 'exhaustive', 'baseV4Uint8Wasm', 'raw', 'greedy', 'Base ONNX uint8 WASM · brut'),
+  e('base-legacy-q4-wasm-raw', 'exhaustive', 'baseLegacyQ4Wasm', 'raw', 'greedy', 'Base legacy q4 WASM · brut'),
+  e('base-legacy-hybrid-gpu-raw', 'exhaustive', 'baseLegacyHybridGpu', 'raw', 'greedy', 'Base legacy fp32/q4 WebGPU · brut'),
+  e('base-v4-compact-gpu-raw', 'exhaustive', 'baseV4CompactGpu', 'raw', 'greedy', 'Base ONNX fp16/q4f16 WebGPU · contrôle'),
+  e('base-v4-fp16-gpu-raw', 'exhaustive', 'baseV4Fp16Gpu', 'raw', 'greedy', 'Base ONNX fp16 WebGPU · contrôle'),
   e('base-v4-q8-wasm-ort-all-control', 'exhaustive', 'baseV4Q8WasmAggressive', 'raw', 'greedy', 'Base ONNX q8 WASM · ORT all · contrôle')
-];
+]
 
 const PACK_ORDER = { essential: 0, deep: 1, exhaustive: 2 };
 

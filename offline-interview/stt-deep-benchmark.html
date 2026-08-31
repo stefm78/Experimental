@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#172554">
-  <meta name="description" content="Matrice approfondie de benchmark STT local sur navigateur et Android.">
+  <meta name="description" content="Matrice approfondie de benchmark STT local sur navigateur, Android, iPhone et Windows.">
   <title>STT Deep Lab — Matrice offline</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -21,12 +21,28 @@
     </header>
 
     <section class="card">
-      <h2>1. Enregistrer une seule référence</h2>
-      <p class="lead">Tous les essais réutilisent exactement le même signal audio 16 kHz. Les variantes VAD et accélération sont dérivées en mémoire de ce signal.</p>
+      <h2>1. Choisir une source audio</h2>
+      <p class="lead">Pour comparer Android, iPhone et Windows, utilisez de préférence un fixture canonique : chaque appareil synthétise exactement la même source puis vérifie son empreinte SHA-256. Le micro reste disponible pour le test d'usage réel.</p>
       <div class="privacy-callout">
         <strong>Confidentialité</strong>
         <span>L'audio n'est jamais persisté. Le rapport exporté contient les transcriptions et métriques, jamais le signal audio.</span>
       </div>
+
+      <div class="fixture-grid">
+        <button id="fixtureShortBtn" class="secondary">
+          <strong>Canonique · qualité</strong>
+          <span>~25 s · parole propre</span>
+        </button>
+        <button id="fixtureLongBtn" class="secondary">
+          <strong>Canonique · long + silences</strong>
+          <span>~90 s · chunking + VAD</span>
+        </button>
+        <button id="fixtureNoiseBtn" class="secondary">
+          <strong>Canonique · bruité</strong>
+          <span>~25 s · robustesse</span>
+        </button>
+      </div>
+      <p id="fixtureStatus" class="hint">Aucun fixture chargé.</p>
 
       <div class="benchmark-reference">
         <span class="eyebrow">TEXTE DE RÉFÉRENCE</span>
@@ -34,7 +50,7 @@
       </div>
 
       <div class="recorder-panel">
-        <div id="recordState" class="record-state">Prêt à enregistrer</div>
+        <div id="recordState" class="record-state">Ou utilisez votre propre lecture micro</div>
         <div id="timer" class="timer">00:00</div>
         <button id="recordBtn" class="record">🎤 Enregistrer</button>
         <button id="stopBtn" class="danger hidden">■ Terminer</button>
@@ -134,6 +150,8 @@
         <summary>Diagnostic de la matrice</summary>
         <dl>
           <div><dt>Build</dt><dd id="buildInfo">—</dd></div>
+          <div><dt>Plateforme</dt><dd id="platformInfo">—</dd></div>
+          <div><dt>Source</dt><dd id="sourceInfo">—</dd></div>
           <div><dt>Navigateur</dt><dd id="browserInfo">—</dd></div>
           <div><dt>Mémoire</dt><dd id="memoryInfo">—</dd></div>
           <div><dt>Connexion</dt><dd id="networkInfo">—</dd></div>
@@ -144,6 +162,6 @@
     </section>
   </main>
 
-  <script type="module" src="./stt-deep-benchmark.js?v=3"></script>
+  <script type="module" src="./stt-deep-benchmark.js?v=4"></script>
 </body>
 </html>
