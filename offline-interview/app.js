@@ -1,4 +1,7 @@
-const TRANSFORMERS_URL = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0';
+const BUILD_ID = '2026-08-31.android-diag-v3';
+const DIAGNOSTIC_SCHEMA = 'offline-interview.diagnostic.v1';
+const TRANSFORMERS_VERSION = '4.2.0';
+const TRANSFORMERS_URL = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_VERSION}`;
 const MODEL_ID = 'onnx-community/whisper-tiny';
 const DB_NAME = 'offline-interview';
 const DB_VERSION = 1;
@@ -12,7 +15,8 @@ const ui = {
   prepareBtn: $('prepareBtn'), resumeBtn: $('resumeBtn'), interviewTitle: $('interviewTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'),
   recordState: $('recordState'), timer: $('timer'), recordBtn: $('recordBtn'), stopBtn: $('stopBtn'), transcribing: $('transcribing'), answerText: $('answerText'), answerMeta: $('answerMeta'), interviewError: $('interviewError'),
   prevBtn: $('prevBtn'), retryBtn: $('retryBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'), doneSummary: $('doneSummary'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), newSessionBtn: $('newSessionBtn'),
-  diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist')
+  diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), diagStage: $('diagStage'),
+  copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput')
 };
 
 let interview;
@@ -25,6 +29,41 @@ let startedRecordingAt = 0;
 let timerHandle;
 let lastRecordingDuration = 0;
 let db;
+let currentDiagStage = 'boot';
+let lastDiagnosticError = null;
+let lastProgressBucket = -1;
+const diagnosticEvents = [];
+
+function diagEvent(stage, status, detail = null) {
+  const entry = {
+    at: new Date().toISOString(),
+    stage,
+    status,
+    detail: detail == null ? null : String(detail).slice(0, 1200)
+  };
+  diagnosticEvents.push(entry);
+  if (diagnosticEvents.length > 120) diagnosticEvents.shift();
+  currentDiagStage = stage;
+  if (ui.diagStage) ui.diagStage.textContent = `${stage} · ${status}`;
+}
+
+function diagError(stage, error) {
+  lastDiagnosticError = {
+    at: new Date().toISOString(),
+    stage,
+    name: error?.name || 'Error',
+    message: String(error?.message || error),
+    stack: error?.stack ? String(error.stack).slice(0, 8000) : null
+  };
+  diagEvent(stage, 'ERROR', lastDiagnosticError.message);
+}
+
+window.addEventListener('error', event => {
+  diagError('window.error', event.error || event.message);
+});
+window.addEventListener('unhandledrejection', event => {
+  diagError('window.unhandledrejection', event.reason || 'Unhandled rejection');
+});
 
 function show(el, visible = true) { el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { el.textContent = message; show(el, Boolean(message)); }
