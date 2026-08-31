@@ -132,21 +132,61 @@ async function prepareModel() {
   ui.prepareBtn.disabled = true;
   show(ui.progressBlock, true);
   try {
-    const { pipeline, env } = await import(TRANSFORMERS_URL);
+    const {
+      AutoTokenizer,
+      AutoProcessor,
+      WhisperForConditionalGeneration,
+      AutomaticSpeechRecognitionPipeline,
+      env
+    } = await import(TRANSFORMERS_URL);
+
     env.useBrowserCache = true;
     env.useWasmCache = true;
     env.allowRemoteModels = true;
     if (env.backends?.onnx?.wasm) env.backends.onnx.wasm.numThreads = 1;
-    transcriber = await pipeline('automatic-speech-recognition', MODEL_ID, {
-      dtype: 'q4',
-      progress_callback: progressCallback
+
+    // Do not rely on pipeline() auto-detection here. On the Android POC,
+    // Transformers.js 4.2.0 created an ASR pipeline with processor === null,
+    // which only failed later at transcription time on processor.feature_extractor.
+    // Bind all Whisper components explicitly and fail during preparation instead.
+    const progressOptions = { progress_callback: progressCallback };
+    const [tokenizer, processor, model] = await Promise.all([
+      AutoTokenizer.from_pretrained(MODEL_ID, progressOptions),
+      AutoProcessor.from_pretrained(MODEL_ID, progressOptions),
+      WhisperForConditionalGeneration.from_pretrained(MODEL_ID, {
+        device: 'wasm',
+        dtype: 'q4',
+        progress_callback: progressCallback
+      })
+    ]);
+
+    if (!processor?.feature_extractor) {
+      await model?.dispose?.();
+      throw new Error('Processeur Whisper incomplet : feature_extractor absent');
+    }
+
+    // Cheap readiness probe: exercise the actual feature extractor before
+    // announcing that the STT engine is ready.
+    const probe = await processor(new Float32Array(1600));
+    if (!probe?.input_features) {
+      await model?.dispose?.();
+      throw new Error('Processeur Whisper invalide : input_features absent');
+    }
+
+    transcriber = new AutomaticSpeechRecognitionPipeline({
+      task: 'automatic-speech-recognition',
+      model,
+      tokenizer,
+      processor
     });
+
     ui.modelProgress.value = 100;
     ui.progressValue.textContent = '100 %';
     ui.progressLabel.textContent = 'Moteur prêt';
     ui.modelStatus.textContent = 'Prêt hors ligne';
     return transcriber;
   } catch (error) {
+    transcriber = null;
     ui.modelStatus.textContent = 'Échec';
     showError(ui.setupError, `Impossible de préparer le moteur STT : ${error.message || error}`);
     throw error;
