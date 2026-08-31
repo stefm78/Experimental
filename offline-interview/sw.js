@@ -1,4 +1,4 @@
-const VERSION = 'offline-interview-v1';
+const VERSION = 'offline-interview-v2';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 const SHELL = ['./', './index.html', './styles.css', './app.js', './interview.json', './manifest.webmanifest', './icon.svg'];
