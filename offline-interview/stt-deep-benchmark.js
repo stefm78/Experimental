@@ -1,7 +1,7 @@
-import { SAMPLE_RATE, blobTo16kMono, buildTransforms, scoreTranscript } from './stt-lab-audio.js';
-import { ENGINES, experimentsForPack, availability, decodeOptions, loadEngine, modelIdFor, TRANSFORMERS_VERSION } from './stt-lab-engines.js';
+import { SAMPLE_RATE, blobTo16kMono, buildTransforms, scoreTranscript } from './stt-lab-audio.js?v=2';
+import { ENGINES, experimentsForPack, availability, decodeOptions, loadEngine, modelIdFor, TRANSFORMERS_VERSION } from './stt-lab-engines.js?v=2';
 
-const BUILD_ID = '2026-08-31.stt-deep-matrix-v1';
+const BUILD_ID = '2026-08-31.stt-deep-matrix-v2';
 const $ = id => document.getElementById(id);
 
 const ui = {
@@ -205,7 +205,7 @@ async function runMatrix() {
 
         const r = {
           id:item.id,label:item.label,ok:false,skipped:false,engineKey,engineLabel:spec.label,
-          model:spec.model,modelId:modelIdFor(spec),dtype:spec.dtype,device:spec.device,
+          modelId:modelIdFor(spec),dtype:spec.dtype,device:spec.device,
           transformKey:item.transformKey,transformLabel:tr.label,transformMeta:tr.meta,decode:item.decode,
           signalSeconds:seconds,loadMs,inferenceMs:null,rtf:null,transcript:'',wer:null,cer:null,error:null
         };
@@ -220,7 +220,7 @@ async function runMatrix() {
     } catch(e) {
       for (const item of group) {
         if (results.some(r => r.id === item.id)) continue;
-        const r = {id:item.id,label:item.label,ok:false,skipped:false,engineKey,engineLabel:spec.label,device:spec.device,dtype:spec.dtype,transformLabel:transforms[item.transformKey]?.label,decode:item.decode,error:`Engine load failed: ${e.name || 'Error'}: ${e.message || e}`};
+        const r = {id:item.id,label:item.label,ok:false,skipped:false,engineKey,engineLabel:spec.label,modelId:modelIdFor(spec),device:spec.device,dtype:spec.dtype,transformLabel:transforms[item.transformKey]?.label,decode:item.decode,error:`Engine load failed: ${e.name || 'Error'}: ${e.message || e}`};
         results.push(r); updateRow(item,r); addCard(item,r); done++; ui.matrixProgress.value = done;
       }
     } finally {
@@ -259,8 +259,8 @@ async function copyReport() {
 
 async function registerSw() {
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=5',{scope:'./'}); try { await reg.update(); } catch {}
-    await navigator.serviceWorker.ready; ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=5') ? 'actif · v5' : 'actif';
+    const reg = await navigator.serviceWorker.register('./sw.js?v=6',{scope:'./'}); try { await reg.update(); } catch {}
+    await navigator.serviceWorker.ready; ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=6') ? 'actif · v6' : 'actif';
   } catch(e) { ui.swInfo.textContent = `erreur · ${e.message || e}`; }
 }
 
