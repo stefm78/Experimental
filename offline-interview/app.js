@@ -315,17 +315,49 @@ async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) {
     ui.swStatus.textContent = 'Non supporté';
     ui.diagSw.textContent = 'non supporté';
+    diagEvent('service-worker', 'UNSUPPORTED');
     return false;
   }
+
+  diagEvent('service-worker', 'START', './sw.js?v=3');
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=3', { scope: './' });
+    try { await reg.update(); } catch {}
+
+    const candidate = reg.installing || reg.waiting;
+    if (candidate && candidate.state !== 'activated') {
+      await new Promise(resolve => {
+        const timeout = setTimeout(resolve, 6000);
+        candidate.addEventListener('statechange', () => {
+          if (candidate.state === 'activated') {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+      });
+    }
+
     await navigator.serviceWorker.ready;
+
+    if (!navigator.serviceWorker.controller?.scriptURL?.includes('v=3')) {
+      await new Promise(resolve => {
+        const timeout = setTimeout(resolve, 6000);
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          clearTimeout(timeout);
+          resolve();
+        }, { once: true });
+      });
+    }
+
+    const controllerUrl = navigator.serviceWorker.controller?.scriptURL || null;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif' : 'installé';
+    ui.diagSw.textContent = controllerUrl?.includes('v=3') ? 'actif · v3' : (reg.active ? 'actif' : 'installé');
+    diagEvent('service-worker', controllerUrl?.includes('v=3') ? 'PASS' : 'WARN', controllerUrl || 'no controller');
     return true;
   } catch (error) {
     ui.swStatus.textContent = 'Erreur';
     ui.diagSw.textContent = String(error.message || error);
+    diagError('service-worker', error);
     return false;
   }
 }
@@ -336,10 +368,12 @@ async function requestPersistentStorage() {
     ui.diagPersist.textContent = 'API indisponible';
     return false;
   }
+  diagEvent('storage.persist', 'START');
   const already = await navigator.storage.persisted();
   const persisted = already || await navigator.storage.persist();
   ui.storageStatus.textContent = persisted ? 'Persistant' : 'Navigateur';
   ui.diagPersist.textContent = persisted ? 'accordé' : 'non garanti';
+  diagEvent('storage.persist', persisted ? 'PASS' : 'WARN', `already=${already}; persisted=${persisted}`);
   return persisted;
 }
 
@@ -385,6 +419,10 @@ async function prepareModel() {
   let model = null;
   try {
     diagEvent('prepare', 'START', `online=${navigator.onLine}`);
+
+    // Ensure the fixed v3 service worker is controlling before Transformers
+    // performs metadata Range requests.
+    await registerServiceWorker();
 
     diagEvent('metadata.range-probe', 'START');
     const [tokenizerProbe, processorProbe] = await Promise.all([
