@@ -42,39 +42,118 @@ export const FIXTURES = {
 
 let mespeakPromise = null;
 
-function loadScript(src) {
+function timeoutError(stage, ms) {
+  return new Error(`${stage} : timeout après ${Math.round(ms / 1000)} s`);
+}
+
+function loadScript(src, timeoutMs = 12000) {
   return new Promise((resolve, reject) => {
+    if (window.meSpeak) return resolve();
     const existing = [...document.scripts].find(s => s.src === src);
-    if (existing && window.meSpeak) return resolve();
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(timeoutError('script meSpeak', timeoutMs));
+    }, timeoutMs);
+
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      window.meSpeak ? resolve() : reject(new Error('script chargé mais global meSpeak absent'));
+    };
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error(`Chargement meSpeak impossible: ${src}`));
+    };
+
+    if (existing) {
+      existing.addEventListener('load', done, { once: true });
+      existing.addEventListener('error', fail, { once: true });
+      return;
+    }
+
     const script = document.createElement('script');
     script.src = src;
     script.async = true;
-    script.onload = resolve;
-    script.onerror = () => reject(new Error(`Chargement meSpeak impossible: ${src}`));
+    script.onload = done;
+    script.onerror = fail;
     document.head.appendChild(script);
   });
 }
 
-function loadMespeakResource(fn, url) {
+function waitUntil(test, stage, timeoutMs = 12000, intervalMs = 50) {
   return new Promise((resolve, reject) => {
-    fn(url, (ok, message) => ok ? resolve(message) : reject(new Error(String(message || 'resource load failed'))));
+    const started = performance.now();
+    const tick = () => {
+      let ready = false;
+      try { ready = Boolean(test()); } catch {}
+      if (ready) return resolve();
+      if (performance.now() - started >= timeoutMs) return reject(timeoutError(stage, timeoutMs));
+      setTimeout(tick, intervalMs);
+    };
+    tick();
   });
 }
 
-async function ensureMespeak() {
+async function loadConfig(meSpeak) {
+  if (meSpeak.isConfigLoaded?.()) return;
+  // meSpeak 1.x loadConfig() does NOT document a completion callback.
+  // Trigger the async XHR, then poll the public isConfigLoaded() state.
+  meSpeak.loadConfig(MESPEAK_CONFIG);
+  await waitUntil(() => meSpeak.isConfigLoaded?.(), 'configuration meSpeak');
+}
+
+function loadVoice(meSpeak, timeoutMs = 12000) {
+  if (meSpeak.isVoiceLoaded?.('fr')) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(timeoutError('voix française meSpeak', timeoutMs));
+    }, timeoutMs);
+
+    try {
+      meSpeak.loadVoice(MESPEAK_FR, (ok, message) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        ok ? resolve(message) : reject(new Error(`voix française meSpeak : ${message || 'échec'}`));
+      });
+    } catch (error) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(error);
+    }
+  });
+}
+
+async function ensureMespeak(onStage = () => {}) {
   if (!mespeakPromise) {
     mespeakPromise = (async () => {
+      onStage('Fixture 1/4 · chargement du script meSpeak…');
       await loadScript(MESPEAK_SCRIPT);
-      if (!window.meSpeak) throw new Error('meSpeak global absent');
-      if (!window.meSpeak.isConfigLoaded()) {
-        await loadMespeakResource(window.meSpeak.loadConfig.bind(window.meSpeak), MESPEAK_CONFIG);
-      }
-      if (!window.meSpeak.isVoiceLoaded('fr')) {
-        await loadMespeakResource(window.meSpeak.loadVoice.bind(window.meSpeak), MESPEAK_FR);
-      }
-      window.meSpeak.setDefaultVoice('fr');
-      return window.meSpeak;
-    })();
+      const meSpeak = window.meSpeak;
+      if (!meSpeak) throw new Error('meSpeak global absent');
+
+      onStage('Fixture 2/4 · chargement de la configuration…');
+      await loadConfig(meSpeak);
+
+      onStage('Fixture 3/4 · chargement de la voix française…');
+      await loadVoice(meSpeak);
+
+      meSpeak.setDefaultVoice('fr');
+      onStage('Fixture 4/4 · synthétiseur prêt');
+      return meSpeak;
+    })().catch(error => {
+      mespeakPromise = null;
+      throw error;
+    });
   }
   return mespeakPromise;
 }
@@ -143,8 +222,12 @@ function resampleLinear(samples, inputRate, outputRate = SAMPLE_RATE) {
   return out;
 }
 
-async function synthesize(text) {
-  const meSpeak = await ensureMespeak();
+async function synthesize(text, onStage = () => {}) {
+  const meSpeak = await ensureMespeak(onStage);
+  // Yield one browser task so the last visible stage can paint before the
+  // synchronous eSpeak compilation/synthesis work starts.
+  await new Promise(resolve => setTimeout(resolve, 0));
+  const started = performance.now();
   const wav = meSpeak.speak(text, {
     rawdata: true,
     voice: 'fr',
@@ -154,6 +237,7 @@ async function synthesize(text) {
     wordgap: 0
   });
   if (!wav) throw new Error('meSpeak n’a produit aucun audio');
+  onStage(`Synthèse terminée en ${((performance.now() - started) / 1000).toFixed(1)} s`);
   const buffer = wav instanceof ArrayBuffer ? wav : wav.buffer.slice(wav.byteOffset || 0, (wav.byteOffset || 0) + wav.byteLength);
   const decoded = wavToMonoFloat32(buffer);
   return resampleLinear(decoded.samples, decoded.sampleRate, SAMPLE_RATE);
@@ -215,18 +299,18 @@ export async function buildFixture(key, onStage = () => {}) {
   let samples;
   if (key === 'shortClean') {
     onStage('Synthèse du fixture court…');
-    samples = await synthesize(SHORT);
+    samples = await synthesize(SHORT, onStage);
   } else if (key === 'longSilence') {
     const parts = [];
     for (let i = 0; i < LONG_SEGMENTS.length; i++) {
       onStage(`Synthèse segment ${i + 1}/${LONG_SEGMENTS.length}…`);
-      parts.push(await synthesize(LONG_SEGMENTS[i]));
+      parts.push(await synthesize(LONG_SEGMENTS[i], onStage));
       if (i < LONG_SEGMENTS.length - 1) parts.push(silence(3));
     }
     samples = concat(parts);
   } else if (key === 'shortNoisy') {
     onStage('Synthèse du fixture bruité…');
-    samples = addDeterministicNoise(await synthesize(SHORT));
+    samples = addDeterministicNoise(await synthesize(SHORT, onStage));
   }
 
   onStage('Calcul de l’empreinte du fixture…');
