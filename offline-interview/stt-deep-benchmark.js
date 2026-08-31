@@ -1,8 +1,8 @@
 import { SAMPLE_RATE, blobTo16kMono, buildTransforms, scoreTranscript } from './stt-lab-audio.js?v=4';
 import { ENGINES, experimentsForPack, availability, decodeOptions, loadEngine, modelIdFor, TRANSFORMERS_VERSION } from './stt-lab-engines.js?v=4';
-import { FIXTURES, buildFixture } from './stt-lab-fixtures.js?v=2';
+import { FIXTURES, buildFixture } from './stt-lab-fixtures.js?v=3';
 
-const BUILD_ID = '2026-08-31.stt-deep-matrix-v5';
+const BUILD_ID = '2026-08-31.stt-deep-matrix-v6';
 const $ = id => document.getElementById(id);
 
 const ui = {
@@ -329,8 +329,8 @@ async function copyReport() {
 
 async function registerSw() {
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=9',{scope:'./'}); try { await reg.update(); } catch {}
-    await navigator.serviceWorker.ready; ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=9') ? 'actif · v9' : 'actif';
+    const reg = await navigator.serviceWorker.register('./sw.js?v=10',{scope:'./'}); try { await reg.update(); } catch {}
+    await navigator.serviceWorker.ready; ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=10') ? 'actif · v10' : 'actif';
   } catch(e) { ui.swInfo.textContent = `erreur · ${e.message || e}`; }
 }
 

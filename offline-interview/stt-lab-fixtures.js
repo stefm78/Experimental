@@ -191,20 +191,25 @@ function wavToMonoFloat32(buffer) {
     offset = body + size + (size % 2);
   }
 
-  if (audioFormat !== 1 || bits !== 16 || dataOffset < 0) {
+  if (audioFormat !== 1 || ![8, 16].includes(bits) || dataOffset < 0) {
     throw new Error(`Fixture WAV non supporté: format=${audioFormat}, bits=${bits}`);
   }
 
-  const frames = Math.floor(dataSize / (channels * 2));
+  const bytesPerSample = bits / 8;
+  const frames = Math.floor(dataSize / (channels * bytesPerSample));
   const out = new Float32Array(frames);
   for (let i = 0; i < frames; i++) {
     let sum = 0;
     for (let c = 0; c < channels; c++) {
-      sum += view.getInt16(dataOffset + (i * channels + c) * 2, true) / 32768;
+      const pos = dataOffset + (i * channels + c) * bytesPerSample;
+      // PCM WAV 8-bit is unsigned; PCM WAV 16-bit is signed little-endian.
+      sum += bits === 8
+        ? (view.getUint8(pos) - 128) / 128
+        : view.getInt16(pos, true) / 32768;
     }
     out[i] = sum / channels;
   }
-  return { samples: out, sampleRate };
+  return { samples: out, sampleRate, bits };
 }
 
 function resampleLinear(samples, inputRate, outputRate = SAMPLE_RATE) {
