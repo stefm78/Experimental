@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#172554">
+  <meta name="description" content="Benchmark local de modèles Whisper sur Android et navigateur.">
+  <title>STT Lab — Benchmark Whisper</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">STT LAB · LOCAL ONLY</p>
+        <h1>Benchmark Whisper</h1>
+      </div>
+      <a class="ghost button-link small" href="./">← Interview</a>
+    </header>
+
+    <section class="card">
+      <h2>Un audio, plusieurs moteurs</h2>
+      <p class="lead">Enregistrez une seule fois le texte ci-dessous. Le même signal 16 kHz sera ensuite transcrit successivement par les modèles sélectionnés.</p>
+      <div class="privacy-callout">
+        <strong>Confidentialité</strong>
+        <span>L'audio reste uniquement en mémoire vive pendant le benchmark et n'est jamais sauvegardé ni envoyé à notre serveur. Les modèles s'exécutent localement dans le navigateur.</span>
+      </div>
+
+      <div class="benchmark-reference">
+        <span class="eyebrow">TEXTE DE RÉFÉRENCE</span>
+        <p id="referenceText">Le mardi quatorze octobre, nous avons lancé un projet à Saint-Germain-en-Laye avec quinze personnes. L'objectif était de préparer trois démonstrations pour une équipe technique et commerciale. J'ai rencontré deux difficultés principales : le bruit dans la salle et les changements de dernière minute. Malgré cela, la réunion s'est terminée à dix-sept heures trente, et nous avons décidé de poursuivre le projet la semaine suivante.</p>
+      </div>
+
+      <div class="recorder-panel">
+        <div id="recordState" class="record-state">Prêt à enregistrer le texte de référence</div>
+        <div id="timer" class="timer">00:00</div>
+        <button id="recordBtn" class="record">🎤 Enregistrer</button>
+        <button id="stopBtn" class="danger hidden">■ Terminer</button>
+      </div>
+      <p id="audioMeta" class="hint"></p>
+      <p id="audioError" class="error hidden" role="alert"></p>
+    </section>
+
+    <section class="card">
+      <h2>Modèles à comparer</h2>
+      <div class="model-choices">
+        <label class="model-choice">
+          <input id="modelTiny" type="checkbox" value="tiny" checked>
+          <span><strong>Tiny q4</strong><small>Très léger · référence actuelle</small></span>
+        </label>
+        <label class="model-choice recommended">
+          <input id="modelBase" type="checkbox" value="base" checked>
+          <span><strong>Base q4</strong><small>Candidat recommandé pour l'interview</small></span>
+        </label>
+        <label class="model-choice">
+          <input id="modelSmall" type="checkbox" value="small">
+          <span><strong>Small q4</strong><small>Plus précis potentiellement, mais beaucoup plus lourd</small></span>
+        </label>
+      </div>
+
+      <p class="hint">La première exécution d'un modèle nécessite Internet pour télécharger ses poids. Une fois le modèle en cache, le même test peut être relancé hors connexion.</p>
+      <p id="benchmarkError" class="error hidden" role="alert"></p>
+      <button id="runBtn" class="primary" disabled>Lancer le benchmark</button>
+      <button id="cancelBtn" class="danger-outline hidden">Arrêter après le modèle en cours</button>
+    </section>
+
+    <section id="resultsCard" class="card hidden">
+      <div class="interview-head">
+        <div>
+          <p class="eyebrow">RÉSULTATS</p>
+          <h2>Comparaison locale</h2>
+        </div>
+        <span id="runStatus" class="badge">—</span>
+      </div>
+      <div id="resultsGrid" class="benchmark-results"></div>
+      <div class="actions">
+        <button id="copyResultsBtn" class="secondary">Copier le rapport benchmark</button>
+        <button id="rerunBtn" class="primary">Relancer avec le même audio</button>
+      </div>
+      <p id="copyStatus" class="hint"></p>
+      <textarea id="resultsOutput" rows="18" readonly class="hidden" spellcheck="false"></textarea>
+    </section>
+
+    <section class="card compact diagnostics">
+      <details>
+        <summary>Informations techniques</summary>
+        <dl>
+          <div><dt>Build</dt><dd id="buildInfo">—</dd></div>
+          <div><dt>Navigateur</dt><dd id="browserInfo">—</dd></div>
+          <div><dt>Mémoire déclarée</dt><dd id="memoryInfo">—</dd></div>
+          <div><dt>Connexion</dt><dd id="networkInfo">—</dd></div>
+          <div><dt>Service worker</dt><dd id="swInfo">—</dd></div>
+          <div><dt>Stockage cache</dt><dd id="storageInfo">—</dd></div>
+        </dl>
+      </details>
+    </section>
+  </main>
+
+  <script type="module" src="./stt-benchmark.js?v=1"></script>
+</body>
+</html>
