@@ -345,82 +345,134 @@ async function requestPersistentStorage() {
 
 function progressCallback(item) {
   show(ui.progressBlock, true);
+
   if (item.status === 'progress' && typeof item.progress === 'number') {
     const value = Math.max(0, Math.min(100, item.progress));
     ui.modelProgress.value = value;
     ui.progressValue.textContent = `${Math.round(value)} %`;
     ui.progressLabel.textContent = item.file ? `Chargement ${item.file.split('/').pop()}` : 'Chargement du modèle';
+
+    const bucket = Math.floor(value / 25) * 25;
+    if (bucket !== lastProgressBucket) {
+      lastProgressBucket = bucket;
+      diagEvent('transformers.progress', `${bucket}%`, item.file || item.name || null);
+    }
   } else if (item.status === 'ready') {
     ui.progressLabel.textContent = 'Ressource prête';
+    diagEvent('transformers.progress', 'READY', item.file || item.name || item.task || null);
   } else if (item.status === 'initiate') {
     ui.progressLabel.textContent = item.file ? `Préparation ${item.file.split('/').pop()}` : 'Préparation';
+    diagEvent('transformers.progress', 'INITIATE', item.file || item.name || null);
+  } else if (item.status) {
+    diagEvent('transformers.progress', String(item.status).toUpperCase(), item.file || item.name || null);
   }
 }
 
 async function prepareModel() {
-  if (transcriber) return transcriber;
+  if (transcriber) {
+    diagEvent('prepare', 'REUSE', 'transcriber already initialized');
+    return transcriber;
+  }
+
   if (!navigator.onLine) ui.modelStatus.textContent = 'Chargement depuis cache…';
   else ui.modelStatus.textContent = 'Téléchargement…';
+
   showError(ui.setupError);
   ui.prepareBtn.disabled = true;
   show(ui.progressBlock, true);
+  lastProgressBucket = -1;
+
+  let model = null;
   try {
+    diagEvent('prepare', 'START', `online=${navigator.onLine}`);
+
+    diagEvent('metadata.range-probe', 'START');
+    const [tokenizerProbe, processorProbe] = await Promise.all([
+      modelRangeProbe('tokenizer_config.json'),
+      modelRangeProbe('preprocessor_config.json')
+    ]);
+    diagEvent('metadata.range-probe', 'DONE', JSON.stringify({ tokenizerProbe, processorProbe }));
+
+    diagEvent('transformers.import', 'START', TRANSFORMERS_URL);
+    const module = await import(TRANSFORMERS_URL);
+    diagEvent('transformers.import', 'PASS', Object.keys(module).filter(k =>
+      ['AutoTokenizer', 'AutoProcessor', 'WhisperForConditionalGeneration', 'AutomaticSpeechRecognitionPipeline', 'env'].includes(k)
+    ).join(','));
+
     const {
       AutoTokenizer,
       AutoProcessor,
       WhisperForConditionalGeneration,
       AutomaticSpeechRecognitionPipeline,
       env
-    } = await import(TRANSFORMERS_URL);
+    } = module;
 
+    if (!AutoTokenizer || !AutoProcessor || !WhisperForConditionalGeneration || !AutomaticSpeechRecognitionPipeline || !env) {
+      throw new Error('Exports Transformers.js requis absents');
+    }
+
+    diagEvent('transformers.env', 'START');
     env.useBrowserCache = true;
     env.useWasmCache = true;
     env.allowRemoteModels = true;
     if (env.backends?.onnx?.wasm) env.backends.onnx.wasm.numThreads = 1;
+    diagEvent('transformers.env', 'PASS', `allowRemoteModels=${env.allowRemoteModels}; useBrowserCache=${env.useBrowserCache}; wasmThreads=${env.backends?.onnx?.wasm?.numThreads ?? 'n/a'}`);
 
-    // Do not rely on pipeline() auto-detection here. On the Android POC,
-    // Transformers.js 4.2.0 created an ASR pipeline with processor === null,
-    // which only failed later at transcription time on processor.feature_extractor.
-    // Bind all Whisper components explicitly and fail during preparation instead.
     const progressOptions = { progress_callback: progressCallback };
-    const [tokenizer, processor, model] = await Promise.all([
-      AutoTokenizer.from_pretrained(MODEL_ID, progressOptions),
-      AutoProcessor.from_pretrained(MODEL_ID, progressOptions),
-      WhisperForConditionalGeneration.from_pretrained(MODEL_ID, {
-        device: 'wasm',
-        dtype: 'q4',
-        progress_callback: progressCallback
-      })
-    ]);
+
+    diagEvent('tokenizer.load', 'START', MODEL_ID);
+    const tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID, progressOptions);
+    diagEvent('tokenizer.load', 'PASS', tokenizer?.constructor?.name || 'unknown');
+
+    diagEvent('processor.load', 'START', MODEL_ID);
+    const processor = await AutoProcessor.from_pretrained(MODEL_ID, progressOptions);
+    diagEvent('processor.load', 'PASS', `${processor?.constructor?.name || 'unknown'}; feature_extractor=${processor?.feature_extractor?.constructor?.name || 'missing'}`);
 
     if (!processor?.feature_extractor) {
-      await model?.dispose?.();
       throw new Error('Processeur Whisper incomplet : feature_extractor absent');
     }
 
-    // Cheap readiness probe: exercise the actual feature extractor before
-    // announcing that the STT engine is ready.
+    diagEvent('model.load', 'START', `${MODEL_ID}; wasm; q4`);
+    model = await WhisperForConditionalGeneration.from_pretrained(MODEL_ID, {
+      device: 'wasm',
+      dtype: 'q4',
+      progress_callback: progressCallback
+    });
+    diagEvent('model.load', 'PASS', model?.constructor?.name || 'unknown');
+
+    diagEvent('processor.probe', 'START', '1600 silent samples @ expected 16 kHz');
     const probe = await processor(new Float32Array(1600));
     if (!probe?.input_features) {
-      await model?.dispose?.();
       throw new Error('Processeur Whisper invalide : input_features absent');
     }
+    diagEvent('processor.probe', 'PASS', `input_features dims=${probe.input_features?.dims?.join('x') || 'unknown'}`);
 
+    diagEvent('pipeline.bind', 'START');
     transcriber = new AutomaticSpeechRecognitionPipeline({
       task: 'automatic-speech-recognition',
       model,
       tokenizer,
       processor
     });
+    diagEvent('pipeline.bind', 'PASS', `processor=${transcriber?.processor?.constructor?.name || 'missing'}`);
+
+    if (!transcriber?.processor?.feature_extractor) {
+      throw new Error('Pipeline ASR invalide : processor.feature_extractor absent après binding');
+    }
 
     ui.modelProgress.value = 100;
     ui.progressValue.textContent = '100 %';
     ui.progressLabel.textContent = 'Moteur prêt';
     ui.modelStatus.textContent = 'Prêt hors ligne';
+    diagEvent('prepare', 'PASS', 'STT ready');
     return transcriber;
   } catch (error) {
+    if (model && !transcriber) {
+      try { await model.dispose?.(); } catch {}
+    }
     transcriber = null;
     ui.modelStatus.textContent = 'Échec';
+    diagError(currentDiagStage || 'prepare', error);
     showError(ui.setupError, `Impossible de préparer le moteur STT : ${error.message || error}`);
     throw error;
   } finally {
