@@ -527,10 +527,10 @@ async function registerServiceWorker() {
     return;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=4', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=5', { scope: './' });
     try { await reg.update(); } catch {}
     await navigator.serviceWorker.ready;
-    ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=4') ? 'actif · v4' : 'actif';
+    ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=5') ? 'actif · v5' : 'actif';
   } catch (error) {
     ui.swInfo.textContent = `erreur · ${error.message || error}`;
   }

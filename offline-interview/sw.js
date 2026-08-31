@@ -1,7 +1,7 @@
-const VERSION = 'offline-interview-v4';
+const VERSION = 'offline-interview-v5';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
-const SHELL = ['./', './index.html', './styles.css', './app.js?v=4', './interview.json', './manifest.webmanifest', './icon.svg', './stt-benchmark.html', './stt-benchmark.js?v=1'];
+const SHELL = ['./', './index.html', './styles.css', './app.js?v=5', './interview.json', './manifest.webmanifest', './icon.svg', './stt-benchmark.html', './stt-benchmark.js?v=1', './stt-deep-benchmark.html', './stt-deep-benchmark.js?v=1', './stt-lab-audio.js', './stt-lab-engines.js'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));

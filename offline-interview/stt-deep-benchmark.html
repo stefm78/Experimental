@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#172554">
+  <meta name="description" content="Matrice approfondie de benchmark STT local sur navigateur et Android.">
+  <title>STT Deep Lab — Matrice offline</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">STT DEEP LAB · LOCAL-FIRST</p>
+        <h1>Matrice de benchmark</h1>
+      </div>
+      <a class="ghost button-link small" href="./stt-benchmark.html">← Benchmark simple</a>
+    </header>
+
+    <section class="card">
+      <h2>1. Enregistrer une seule référence</h2>
+      <p class="lead">Tous les essais réutilisent exactement le même signal audio 16 kHz. Les variantes VAD et accélération sont dérivées en mémoire de ce signal.</p>
+      <div class="privacy-callout">
+        <strong>Confidentialité</strong>
+        <span>L'audio n'est jamais persisté. Le rapport exporté contient les transcriptions et métriques, jamais le signal audio.</span>
+      </div>
+
+      <div class="benchmark-reference">
+        <span class="eyebrow">TEXTE DE RÉFÉRENCE</span>
+        <p id="referenceText">Le mardi quatorze octobre, nous avons lancé un projet à Saint-Germain-en-Laye avec quinze personnes. L'objectif était de préparer trois démonstrations pour une équipe technique et commerciale. J'ai rencontré deux difficultés principales : le bruit dans la salle et les changements de dernière minute. Malgré cela, la réunion s'est terminée à dix-sept heures trente, et nous avons décidé de poursuivre le projet la semaine suivante.</p>
+      </div>
+
+      <div class="recorder-panel">
+        <div id="recordState" class="record-state">Prêt à enregistrer</div>
+        <div id="timer" class="timer">00:00</div>
+        <button id="recordBtn" class="record">🎤 Enregistrer</button>
+        <button id="stopBtn" class="danger hidden">■ Terminer</button>
+      </div>
+      <p id="audioMeta" class="hint"></p>
+      <p id="audioError" class="error hidden" role="alert"></p>
+    </section>
+
+    <section class="card">
+      <h2>2. Choisir la profondeur</h2>
+      <div class="pack-choices">
+        <label class="model-choice">
+          <input type="radio" name="pack" value="essential">
+          <span><strong>Essentiel</strong><small>q4 vs q8, Base vs Small, VAD.</small></span>
+        </label>
+        <label class="model-choice recommended">
+          <input type="radio" name="pack" value="deep" checked>
+          <span><strong>Approfondi</strong><small>Ajoute décodage, WSOLA et WebGPU Base.</small></span>
+        </label>
+        <label class="model-choice">
+          <input type="radio" name="pack" value="exhaustive">
+          <span><strong>Exhaustif</strong><small>Ajoute Tiny q8, Small beam search et WebGPU Small. Long et volumineux.</small></span>
+        </label>
+      </div>
+
+      <div class="status-grid">
+        <div><span>WebGPU</span><strong id="webgpuStatus">Vérification…</strong></div>
+        <div><span>shader-f16</span><strong id="fp16Status">Vérification…</strong></div>
+        <div><span>Tests prévus</span><strong id="testCount">—</strong></div>
+      </div>
+
+      <div class="benchmark-reference">
+        <span class="eyebrow">FAMILLES TESTÉES</span>
+        <p class="hint"><strong>Modèle/dtype :</strong> Tiny/Base/Small, q4/q8. <strong>Prétraitement :</strong> brut, VAD compact, WSOLA 1,15× et 1,25×. <strong>Décodage :</strong> greedy, direct, anti-répétition, beam-3. <strong>Backend :</strong> WASM et WebGPU quand disponible.</p>
+      </div>
+
+      <p id="runError" class="error hidden" role="alert"></p>
+      <button id="runBtn" class="primary" disabled>Lancer la matrice</button>
+      <button id="cancelBtn" class="danger-outline hidden">Arrêter après l'essai en cours</button>
+    </section>
+
+    <section id="progressCard" class="card hidden">
+      <div class="interview-head">
+        <div>
+          <p class="eyebrow">EXÉCUTION</p>
+          <h2 id="progressTitle">Préparation…</h2>
+        </div>
+        <span id="progressBadge" class="badge">0 / 0</span>
+      </div>
+      <progress id="matrixProgress" max="1" value="0"></progress>
+      <p id="progressDetail" class="hint"></p>
+    </section>
+
+    <section id="resultsCard" class="card hidden">
+      <div class="interview-head">
+        <div>
+          <p class="eyebrow">RÉSULTATS</p>
+          <h2>Frontière qualité / vitesse</h2>
+        </div>
+        <span id="runStatus" class="badge">—</span>
+      </div>
+
+      <div id="paretoBox" class="privacy-callout hidden">
+        <strong>Frontière de Pareto</strong>
+        <span id="paretoText"></span>
+      </div>
+
+      <div class="table-scroll">
+        <table class="matrix-table">
+          <thead>
+            <tr>
+              <th>Essai</th>
+              <th>WER</th>
+              <th>CER</th>
+              <th>Inférence</th>
+              <th>RTF</th>
+              <th>Mots</th>
+              <th>État</th>
+            </tr>
+          </thead>
+          <tbody id="resultsBody"></tbody>
+        </table>
+      </div>
+
+      <div id="transcriptResults" class="benchmark-results"></div>
+
+      <div class="actions">
+        <button id="copyBtn" class="secondary">Copier le rapport complet</button>
+        <button id="rerunBtn" class="primary">Relancer avec le même audio</button>
+      </div>
+      <p id="copyStatus" class="hint"></p>
+      <textarea id="reportOutput" rows="20" readonly class="hidden" spellcheck="false"></textarea>
+    </section>
+
+    <section class="card compact diagnostics">
+      <details>
+        <summary>Diagnostic de la matrice</summary>
+        <dl>
+          <div><dt>Build</dt><dd id="buildInfo">—</dd></div>
+          <div><dt>Navigateur</dt><dd id="browserInfo">—</dd></div>
+          <div><dt>Mémoire</dt><dd id="memoryInfo">—</dd></div>
+          <div><dt>Connexion</dt><dd id="networkInfo">—</dd></div>
+          <div><dt>Service worker</dt><dd id="swInfo">—</dd></div>
+          <div><dt>Cache navigateur</dt><dd id="storageInfo">—</dd></div>
+        </dl>
+      </details>
+    </section>
+  </main>
+
+  <script type="module" src="./stt-deep-benchmark.js?v=1"></script>
+</body>
+</html>
