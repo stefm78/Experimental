@@ -1,12 +1,14 @@
-import { SAMPLE_RATE, blobTo16kMono, buildTransforms, scoreTranscript } from './stt-lab-audio.js?v=3';
-import { ENGINES, experimentsForPack, availability, decodeOptions, loadEngine, modelIdFor, TRANSFORMERS_VERSION } from './stt-lab-engines.js?v=3';
+import { SAMPLE_RATE, blobTo16kMono, buildTransforms, scoreTranscript } from './stt-lab-audio.js?v=4';
+import { ENGINES, experimentsForPack, availability, decodeOptions, loadEngine, modelIdFor, TRANSFORMERS_VERSION } from './stt-lab-engines.js?v=4';
+import { FIXTURES, buildFixture } from './stt-lab-fixtures.js?v=1';
 
-const BUILD_ID = '2026-08-31.stt-deep-matrix-v3';
+const BUILD_ID = '2026-08-31.stt-deep-matrix-v4';
 const $ = id => document.getElementById(id);
 
 const ui = {
   referenceText: $('referenceText'), recordState: $('recordState'), timer: $('timer'),
   recordBtn: $('recordBtn'), stopBtn: $('stopBtn'), audioMeta: $('audioMeta'), audioError: $('audioError'),
+  fixtureShortBtn: $('fixtureShortBtn'), fixtureLongBtn: $('fixtureLongBtn'), fixtureNoiseBtn: $('fixtureNoiseBtn'), fixtureStatus: $('fixtureStatus'),
   webgpuStatus: $('webgpuStatus'), fp16Status: $('fp16Status'), testCount: $('testCount'),
   runError: $('runError'), runBtn: $('runBtn'), cancelBtn: $('cancelBtn'),
   progressCard: $('progressCard'), progressTitle: $('progressTitle'), progressBadge: $('progressBadge'),
@@ -14,7 +16,8 @@ const ui = {
   resultsCard: $('resultsCard'), resultsBody: $('resultsBody'), transcriptResults: $('transcriptResults'),
   runStatus: $('runStatus'), paretoBox: $('paretoBox'), paretoText: $('paretoText'),
   copyBtn: $('copyBtn'), rerunBtn: $('rerunBtn'), copyStatus: $('copyStatus'), reportOutput: $('reportOutput'),
-  buildInfo: $('buildInfo'), browserInfo: $('browserInfo'), memoryInfo: $('memoryInfo'),
+  buildInfo: $('buildInfo'), platformInfo: $('platformInfo'), sourceInfo: $('sourceInfo'),
+  browserInfo: $('browserInfo'), memoryInfo: $('memoryInfo'),
   networkInfo: $('networkInfo'), swInfo: $('swInfo'), storageInfo: $('storageInfo')
 };
 
@@ -25,6 +28,7 @@ let transforms = null;
 let sourceDuration = 0;
 let cancelRequested = false;
 let latestReport = null;
+let sourceMeta = { mode: 'none' };
 let webgpuInfo = { available: false, shaderF16: false, adapterName: null };
 
 function show(el, yes = true) { el.classList.toggle('hidden', !yes); }
@@ -40,6 +44,69 @@ function mime() {
   return ['audio/webm;codecs=opus','audio/mp4','audio/webm'].find(x => MediaRecorder.isTypeSupported?.(x)) || '';
 }
 function pack() { return document.querySelector('input[name="pack"]:checked')?.value || 'deep'; }
+
+function detectPlatformClass() {
+  const ua = navigator.userAgent || '';
+  const platform = navigator.userAgentData?.platform || navigator.platform || '';
+  if (/iPhone|iPad|iPod/i.test(ua) || (platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'iphone-ios';
+  if (/Android/i.test(ua)) return 'android';
+  if (/Windows/i.test(ua) || /Win/i.test(platform)) return 'windows';
+  if (/Mac/i.test(platform)) return 'macos';
+  return 'other';
+}
+
+function setFixtureButtonsDisabled(disabled) {
+  for (const button of [ui.fixtureShortBtn, ui.fixtureLongBtn, ui.fixtureNoiseBtn]) {
+    if (button) button.disabled = disabled;
+  }
+}
+
+function useSource(samples, referenceText, meta) {
+  sourceSamples = samples;
+  sourceDuration = sourceSamples.length / SAMPLE_RATE;
+  transforms = buildTransforms(sourceSamples);
+  sourceMeta = meta;
+  ui.referenceText.textContent = referenceText;
+  ui.recordState.textContent = meta.mode === 'fixture' ? 'Fixture canonique prêt' : 'Audio micro prêt';
+  ui.timer.textContent = time(sourceDuration);
+  ui.audioMeta.textContent = `${sourceDuration.toFixed(2)} s · VAD conserve ${(transforms.vad.meta.vadStats.keptRatio*100).toFixed(1)} % · variantes WSOLA prêtes`;
+  ui.sourceInfo.textContent = meta.mode === 'fixture'
+    ? `${meta.fixtureId} · sha256:${meta.sha256.slice(0,12)}…`
+    : 'micro réel';
+  refreshCount();
+}
+
+async function prepareFixture(key) {
+  error(ui.audioError);
+  latestReport = null;
+  sourceSamples = null;
+  transforms = null;
+  ui.runBtn.disabled = true;
+  setFixtureButtonsDisabled(true);
+  ui.recordBtn.disabled = true;
+  try {
+    const fixture = await buildFixture(key, stage => {
+      ui.fixtureStatus.textContent = stage;
+    });
+    useSource(fixture.samples, fixture.referenceText, {
+      mode: 'fixture',
+      fixtureKey: key,
+      fixtureId: fixture.id,
+      sha256: fixture.sha256,
+      generator: fixture.generator,
+      description: fixture.description
+    });
+    ui.fixtureStatus.textContent = `${fixture.label} · ${fixture.durationSeconds.toFixed(2)} s · SHA-256 ${fixture.sha256}`;
+  } catch (e) {
+    sourceMeta = { mode: 'none' };
+    ui.fixtureStatus.textContent = 'Échec du fixture.';
+    error(ui.audioError, `Fixture impossible : ${e.message || e}`);
+  } finally {
+    setFixtureButtonsDisabled(false);
+    ui.recordBtn.disabled = false;
+  }
+}
+
 
 async function storage() {
   try {
@@ -75,7 +142,9 @@ function refreshCount() {
 
 async function startRecording() {
   error(ui.audioError);
-  sourceSamples = null; transforms = null; latestReport = null; ui.runBtn.disabled = true;
+  sourceSamples = null; transforms = null; latestReport = null; sourceMeta = { mode: 'micro' }; ui.runBtn.disabled = true;
+  ui.referenceText.textContent = FIXTURES.shortClean.referenceText;
+  ui.fixtureStatus.textContent = 'Mode micro réel.';
   try {
     stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,channelCount:1}});
     const m = mime();
@@ -103,11 +172,10 @@ async function finishRecording() {
     sourceSamples = await blobTo16kMono(blob);
     sourceDuration = sourceSamples.length / SAMPLE_RATE;
     if (sourceDuration < 8) throw new Error('Enregistrement trop court.');
-    transforms = buildTransforms(sourceSamples);
-    ui.recordState.textContent = 'Audio de référence prêt';
-    ui.timer.textContent = time(sourceDuration);
-    ui.audioMeta.textContent = `${sourceDuration.toFixed(2)} s · VAD conserve ${(transforms.vad.meta.vadStats.keptRatio*100).toFixed(1)} % · variantes WSOLA prêtes`;
-    refreshCount();
+    useSource(sourceSamples, FIXTURES.shortClean.referenceText, {
+      mode: 'micro',
+      capturedAt: new Date().toISOString()
+    });
   } catch(e) {
     sourceSamples = null; transforms = null; error(ui.audioError,`Préparation impossible : ${e.message || e}`);
   }
@@ -240,7 +308,8 @@ async function runMatrix() {
   latestReport = {
     schema:'offline-interview.stt-deep-benchmark.v1',build:BUILD_ID,generatedAt:new Date().toISOString(),pack:pack(),
     privacy:'No audio included. Reference text and transcripts are included.',
-    environment:{userAgent:navigator.userAgent,platform:navigator.userAgentData?.platform || navigator.platform,mobile:navigator.userAgentData?.mobile ?? null,hardwareConcurrency:navigator.hardwareConcurrency ?? null,deviceMemoryGB:navigator.deviceMemory ?? null,online:navigator.onLine,crossOriginIsolated:window.crossOriginIsolated,transformersVersion:TRANSFORMERS_VERSION,webgpu:webgpuInfo},
+    environment:{deviceClass:detectPlatformClass(),userAgent:navigator.userAgent,platform:navigator.userAgentData?.platform || navigator.platform,mobile:navigator.userAgentData?.mobile ?? null,hardwareConcurrency:navigator.hardwareConcurrency ?? null,deviceMemoryGB:navigator.deviceMemory ?? null,online:navigator.onLine,crossOriginIsolated:window.crossOriginIsolated,transformersVersion:TRANSFORMERS_VERSION,webgpu:webgpuInfo},
+    source:sourceMeta,
     audio:{sourceDurationSeconds:sourceDuration,sampleRate:SAMPLE_RATE,vad:transforms.vad.meta.vadStats,variants:Object.fromEntries(Object.entries(transforms).map(([k,v])=>[k,{label:v.label,durationSeconds:v.samples.length/SAMPLE_RATE,meta:v.meta}]))},
     referenceText:ui.referenceText.textContent.trim(),results,pareto:pf.map(r=>r.id),finalStorage:await storage()
   };
@@ -260,19 +329,24 @@ async function copyReport() {
 
 async function registerSw() {
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=7',{scope:'./'}); try { await reg.update(); } catch {}
-    await navigator.serviceWorker.ready; ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=7') ? 'actif · v7' : 'actif';
+    const reg = await navigator.serviceWorker.register('./sw.js?v=8',{scope:'./'}); try { await reg.update(); } catch {}
+    await navigator.serviceWorker.ready; ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=8') ? 'actif · v8' : 'actif';
   } catch(e) { ui.swInfo.textContent = `erreur · ${e.message || e}`; }
 }
 
 async function tech() {
   ui.buildInfo.textContent = BUILD_ID;
+  ui.platformInfo.textContent = detectPlatformClass();
+  ui.sourceInfo.textContent = sourceMeta.mode === 'none' ? 'aucune' : sourceMeta.mode;
   ui.browserInfo.textContent = navigator.userAgentData?.brands?.map(x=>`${x.brand} ${x.version}`).join(' · ') || navigator.userAgent;
   ui.memoryInfo.textContent = `${navigator.deviceMemory || '?'} Go · ${navigator.hardwareConcurrency || '?'} threads`;
   ui.networkInfo.textContent = navigator.onLine ? 'en ligne' : 'hors connexion';
   const s = await storage(); ui.storageInfo.textContent = s.usage == null ? 'indisponible' : `${bytes(s.usage)} / ${bytes(s.quota)}`;
 }
 
+ui.fixtureShortBtn.addEventListener('click',()=>prepareFixture('shortClean'));
+ui.fixtureLongBtn.addEventListener('click',()=>prepareFixture('longSilence'));
+ui.fixtureNoiseBtn.addEventListener('click',()=>prepareFixture('shortNoisy'));
 ui.recordBtn.addEventListener('click',startRecording);
 ui.stopBtn.addEventListener('click',stopRecording);
 ui.runBtn.addEventListener('click',runMatrix);
