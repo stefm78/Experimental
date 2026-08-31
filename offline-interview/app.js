@@ -84,6 +84,200 @@ function updateNetwork() {
   ui.diagNetwork.textContent = offline ? 'hors connexion' : 'en ligne';
 }
 
+async function modelRangeProbe(filename) {
+  if (!navigator.onLine) {
+    diagEvent(`range-probe:${filename}`, 'SKIP', 'offline');
+    return { filename, skipped: 'offline' };
+  }
+  const url = `https://huggingface.co/${MODEL_ID}/resolve/main/${filename}`;
+  const started = performance.now();
+  try {
+    const response = await fetch(url, {
+      headers: { Range: 'bytes=0-0' },
+      cache: 'no-store'
+    });
+    const result = {
+      filename,
+      status: response.status,
+      ok: response.ok,
+      contentRange: response.headers.get('content-range'),
+      contentLength: response.headers.get('content-length'),
+      type: response.type,
+      elapsedMs: Math.round(performance.now() - started)
+    };
+    try { await response.body?.cancel(); } catch {}
+    diagEvent(`range-probe:${filename}`, response.ok ? 'PASS' : 'FAIL', JSON.stringify(result));
+    return result;
+  } catch (error) {
+    diagError(`range-probe:${filename}`, error);
+    return { filename, error: String(error?.message || error) };
+  }
+}
+
+async function cacheDiagnostics() {
+  if (!('caches' in window)) return { supported: false };
+  try {
+    const names = await caches.keys();
+    const entries = [];
+    for (const name of names) {
+      const cache = await caches.open(name);
+      const requests = await cache.keys();
+      entries.push({
+        name,
+        count: requests.length,
+        sample: requests.slice(0, 20).map(request => {
+          try {
+            const u = new URL(request.url);
+            return `${u.hostname}${u.pathname}`;
+          } catch {
+            return request.url;
+          }
+        })
+      });
+    }
+    return { supported: true, entries };
+  } catch (error) {
+    return { supported: true, error: String(error?.message || error) };
+  }
+}
+
+async function serviceWorkerDiagnostics() {
+  if (!('serviceWorker' in navigator)) return { supported: false };
+  try {
+    const reg = await navigator.serviceWorker.getRegistration('./');
+    return {
+      supported: true,
+      controller: navigator.serviceWorker.controller ? {
+        scriptURL: navigator.serviceWorker.controller.scriptURL,
+        state: navigator.serviceWorker.controller.state
+      } : null,
+      registration: reg ? {
+        scope: reg.scope,
+        active: reg.active ? { scriptURL: reg.active.scriptURL, state: reg.active.state } : null,
+        waiting: reg.waiting ? { scriptURL: reg.waiting.scriptURL, state: reg.waiting.state } : null,
+        installing: reg.installing ? { scriptURL: reg.installing.scriptURL, state: reg.installing.state } : null
+      } : null
+    };
+  } catch (error) {
+    return { supported: true, error: String(error?.message || error) };
+  }
+}
+
+async function collectDiagnosticReport() {
+  let storage = {};
+  try {
+    storage.persisted = navigator.storage?.persisted ? await navigator.storage.persisted() : null;
+    storage.estimate = navigator.storage?.estimate ? await navigator.storage.estimate() : null;
+  } catch (error) {
+    storage.error = String(error?.message || error);
+  }
+
+  let microphonePermission = 'unknown';
+  try {
+    if (navigator.permissions?.query) {
+      microphonePermission = (await navigator.permissions.query({ name: 'microphone' })).state;
+    }
+  } catch {}
+
+  const uaData = navigator.userAgentData ? {
+    mobile: navigator.userAgentData.mobile,
+    platform: navigator.userAgentData.platform,
+    brands: navigator.userAgentData.brands
+  } : null;
+
+  return {
+    schema: DIAGNOSTIC_SCHEMA,
+    generatedAt: new Date().toISOString(),
+    privacy: 'No audio and no interview answer text included.',
+    app: {
+      build: BUILD_ID,
+      url: location.origin + location.pathname,
+      secureContext: window.isSecureContext,
+      crossOriginIsolated: window.crossOriginIsolated
+    },
+    runtime: {
+      transformersVersion: TRANSFORMERS_VERSION,
+      transformersUrl: TRANSFORMERS_URL,
+      modelId: MODEL_ID,
+      modelDtype: 'q4',
+      requestedDevice: 'wasm',
+      currentStage: currentDiagStage
+    },
+    browser: {
+      userAgent: navigator.userAgent,
+      userAgentData: uaData,
+      language: navigator.language,
+      languages: navigator.languages,
+      platform: navigator.platform,
+      hardwareConcurrency: navigator.hardwareConcurrency ?? null,
+      deviceMemoryGB: navigator.deviceMemory ?? null,
+      online: navigator.onLine,
+      visibilityState: document.visibilityState
+    },
+    capabilities: {
+      WebAssembly: typeof WebAssembly !== 'undefined',
+      SharedArrayBuffer: typeof SharedArrayBuffer !== 'undefined',
+      AudioContext: Boolean(window.AudioContext || window.webkitAudioContext),
+      OfflineAudioContext: typeof OfflineAudioContext !== 'undefined',
+      MediaRecorder: typeof MediaRecorder !== 'undefined',
+      mediaDevices: Boolean(navigator.mediaDevices),
+      getUserMedia: Boolean(navigator.mediaDevices?.getUserMedia),
+      indexedDB: typeof indexedDB !== 'undefined',
+      CacheStorage: 'caches' in window,
+      serviceWorker: 'serviceWorker' in navigator,
+      microphonePermission,
+      mediaRecorderTypes: typeof MediaRecorder !== 'undefined' ? {
+        webmOpus: MediaRecorder.isTypeSupported?.('audio/webm;codecs=opus') ?? null,
+        webm: MediaRecorder.isTypeSupported?.('audio/webm') ?? null,
+        mp4: MediaRecorder.isTypeSupported?.('audio/mp4') ?? null
+      } : null
+    },
+    storage,
+    serviceWorker: await serviceWorkerDiagnostics(),
+    caches: await cacheDiagnostics(),
+    ui: {
+      swStatus: ui.swStatus?.textContent || null,
+      storageStatus: ui.storageStatus?.textContent || null,
+      modelStatus: ui.modelStatus?.textContent || null,
+      modelProgress: ui.modelProgress?.value ?? null,
+      setupError: ui.setupError && !ui.setupError.classList.contains('hidden') ? ui.setupError.textContent : null,
+      interviewError: ui.interviewError && !ui.interviewError.classList.contains('hidden') ? ui.interviewError.textContent : null
+    },
+    lastError: lastDiagnosticError,
+    events: diagnosticEvents.slice(-100)
+  };
+}
+
+async function copyDiagnosticReport() {
+  ui.copyDiagBtn.disabled = true;
+  ui.copyDiagStatus.textContent = 'Génération du rapport…';
+  try {
+    const report = await collectDiagnosticReport();
+    const text = `OFFLINE_INTERVIEW_DIAGNOSTIC\n${JSON.stringify(report, null, 2)}`;
+    ui.diagnosticOutput.value = text;
+    show(ui.diagnosticOutput, true);
+
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(text);
+      copied = true;
+    } catch {
+      ui.diagnosticOutput.focus();
+      ui.diagnosticOutput.select();
+      copied = document.execCommand?.('copy') || false;
+      ui.diagnosticOutput.setSelectionRange(0, 0);
+    }
+    ui.copyDiagStatus.textContent = copied
+      ? 'Diagnostic copié. Collez-le tel quel dans ChatGPT.'
+      : 'Copie automatique refusée : sélectionnez le rapport ci-dessous et copiez-le.';
+  } catch (error) {
+    diagError('diagnostic.generate', error);
+    ui.copyDiagStatus.textContent = `Échec du diagnostic : ${error.message || error}`;
+  } finally {
+    ui.copyDiagBtn.disabled = false;
+  }
+}
+
 function openDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
