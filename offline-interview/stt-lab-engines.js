@@ -9,7 +9,15 @@ const MODELS = {
 };
 
 function engine(key, modelId, dtype, device, label, extra = {}) {
-  return { key, modelId, dtype, device, label, ...extra };
+  return {
+    key,
+    modelId,
+    dtype,
+    device,
+    label,
+    graphOptimizationLevel: 'basic',
+    ...extra
+  };
 }
 
 export const ENGINES = {
@@ -34,6 +42,42 @@ export const ENGINES = {
     { encoder_model: 'fp32', decoder_model_merged: 'fp32' },
     'wasm',
     'Base ONNX · fp32/fp32 · WASM'
+  ),
+  baseV4Int8Wasm: engine(
+    'baseV4Int8Wasm',
+    MODELS.baseV4,
+    { encoder_model: 'int8', decoder_model_merged: 'int8' },
+    'wasm',
+    'Base ONNX · int8/int8 · WASM'
+  ),
+  baseV4Uint8Wasm: engine(
+    'baseV4Uint8Wasm',
+    MODELS.baseV4,
+    { encoder_model: 'uint8', decoder_model_merged: 'uint8' },
+    'wasm',
+    'Base ONNX · uint8/uint8 · WASM'
+  ),
+  smallV4Int8Wasm: engine(
+    'smallV4Int8Wasm',
+    MODELS.smallV4,
+    { encoder_model: 'int8', decoder_model_merged: 'int8' },
+    'wasm',
+    'Small ONNX · int8/int8 · WASM'
+  ),
+  smallV4Uint8Wasm: engine(
+    'smallV4Uint8Wasm',
+    MODELS.smallV4,
+    { encoder_model: 'uint8', decoder_model_merged: 'uint8' },
+    'wasm',
+    'Small ONNX · uint8/uint8 · WASM'
+  ),
+  baseV4Q8WasmAggressive: engine(
+    'baseV4Q8WasmAggressive',
+    MODELS.baseV4,
+    { encoder_model: 'q8', decoder_model_merged: 'q8' },
+    'wasm',
+    'Base ONNX · q8/q8 · WASM · ORT all',
+    { graphOptimizationLevel: 'all', expectedControl: true }
   ),
 
   // Known practical WebGPU profile for Whisper: accurate encoder + compact decoder.
@@ -114,6 +158,8 @@ export const EXPERIMENTS = [
   e('base-v4-q8-wasm-raw', 'essential', 'baseV4Q8Wasm', 'raw', 'greedy', 'Base ONNX q8 WASM · brut'),
   e('small-v4-q8-wasm-raw', 'essential', 'smallV4Q8Wasm', 'raw', 'greedy', 'Small ONNX q8 WASM · brut'),
   e('base-v4-fp32-wasm-raw', 'essential', 'baseV4Fp32Wasm', 'raw', 'greedy', 'Base ONNX fp32 WASM · contrôle'),
+  e('base-v4-int8-wasm-raw', 'essential', 'baseV4Int8Wasm', 'raw', 'greedy', 'Base ONNX int8 WASM · brut'),
+  e('base-v4-uint8-wasm-raw', 'essential', 'baseV4Uint8Wasm', 'raw', 'greedy', 'Base ONNX uint8 WASM · brut'),
   e('base-v4-hybrid-gpu-raw', 'essential', 'baseV4HybridGpu', 'raw', 'greedy', 'Base ONNX fp32/q4 WebGPU · brut'),
   e('small-v4-hybrid-gpu-raw', 'essential', 'smallV4HybridGpu', 'raw', 'greedy', 'Small ONNX fp32/q4 WebGPU · brut'),
 
@@ -126,15 +172,18 @@ export const EXPERIMENTS = [
   e('small-v4-hybrid-gpu-vad', 'deep', 'smallV4HybridGpu', 'vad', 'greedy', 'Small ONNX fp32/q4 WebGPU · VAD'),
   e('small-v4-hybrid-gpu-speed115', 'deep', 'smallV4HybridGpu', 'speed115', 'greedy', 'Small ONNX fp32/q4 WebGPU · WSOLA 1,15×'),
   e('small-v4-hybrid-gpu-speed125', 'deep', 'smallV4HybridGpu', 'speed125', 'greedy', 'Small ONNX fp32/q4 WebGPU · WSOLA 1,25×'),
+  e('small-v4-int8-wasm-raw', 'deep', 'smallV4Int8Wasm', 'raw', 'greedy', 'Small ONNX int8 WASM · brut'),
+  e('small-v4-uint8-wasm-raw', 'deep', 'smallV4Uint8Wasm', 'raw', 'greedy', 'Small ONNX uint8 WASM · brut'),
 
-  // Exhaustive: compact fp16/q4f16, full fp16 and legacy controls.
+  // Exhaustive: compact fp16/q4f16, full fp16, legacy controls and one ORT aggressive control.
   e('base-v4-compact-gpu-raw', 'exhaustive', 'baseV4CompactGpu', 'raw', 'greedy', 'Base ONNX fp16/q4f16 WebGPU · brut'),
   e('small-v4-compact-gpu-raw', 'exhaustive', 'smallV4CompactGpu', 'raw', 'greedy', 'Small ONNX fp16/q4f16 WebGPU · brut'),
   e('base-v4-fp16-gpu-raw', 'exhaustive', 'baseV4Fp16Gpu', 'raw', 'greedy', 'Base ONNX fp16 WebGPU · brut'),
   e('small-v4-fp16-gpu-raw', 'exhaustive', 'smallV4Fp16Gpu', 'raw', 'greedy', 'Small ONNX fp16 WebGPU · brut'),
   e('small-v4-compact-gpu-vad-speed115', 'exhaustive', 'smallV4CompactGpu', 'vadSpeed115', 'greedy', 'Small ONNX fp16/q4f16 WebGPU · VAD + 1,15×'),
   e('base-legacy-hybrid-gpu-raw', 'exhaustive', 'baseLegacyHybridGpu', 'raw', 'greedy', 'Base legacy fp32/q4 WebGPU · contrôle'),
-  e('small-legacy-hybrid-gpu-raw', 'exhaustive', 'smallLegacyHybridGpu', 'raw', 'greedy', 'Small legacy fp32/q4 WebGPU · contrôle')
+  e('small-legacy-hybrid-gpu-raw', 'exhaustive', 'smallLegacyHybridGpu', 'raw', 'greedy', 'Small legacy fp32/q4 WebGPU · contrôle'),
+  e('base-v4-q8-wasm-ort-all-control', 'exhaustive', 'baseV4Q8WasmAggressive', 'raw', 'greedy', 'Base ONNX q8 WASM · ORT all · contrôle')
 ];
 
 const PACK_ORDER = { essential: 0, deep: 1, exhaustive: 2 };
@@ -197,6 +246,9 @@ export async function loadEngine(spec, onProgress) {
   const model = await WhisperForConditionalGeneration.from_pretrained(spec.modelId, {
     device: spec.device,
     dtype: spec.dtype,
+    session_options: {
+      graphOptimizationLevel: spec.graphOptimizationLevel
+    },
     progress_callback: x => onProgress?.(x)
   });
 
