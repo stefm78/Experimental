@@ -528,10 +528,10 @@ async function registerServiceWorker() {
     return;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=12', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=13', { scope: './' });
     try { await reg.update(); } catch {}
     await navigator.serviceWorker.ready;
-    ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=12') ? 'actif · v12' : 'actif';
+    ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=12') ? 'actif · v13' : 'actif';
   } catch (error) {
     ui.swInfo.textContent = `erreur · ${error.message || error}`;
   }

@@ -66,13 +66,16 @@
         <input id="parallelCaptureToggle" type="checkbox">
         <span><strong>Capture parallèle expérimentale</strong><small>À activer seulement pour comparer Whisper sur exactement la même prise. Le benchmark navigateur de référence doit rester décoché.</small></span>
       </label>
-      <p class="hint">Le test s'arrête automatiquement après 75 s pour éviter qu'un moteur silencieux ne fausse la durée.</p>
+      <p class="hint">Le lab ouvre un seul micro via getUserMedia et passe explicitement son MediaStreamTrack à SpeechRecognition.start(track) quand le navigateur l'accepte. Le niveau RMS/peak et les événements audio/sound/speech permettent de localiser précisément un éventuel no-speech. Arrêt automatique après 75 s.</p>
 
       <div class="status-grid">
         <div><span>Mode en cours</span><strong id="activeMode">—</strong></div>
         <div><span>Durée</span><strong id="speechTimer">00:00</strong></div>
         <div><span>Résultats interim</span><strong id="interimSupport">—</strong></div>
         <div><span>Capture parallèle</span><strong id="captureStatus">—</strong></div>
+        <div><span>Entrée Speech</span><strong id="speechInputStatus">—</strong></div>
+        <div><span>Niveau micro</span><strong id="micLevelStatus">—</strong></div>
+        <div><span>Événements audio</span><strong id="speechEventsStatus">—</strong></div>
       </div>
 
       <label for="liveTranscript">Transcription navigateur</label>
@@ -153,6 +156,6 @@
     </section>
   </main>
 
-  <script type="module" src="./device-stt-capability.js?v=2"></script>
+  <script type="module" src="./device-stt-capability.js?v=3"></script>
 </body>
 </html>
