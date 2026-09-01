@@ -329,8 +329,8 @@ async function copyReport() {
 
 async function registerSw() {
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=11',{scope:'./'}); try { await reg.update(); } catch {}
-    await navigator.serviceWorker.ready; ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=11') ? 'actif · v11' : 'actif';
+    const reg = await navigator.serviceWorker.register('./sw.js?v=12',{scope:'./'}); try { await reg.update(); } catch {}
+    await navigator.serviceWorker.ready; ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=12') ? 'actif · v12' : 'actif';
   } catch(e) { ui.swInfo.textContent = `erreur · ${e.message || e}`; }
 }
 
