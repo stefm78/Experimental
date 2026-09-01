@@ -1,10 +1,11 @@
 import { SAMPLE_RATE, blobTo16kMono, scoreTranscript } from './stt-lab-audio.js?v=4';
 
-const BUILD_ID = '2026-09-01.device-stt-capability-v1';
+const BUILD_ID = '2026-09-01.device-stt-capability-v2';
 const LANG = 'fr-FR';
 const TRANSFORMERS_VERSION = '4.2.0';
 const TRANSFORMERS_URL = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_VERSION}`;
 const WHISPER_MODEL_ID = 'onnx-community/whisper-base-ONNX';
+const MAX_SPEECH_SECONDS = 75;
 
 const $ = id => document.getElementById(id);
 const ui = {
@@ -38,6 +39,7 @@ const ui = {
   browserLatency: $('browserLatency'),
   browserWords: $('browserWords'),
   runWhisperSameAudioBtn: $('runWhisperSameAudioBtn'),
+  parallelCaptureToggle: $('parallelCaptureToggle'),
 
   whisperComparison: $('whisperComparison'),
   whisperWer: $('whisperWer'),
@@ -74,6 +76,7 @@ let capabilities = null;
 let activeRecognition = null;
 let activeCapture = null;
 let speechTimerHandle = null;
+let speechTimeoutHandle = null;
 let speechStartedAt = 0;
 let finalizedForActiveRun = false;
 let currentRun = null;
@@ -215,7 +218,10 @@ async function probeCapabilities() {
   ui.interimSupport.textContent = interimResults ? 'oui' : 'non';
 
   const installable = Boolean(SpeechCtor?.install) &&
-    ['downloadable', 'downloading'].includes(dictation.value || local.value);
+    (
+      ['downloadable', 'downloading'].includes(dictation.value) ||
+      ['downloadable', 'downloading'].includes(local.value)
+    );
   show(ui.installFrenchBtn, installable);
 
   if (!hasApi) {
@@ -230,9 +236,10 @@ async function probeCapabilities() {
     ui.capabilityMessage.textContent = 'Web Speech est présent, mais le traitement local français n’est pas confirmé sur ce navigateur.';
   }
 
+  const localReady = localProperty && local.value === 'available';
   ui.runNormalBtn.disabled = !hasApi;
-  ui.runLocalBtn.disabled = !hasApi || !localProperty;
-  ui.runOfflineLocalBtn.disabled = !hasApi || !localProperty;
+  ui.runLocalBtn.disabled = !hasApi || !localReady;
+  ui.runOfflineLocalBtn.disabled = !hasApi || !localReady;
 
   return capabilities;
 }
@@ -247,22 +254,29 @@ async function installFrenchPack() {
   let installed = false;
   let detail = null;
   try {
-    try {
-      installed = await SpeechCtor.install({
-        langs: [LANG],
-        processLocally: true,
-        quality: 'dictation'
-      });
-      detail = 'dictation';
-    } catch {
+    const dictationState = capabilities?.localDictationAvailability?.value;
+    const standardState = capabilities?.localAvailability?.value;
+
+    if (['downloadable', 'downloading', 'available'].includes(dictationState)) {
+      try {
+        installed = await SpeechCtor.install({
+          langs: [LANG],
+          processLocally: true,
+          quality: 'dictation'
+        });
+        if (installed) detail = 'dictation';
+      } catch {}
+    }
+
+    if (!installed && ['downloadable', 'downloading', 'available'].includes(standardState)) {
       installed = await SpeechCtor.install({
         langs: [LANG],
         processLocally: true
       });
-      detail = 'standard';
+      if (installed) detail = 'standard';
     }
 
-    if (!installed) throw new Error('Le navigateur a refusé ou échoué à installer le pack.');
+    if (!installed) throw new Error('Le navigateur a refusé ou échoué à installer le pack FR local.');
     ui.capabilityMessage.textContent = `Pack FR installé (${detail}). Nouveau diagnostic en cours…`;
     await probeCapabilities();
   } catch (error) {
@@ -324,10 +338,16 @@ async function startParallelCapture() {
 
 function stopTimer() {
   clearInterval(speechTimerHandle);
+  clearTimeout(speechTimeoutHandle);
   speechTimerHandle = null;
+  speechTimeoutHandle = null;
 }
 
-function stopActiveSpeech() {
+function stopActiveSpeech(reason = 'manual-stop') {
+  if (currentRun && !currentRun.stopRequestedAt) {
+    currentRun.stopRequestedAt = performance.now();
+    currentRun.stopReason = reason;
+  }
   if (activeRecognition) {
     try { activeRecognition.stop(); } catch {}
   }
@@ -341,9 +361,15 @@ async function finalizeSpeechRun(reason = 'end') {
   stopTimer();
 
   activeCapture?.stop?.();
-  const captureResult = activeCapture ? await activeCapture.promise : { samples: null, durationSeconds: null, error: 'capture absent' };
+  const captureResult = activeCapture
+    ? await activeCapture.promise
+    : { samples: null, durationSeconds: null, error: null };
 
-  const latencyMs = performance.now() - speechStartedAt;
+  const finishedPerf = performance.now();
+  const runDurationMs = finishedPerf - speechStartedAt;
+  const firstResultMs = currentRun.firstResultAt == null ? null : currentRun.firstResultAt - speechStartedAt;
+  const lastResultMs = currentRun.lastResultAt == null ? null : currentRun.lastResultAt - speechStartedAt;
+  const finalizationAfterStopMs = currentRun.stopRequestedAt == null ? null : finishedPerf - currentRun.stopRequestedAt;
   const transcript = ui.liveTranscript.value.trim();
   const score = scoreTranscript(ui.referenceText.textContent, transcript);
 
@@ -359,7 +385,13 @@ async function finalizeSpeechRun(reason = 'end') {
     endedBy: reason,
     startedAt: currentRun.startedAt,
     finishedAt: new Date().toISOString(),
-    latencyMs,
+    runDurationMs,
+    firstResultMs,
+    lastResultMs,
+    finalizationAfterStopMs,
+    resultEvents: currentRun.resultEvents,
+    stopReason: currentRun.stopReason || null,
+    parallelCaptureEnabled: currentRun.parallelCaptureEnabled,
     transcript,
     wer: score.wer,
     cer: score.cer,
@@ -381,13 +413,17 @@ async function finalizeSpeechRun(reason = 'end') {
 
   ui.browserWer.textContent = formatPct(score.wer);
   ui.browserCer.textContent = formatPct(score.cer);
-  ui.browserLatency.textContent = `${(latencyMs / 1000).toFixed(2)} s`;
+  ui.browserLatency.textContent = firstResultMs == null
+    ? 'aucun résultat'
+    : `1er ${(firstResultMs / 1000).toFixed(2)} s · dernier ${(lastResultMs / 1000).toFixed(2)} s${finalizationAfterStopMs == null ? '' : ` · fin +${(finalizationAfterStopMs / 1000).toFixed(2)} s`}`;
   ui.browserWords.textContent = `${score.hypothesisWords} / ${score.referenceWords}`;
   show(ui.browserMetrics, true);
   show(ui.runWhisperSameAudioBtn, Boolean(lastCaptureSamples));
-  ui.captureStatus.textContent = captureResult.samples
-    ? `${captureResult.durationSeconds.toFixed(2)} s en RAM`
-    : `échec : ${captureResult.error || 'inconnu'}`;
+  ui.captureStatus.textContent = currentRun.parallelCaptureEnabled
+    ? (captureResult.samples
+      ? `${captureResult.durationSeconds.toFixed(2)} s en RAM · expérimental`
+      : `échec : ${captureResult.error || 'inconnu'}`)
+    : 'désactivée · benchmark propre';
 
   if (currentRun.mode === 'local-offline') {
     offlineProof = {
@@ -407,9 +443,10 @@ async function finalizeSpeechRun(reason = 'end') {
   currentRun = null;
   show(ui.stopSpeechBtn, false);
   ui.stopSpeechBtn.disabled = false;
+  const localReady = capabilities?.localAvailability?.value === 'available';
   ui.runNormalBtn.disabled = !SpeechCtor;
-  ui.runLocalBtn.disabled = !SpeechCtor || !capabilities?.processLocallyProperty;
-  ui.runOfflineLocalBtn.disabled = !SpeechCtor || !capabilities?.processLocallyProperty;
+  ui.runLocalBtn.disabled = !SpeechCtor || !localReady;
+  ui.runOfflineLocalBtn.disabled = !SpeechCtor || !localReady;
   ui.activeMode.textContent = '—';
 }
 
@@ -443,11 +480,15 @@ async function runSpeech(mode) {
   ui.runLocalBtn.disabled = true;
   ui.runOfflineLocalBtn.disabled = true;
   show(ui.stopSpeechBtn, true);
-  ui.captureStatus.textContent = 'démarrage…';
+
+  const parallelCaptureEnabled = Boolean(ui.parallelCaptureToggle?.checked);
+  ui.captureStatus.textContent = parallelCaptureEnabled ? 'démarrage expérimental…' : 'désactivée · benchmark propre';
 
   try {
-    activeCapture = await startParallelCapture();
-    ui.captureStatus.textContent = activeCapture.available ? 'active' : 'indisponible';
+    activeCapture = parallelCaptureEnabled ? await startParallelCapture() : null;
+    if (parallelCaptureEnabled) {
+      ui.captureStatus.textContent = activeCapture?.available ? 'active · expérimental' : 'indisponible';
+    }
 
     const recognition = new SpeechCtor();
     recognition.lang = LANG;
@@ -463,8 +504,14 @@ async function runSpeech(mode) {
     currentRun = {
       mode,
       processLocally,
+      parallelCaptureEnabled,
       startedOnline: navigator.onLine,
       startedAt: new Date().toISOString(),
+      firstResultAt: null,
+      lastResultAt: null,
+      resultEvents: 0,
+      stopRequestedAt: null,
+      stopReason: null,
       error: null
     };
     activeRecognition = recognition;
@@ -479,9 +526,18 @@ async function runSpeech(mode) {
       speechTimerHandle = setInterval(() => {
         ui.speechTimer.textContent = formatTime((performance.now() - speechStartedAt) / 1000);
       }, 250);
+      speechTimeoutHandle = setTimeout(() => {
+        if (activeRecognition) stopActiveSpeech('max-duration');
+      }, MAX_SPEECH_SECONDS * 1000);
     };
 
     recognition.onresult = event => {
+      if (currentRun) {
+        const now = performance.now();
+        if (currentRun.firstResultAt == null) currentRun.firstResultAt = now;
+        currentRun.lastResultAt = now;
+        currentRun.resultEvents += 1;
+      }
       interimText = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const text = event.results[i][0]?.transcript || '';
@@ -512,8 +568,9 @@ async function runSpeech(mode) {
     currentRun = null;
     show(ui.stopSpeechBtn, false);
     ui.runNormalBtn.disabled = false;
-    ui.runLocalBtn.disabled = !capabilities?.processLocallyProperty;
-    ui.runOfflineLocalBtn.disabled = !capabilities?.processLocallyProperty;
+    const localReady = capabilities?.localAvailability?.value === 'available';
+    ui.runLocalBtn.disabled = !localReady;
+    ui.runOfflineLocalBtn.disabled = !localReady;
     showError(ui.speechError, `Impossible de démarrer le test : ${error.name || 'Error'}: ${error.message || error}`);
   }
 }
@@ -632,7 +689,7 @@ function scoreOsDictation() {
 
 async function buildReport() {
   return {
-    schema: 'offline-interview.device-stt-capability.v1',
+    schema: 'offline-interview.device-stt-capability.v2',
     build: BUILD_ID,
     generatedAt: new Date().toISOString(),
     privacy: 'No audio included or persisted. Transcripts and capability metadata are included.',
@@ -678,10 +735,10 @@ async function registerServiceWorker() {
     return;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=11', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=12', { scope: './' });
     try { await reg.update(); } catch {}
     await navigator.serviceWorker.ready;
-    ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=11') ? 'actif · v11' : 'actif';
+    ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=12') ? 'actif · v12' : 'actif';
   } catch (error) {
     ui.swInfo.textContent = `erreur · ${error.message || error}`;
   }
@@ -702,7 +759,7 @@ ui.installFrenchBtn.addEventListener('click', installFrenchPack);
 ui.runNormalBtn.addEventListener('click', () => runSpeech('normal'));
 ui.runLocalBtn.addEventListener('click', () => runSpeech('local'));
 ui.runOfflineLocalBtn.addEventListener('click', () => runSpeech('local-offline'));
-ui.stopSpeechBtn.addEventListener('click', stopActiveSpeech);
+ui.stopSpeechBtn.addEventListener('click', () => stopActiveSpeech('manual-stop'));
 ui.runWhisperSameAudioBtn.addEventListener('click', compareWhisperSameAudio);
 ui.scoreOsDictationBtn.addEventListener('click', scoreOsDictation);
 ui.copyReportBtn.addEventListener('click', copyReport);
