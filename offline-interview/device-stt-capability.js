@@ -1,6 +1,6 @@
 import { SAMPLE_RATE, blobTo16kMono, scoreTranscript } from './stt-lab-audio.js?v=4';
 
-const BUILD_ID = '2026-09-01.device-stt-capability-v2';
+const BUILD_ID = '2026-09-01.device-stt-capability-v3';
 const LANG = 'fr-FR';
 const TRANSFORMERS_VERSION = '4.2.0';
 const TRANSFORMERS_URL = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_VERSION}`;
@@ -30,6 +30,9 @@ const ui = {
   speechTimer: $('speechTimer'),
   interimSupport: $('interimSupport'),
   captureStatus: $('captureStatus'),
+  speechInputStatus: $('speechInputStatus'),
+  micLevelStatus: $('micLevelStatus'),
+  speechEventsStatus: $('speechEventsStatus'),
   liveTranscript: $('liveTranscript'),
   speechError: $('speechError'),
 
@@ -75,6 +78,7 @@ const speechCtorName = window.SpeechRecognition ? 'SpeechRecognition' : window.w
 let capabilities = null;
 let activeRecognition = null;
 let activeCapture = null;
+let activeInput = null;
 let speechTimerHandle = null;
 let speechTimeoutHandle = null;
 let speechStartedAt = 0;
@@ -286,54 +290,114 @@ async function installFrenchPack() {
   }
 }
 
-async function startParallelCapture() {
-  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-    return {
-      available: false,
-      stop: () => {},
-      promise: Promise.resolve({ samples: null, durationSeconds: null, error: 'MediaRecorder/getUserMedia absent' })
-    };
+async function openSpeechInput(parallelCaptureEnabled) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error('getUserMedia absent');
   }
 
   const stream = await navigator.mediaDevices.getUserMedia({
-    audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 }
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+      channelCount: 1
+    }
   });
+  const track = stream.getAudioTracks()[0];
+  if (!track) {
+    stream.getTracks().forEach(t => t.stop());
+    throw new Error('Aucune piste audio micro');
+  }
 
-  const mimeType = preferredMimeType();
-  const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-  const chunks = [];
+  try { track.contentHint = 'speech-recognition'; } catch {}
+  const settings = track.getSettings?.() || {};
+  const constraints = track.getConstraints?.() || {};
+  const label = track.label || 'micro sans label';
 
-  const promise = new Promise(resolve => {
-    recorder.ondataavailable = e => {
-      if (e.data?.size) chunks.push(e.data);
-    };
-    recorder.onerror = e => {
-      resolve({ samples: null, durationSeconds: null, error: e.error?.message || 'MediaRecorder error' });
-    };
-    recorder.onstop = async () => {
-      stream.getTracks().forEach(track => track.stop());
-      try {
-        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-        const samples = await blobTo16kMono(blob);
-        resolve({
-          samples,
-          durationSeconds: samples.length / SAMPLE_RATE,
-          error: null
-        });
-      } catch (error) {
-        resolve({ samples: null, durationSeconds: null, error: error.message || String(error) });
+  let audioContext = null;
+  let analyser = null;
+  let meterTimer = null;
+  let meterBuffer = null;
+
+  try {
+    audioContext = new AudioContext();
+    const source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+    meterBuffer = new Float32Array(analyser.fftSize);
+    meterTimer = setInterval(() => {
+      if (!currentRun || !analyser) return;
+      analyser.getFloatTimeDomainData(meterBuffer);
+      let sum = 0;
+      let peak = 0;
+      for (const sample of meterBuffer) {
+        sum += sample * sample;
+        const abs = Math.abs(sample);
+        if (abs > peak) peak = abs;
       }
-    };
-  });
+      const rms = Math.sqrt(sum / meterBuffer.length);
+      currentRun.audioLevel.samples += 1;
+      currentRun.audioLevel.maxRms = Math.max(currentRun.audioLevel.maxRms, rms);
+      currentRun.audioLevel.maxPeak = Math.max(currentRun.audioLevel.maxPeak, peak);
+      currentRun.audioLevel.lastRms = rms;
+      currentRun.audioLevel.lastPeak = peak;
+      ui.micLevelStatus.textContent = `RMS ${rms.toFixed(4)} · peak ${peak.toFixed(3)}`;
+    }, 120);
+  } catch (error) {
+    ui.micLevelStatus.textContent = `mètre indisponible · ${error.message || error}`;
+  }
 
-  recorder.start(500);
+  let capture = null;
+  if (parallelCaptureEnabled && window.MediaRecorder) {
+    const clone = track.clone();
+    const captureStream = new MediaStream([clone]);
+    const mimeType = preferredMimeType();
+    const recorder = mimeType ? new MediaRecorder(captureStream, { mimeType }) : new MediaRecorder(captureStream);
+    const chunks = [];
+    const promise = new Promise(resolve => {
+      recorder.ondataavailable = e => { if (e.data?.size) chunks.push(e.data); };
+      recorder.onerror = e => resolve({ samples: null, durationSeconds: null, error: e.error?.message || 'MediaRecorder error' });
+      recorder.onstop = async () => {
+        captureStream.getTracks().forEach(t => t.stop());
+        try {
+          const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+          const samples = await blobTo16kMono(blob);
+          resolve({ samples, durationSeconds: samples.length / SAMPLE_RATE, error: null });
+        } catch (error) {
+          resolve({ samples: null, durationSeconds: null, error: error.message || String(error) });
+        }
+      };
+    });
+    recorder.start(500);
+    capture = {
+      available: true,
+      stop: () => { if (recorder.state !== 'inactive') recorder.stop(); },
+      promise
+    };
+  }
+
   return {
-    available: true,
-    stop: () => {
-      if (recorder.state !== 'inactive') recorder.stop();
-    },
-    promise
+    stream,
+    track,
+    label,
+    settings,
+    constraints,
+    capture,
+    stop: async () => {
+      clearInterval(meterTimer);
+      meterTimer = null;
+      stream.getTracks().forEach(t => t.stop());
+      try { await audioContext?.close?.(); } catch {}
+    }
   };
+}
+
+function speechEvent(name) {
+  if (!currentRun) return;
+  const ms = performance.now() - speechStartedAt;
+  currentRun.speechEvents.push({ name, ms });
+  ui.speechEventsStatus.textContent = currentRun.speechEvents.map(x => x.name).join(' → ');
 }
 
 function stopTimer() {
@@ -364,6 +428,15 @@ async function finalizeSpeechRun(reason = 'end') {
   const captureResult = activeCapture
     ? await activeCapture.promise
     : { samples: null, durationSeconds: null, error: null };
+  const inputSnapshot = currentRun.input
+    ? {
+        label: currentRun.input.label,
+        settings: currentRun.input.settings,
+        constraints: currentRun.input.constraints,
+        startMode: currentRun.input.startMode
+      }
+    : null;
+  await activeInput?.stop?.();
 
   const finishedPerf = performance.now();
   const runDurationMs = finishedPerf - speechStartedAt;
@@ -392,6 +465,9 @@ async function finalizeSpeechRun(reason = 'end') {
     resultEvents: currentRun.resultEvents,
     stopReason: currentRun.stopReason || null,
     parallelCaptureEnabled: currentRun.parallelCaptureEnabled,
+    input: inputSnapshot,
+    audioLevel: currentRun.audioLevel,
+    speechEvents: currentRun.speechEvents,
     transcript,
     wer: score.wer,
     cer: score.cer,
@@ -440,6 +516,7 @@ async function finalizeSpeechRun(reason = 'end') {
 
   activeRecognition = null;
   activeCapture = null;
+  activeInput = null;
   currentRun = null;
   show(ui.stopSpeechBtn, false);
   ui.stopSpeechBtn.disabled = false;
@@ -456,6 +533,9 @@ async function runSpeech(mode) {
   show(ui.whisperComparison, false);
   show(ui.runWhisperSameAudioBtn, false);
   ui.liveTranscript.value = '';
+  ui.speechInputStatus.textContent = 'ouverture…';
+  ui.micLevelStatus.textContent = 'mesure…';
+  ui.speechEventsStatus.textContent = '—';
   lastCaptureSamples = null;
   lastCaptureDuration = 0;
   lastBrowserResult = null;
@@ -482,13 +562,11 @@ async function runSpeech(mode) {
   show(ui.stopSpeechBtn, true);
 
   const parallelCaptureEnabled = Boolean(ui.parallelCaptureToggle?.checked);
-  ui.captureStatus.textContent = parallelCaptureEnabled ? 'démarrage expérimental…' : 'désactivée · benchmark propre';
+  ui.captureStatus.textContent = parallelCaptureEnabled ? 'même track · capture activée' : 'désactivée';
 
   try {
-    activeCapture = parallelCaptureEnabled ? await startParallelCapture() : null;
-    if (parallelCaptureEnabled) {
-      ui.captureStatus.textContent = activeCapture?.available ? 'active · expérimental' : 'indisponible';
-    }
+    activeInput = await openSpeechInput(parallelCaptureEnabled);
+    activeCapture = activeInput.capture;
 
     const recognition = new SpeechCtor();
     recognition.lang = LANG;
@@ -512,11 +590,22 @@ async function runSpeech(mode) {
       resultEvents: 0,
       stopRequestedAt: null,
       stopReason: null,
-      error: null
+      error: null,
+      speechEvents: [],
+      audioLevel: { samples: 0, maxRms: 0, maxPeak: 0, lastRms: 0, lastPeak: 0 },
+      input: {
+        label: activeInput.label,
+        settings: activeInput.settings,
+        constraints: activeInput.constraints,
+        startMode: null
+      }
     };
     activeRecognition = recognition;
 
+    ui.speechInputStatus.textContent = `${activeInput.label} · ${activeInput.settings.sampleRate || '?'} Hz`;
+
     recognition.onstart = () => {
+      speechEvent('start');
       ui.activeMode.textContent = mode === 'normal'
         ? 'Web Speech normal'
         : mode === 'local-offline'
@@ -531,7 +620,15 @@ async function runSpeech(mode) {
       }, MAX_SPEECH_SECONDS * 1000);
     };
 
+    recognition.onaudiostart = () => speechEvent('audiostart');
+    recognition.onsoundstart = () => speechEvent('soundstart');
+    recognition.onspeechstart = () => speechEvent('speechstart');
+    recognition.onspeechend = () => speechEvent('speechend');
+    recognition.onsoundend = () => speechEvent('soundend');
+    recognition.onaudioend = () => speechEvent('audioend');
+
     recognition.onresult = event => {
+      speechEvent('result');
       if (currentRun) {
         const now = performance.now();
         if (currentRun.firstResultAt == null) currentRun.firstResultAt = now;
@@ -541,29 +638,38 @@ async function runSpeech(mode) {
       interimText = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const text = event.results[i][0]?.transcript || '';
-        if (event.results[i].isFinal) {
-          finalText += `${text} `;
-        } else {
-          interimText += text;
-        }
+        if (event.results[i].isFinal) finalText += `${text} `;
+        else interimText += text;
       }
       ui.liveTranscript.value = `${finalText}${interimText}`.trim();
     };
 
     recognition.onerror = event => {
+      speechEvent(`error:${event.error || 'unknown'}`);
       const detail = [event.error, event.message].filter(Boolean).join(' · ');
       if (currentRun) currentRun.error = detail || 'speech recognition error';
       showError(ui.speechError, `Web Speech : ${detail || 'erreur inconnue'}`);
     };
 
     recognition.onend = () => {
+      speechEvent('end');
       finalizeSpeechRun('recognition-end');
     };
 
-    recognition.start();
+    try {
+      recognition.start(activeInput.track);
+      currentRun.input.startMode = 'explicit-audio-track';
+      ui.speechInputStatus.textContent += ' · explicit track';
+    } catch (error) {
+      currentRun.input.startMode = `implicit-fallback:${error.name || 'Error'}`;
+      ui.speechInputStatus.textContent += ' · fallback micro implicite';
+      recognition.start();
+    }
   } catch (error) {
     activeCapture?.stop?.();
+    await activeInput?.stop?.();
     activeCapture = null;
+    activeInput = null;
     activeRecognition = null;
     currentRun = null;
     show(ui.stopSpeechBtn, false);
@@ -689,7 +795,7 @@ function scoreOsDictation() {
 
 async function buildReport() {
   return {
-    schema: 'offline-interview.device-stt-capability.v2',
+    schema: 'offline-interview.device-stt-capability.v3',
     build: BUILD_ID,
     generatedAt: new Date().toISOString(),
     privacy: 'No audio included or persisted. Transcripts and capability metadata are included.',
@@ -735,10 +841,10 @@ async function registerServiceWorker() {
     return;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=12', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=13', { scope: './' });
     try { await reg.update(); } catch {}
     await navigator.serviceWorker.ready;
-    ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=12') ? 'actif · v12' : 'actif';
+    ui.swInfo.textContent = navigator.serviceWorker.controller?.scriptURL?.includes('v=13') ? 'actif · v13' : 'actif';
   } catch (error) {
     ui.swInfo.textContent = `erreur · ${error.message || error}`;
   }
