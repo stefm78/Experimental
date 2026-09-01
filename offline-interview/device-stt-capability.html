@@ -46,7 +46,7 @@
 
     <section class="card">
       <h2>2. Texte de référence</h2>
-      <p class="hint">Pour comparer les moteurs, lisez exactement ce texte. Pendant un test Web Speech, le même signal micro est capturé en RAM pour permettre ensuite une comparaison Whisper sur la même prise.</p>
+      <p class="hint">Pour comparer les moteurs, lisez exactement ce texte. Le benchmark navigateur est propre par défaut : aucune seconde capture micro n'est ouverte en parallèle. La capture simultanée reste disponible comme option expérimentale pour comparer Whisper sur la même prise.</p>
       <div class="benchmark-reference">
         <p id="referenceText">Le mardi quatorze octobre, nous avons lancé un projet à Saint-Germain-en-Laye avec quinze personnes. L'objectif était de préparer trois démonstrations pour une équipe technique et commerciale. J'ai rencontré deux difficultés principales : le bruit dans la salle et les changements de dernière minute. Malgré cela, la réunion s'est terminée à dix-sept heures trente, et nous avons décidé de poursuivre le projet la semaine suivante.</p>
       </div>
@@ -62,6 +62,12 @@
         <button id="stopSpeechBtn" class="danger hidden">■ Terminer la lecture</button>
       </div>
 
+      <label class="model-choice">
+        <input id="parallelCaptureToggle" type="checkbox">
+        <span><strong>Capture parallèle expérimentale</strong><small>À activer seulement pour comparer Whisper sur exactement la même prise. Le benchmark navigateur de référence doit rester décoché.</small></span>
+      </label>
+      <p class="hint">Le test s'arrête automatiquement après 75 s pour éviter qu'un moteur silencieux ne fausse la durée.</p>
+
       <div class="status-grid">
         <div><span>Mode en cours</span><strong id="activeMode">—</strong></div>
         <div><span>Durée</span><strong id="speechTimer">00:00</strong></div>
@@ -76,7 +82,7 @@
       <div id="browserMetrics" class="benchmark-metrics hidden">
         <div><span>WER</span><strong id="browserWer">—</strong></div>
         <div><span>CER</span><strong id="browserCer">—</strong></div>
-        <div><span>Latence totale</span><strong id="browserLatency">—</strong></div>
+        <div><span>Latence résultats</span><strong id="browserLatency">—</strong></div>
         <div><span>Mots</span><strong id="browserWords">—</strong></div>
       </div>
 
@@ -147,6 +153,6 @@
     </section>
   </main>
 
-  <script type="module" src="./device-stt-capability.js?v=1"></script>
+  <script type="module" src="./device-stt-capability.js?v=2"></script>
 </body>
 </html>
