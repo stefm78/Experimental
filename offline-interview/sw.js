@@ -51,6 +51,7 @@ self.addEventListener('fetch', event => {
       } catch {
         const exact = await caches.match(request, { ignoreSearch: true });
         if (exact) return exact;
+        if (url.pathname.endsWith('/device-stt-capability.html')) return caches.match('./device-stt-capability.html');
         if (url.pathname.endsWith('/stt-deep-benchmark.html')) return caches.match('./stt-deep-benchmark.html');
         if (url.pathname.endsWith('/stt-benchmark.html')) return caches.match('./stt-benchmark.html');
         return caches.match('./index.html');
