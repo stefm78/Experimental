@@ -1,11 +1,11 @@
-const VERSION = 'offline-interview-v12';
+const VERSION = 'offline-interview-v13';
 const SHELL_CACHE = `${VERSION}-shell`;
 const SHELL = [
-  './', './index.html', './styles.css', './app.js?v=12',
+  './', './index.html', './styles.css', './app.js?v=13',
   './interview.json', './manifest.webmanifest', './icon.svg',
-  './stt-benchmark.html', './stt-benchmark.js?v=8',
-  './stt-deep-benchmark.html', './stt-deep-benchmark.js?v=8',
-  './device-stt-capability.html', './device-stt-capability.js?v=2', './stt-lab-audio.js?v=4', './stt-lab-engines.js?v=4', './stt-lab-fixtures.js?v=3'
+  './stt-benchmark.html', './stt-benchmark.js?v=9',
+  './stt-deep-benchmark.html', './stt-deep-benchmark.js?v=9',
+  './device-stt-capability.html', './device-stt-capability.js?v=3', './stt-lab-audio.js?v=4', './stt-lab-engines.js?v=4', './stt-lab-fixtures.js?v=3'
 ];
 
 self.addEventListener('install', event => {
