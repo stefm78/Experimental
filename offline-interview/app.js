@@ -598,6 +598,7 @@ async function handleSpeakerButtonClick(participantId) {
 
   if (captureFinalizing) {
     queuedSpeakerId = participantId;
+    queuedRecordingQuestionId = recordingQuestionId || queuedRecordingQuestionId;
     await selectSpeaker(participantId);
     ui.recordState.textContent = 'Finalisation du propos précédent…';
     return;
@@ -1132,16 +1133,16 @@ function systemSpeechLabel() {
 
 function refreshSttStatus() {
   if (systemSpeechCapability.mode === 'local') {
-    ui.modelStatus.textContent = transcriber ? 'Système local · secours prêt' : 'Système local · secours Whisper';
+    ui.modelStatus.textContent = transcriber ? 'Automatique · secours local prêt' : 'Automatique · secours local';
     if (ui.diagStt) ui.diagStt.textContent = 'Système local · Whisper secours';
     return;
   }
   if (systemSpeechCapability.mode === 'standard') {
-    ui.modelStatus.textContent = transcriber ? 'Système · secours prêt' : 'Système · secours Whisper';
+    ui.modelStatus.textContent = transcriber ? 'Automatique · secours local prêt' : 'Automatique · secours local';
     if (ui.diagStt) ui.diagStt.textContent = 'Système (réseau possible) · Whisper secours';
     return;
   }
-  ui.modelStatus.textContent = transcriber ? 'Whisper local prêt' : 'Whisper de secours';
+  ui.modelStatus.textContent = transcriber ? 'Local prêt' : 'Secours local disponible';
   if (ui.diagStt) ui.diagStt.textContent = 'Système indisponible · Whisper secours';
 }
 
@@ -1370,10 +1371,7 @@ async function handleRecordingStopped() {
     try { resolveRecordingCompletion?.(); } catch {}
     resolveRecordingCompletion = null;
     recordingCompletionPromise = null;
-    if (ui.liveTranscriptPreview) {
-      ui.liveTranscriptPreview.textContent = '';
-      show(ui.liveTranscriptPreview, false);
-    }
+    if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
     ui.timer.textContent = '00:00';
     renderSpeakerButtons();
 
