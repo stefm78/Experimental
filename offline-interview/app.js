@@ -54,6 +54,7 @@ let recordingQuestionId = null;
 let queuedSpeakerId = null;
 let recordingCompletionPromise = null;
 let resolveRecordingCompletion = null;
+let captureFinalizing = false;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -588,6 +589,13 @@ async function handleSpeakerButtonClick(participantId) {
   if (!session || !participantById(participantId)) return;
   showError(ui.interviewError);
 
+  if (captureFinalizing) {
+    queuedSpeakerId = participantId;
+    await selectSpeaker(participantId);
+    ui.recordState.textContent = 'Finalisation du propos précédent…';
+    return;
+  }
+
   if (isRecording()) {
     if (participantId === recordingSpeakerId) {
       queuedSpeakerId = null;
@@ -703,7 +711,7 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
     rawTranscript,
     durationSeconds
   }));
-  response.status = 'draft';
+  response.status = 'answered';
   session.updatedAt = nowIso();
   await persistSession();
   renderTurns();
@@ -767,7 +775,7 @@ function renderTurns() {
 
     const type = document.createElement('span');
     type.className = 'turn-type';
-    type.textContent = turn.type === 'follow_up' ? (turn.followUpKind === 'ad_hoc' ? 'Relance spontanée' : 'Relance') : (turn.source === 'speech' ? 'Voix' : 'Texte');
+    type.textContent = turn.type === 'follow_up' ? (turn.followUpKind === 'ad_hoc' ? 'Relance spontanée' : 'Relance') : (/system|whisper|speech/.test(turn.source || '') ? 'Voix' : 'Texte');
 
     const remove = document.createElement('button');
     remove.type = 'button';
@@ -1151,7 +1159,7 @@ function preferredMimeType() {
 }
 async function startRecording(speakerId = session?.activeSpeakerId) {
   showError(ui.interviewError);
-  if (isRecording() || !speakerId) return;
+  if (isRecording() || captureFinalizing || !speakerId) return;
   try {
     try { systemSpeechSession?.abort(); } catch {}
     systemSpeechSession = null;
@@ -1190,6 +1198,12 @@ async function startRecording(speakerId = session?.activeSpeakerId) {
   } catch (error) {
     diagnosticError = String(error?.message || error);
     showError(ui.interviewError, `Accès au microphone impossible : ${error.message || error}`);
+    recordingSpeakerId = null;
+    recordingQuestionId = null;
+    try { resolveRecordingCompletion?.(); } catch {}
+    resolveRecordingCompletion = null;
+    recordingCompletionPromise = null;
+    renderSpeakerButtons();
   }
 }
 function stopRecording() {
@@ -1223,6 +1237,7 @@ async function blobTo16kMono(blob) {
   return samples;
 }
 async function handleRecordingStopped() {
+  captureFinalizing = true;
   const speakerId = recordingSpeakerId;
   const questionId = recordingQuestionId;
   const durationSeconds = composerDurationSeconds;
@@ -1285,6 +1300,7 @@ async function handleRecordingStopped() {
     recordingSpeakerId = null;
     recordingQuestionId = null;
     recorder = null;
+    captureFinalizing = false;
     stream = null;
     try { resolveRecordingCompletion?.(); } catch {}
     resolveRecordingCompletion = null;
