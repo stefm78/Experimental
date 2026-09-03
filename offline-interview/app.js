@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v19';
+const BUILD_ID = '2026-09-03.interview-runtime-v20';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -18,7 +18,7 @@ const ui = {
   interviewFile: $('interviewFile'), loadError: $('loadError'), setupParticipants: $('setupParticipants'), setupAddParticipantBtn: $('setupAddParticipantBtn'),
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
-  sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'),
+  sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
   questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarTimeSummary: $('sidebarTimeSummary'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
@@ -75,6 +75,7 @@ function setView(name) {
   show(ui.doneView, name === 'done');
   show(ui.sttLabCard, name === 'setup');
   show(ui.authoringKitCard, name === 'setup');
+  document.body.classList.toggle('interview-mode', name === 'interview');
   if (name === 'interview') startSessionClock();
   else stopSessionClock();
 }
@@ -638,6 +639,10 @@ function renderSpeakerButtons() {
   ui.activeSpeakerLabel.textContent = active
     ? (isRecording() ? `${active.name} · enregistrement en cours` : `${active.name} · prêt`)
     : '';
+  if (ui.speakerHelp) {
+    const hasTurns = Object.values(session.responses || {}).some(r => (r.turns || []).some(t => t.type === 'answer'));
+    ui.speakerHelp.classList.toggle('hidden', hasTurns || isRecording());
+  }
   updateComposerSpeaker();
 }
 function updateComposerSpeaker() {
@@ -652,7 +657,7 @@ function resetComposer() {
   composerDurationSeconds = 0;
   composerSource = 'keyboard';
   composerRawTranscript = null;
-  ui.recordState.textContent = 'Prêt à enregistrer';
+  ui.recordState.textContent = 'Choisissez un locuteur';
   ui.timer.textContent = '00:00';
 }
 
@@ -672,8 +677,9 @@ function renderQuestion() {
   ui.questionProgress.max = all.length;
   ui.questionProgress.value = session.currentIndex + 1;
   ui.questionText.textContent = question.text;
-  ui.questionIntent.textContent = question.intent ? 'Pourquoi cette question : ' + question.intent : '';
-  show(ui.questionIntent, Boolean(question.intent));
+  ui.questionIntent.textContent = question.intent || '';
+  show(ui.questionIntentDetails, Boolean(question.intent));
+  if (ui.questionIntentDetails) ui.questionIntentDetails.open = false;
   ui.prevBtn.disabled = session.currentIndex === 0;
   ui.validateBtn.textContent = session.currentIndex === all.length - 1 ? 'Terminer l’entretien' : 'Question suivante →';
   showError(ui.interviewError);
@@ -1024,10 +1030,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=19', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=20', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v19' : 'installé · v19';
+    ui.diagSw.textContent = reg.active ? 'actif · v20' : 'installé · v20';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
