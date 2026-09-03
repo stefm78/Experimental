@@ -1,12 +1,80 @@
 {
-  "id": "demo-fr-v1",
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "demo-fr-v2",
   "version": "1.0",
   "title": "Entretien de démonstration",
-  "questions": [
-    {"id": "Q01", "text": "Pouvez-vous vous présenter en quelques phrases ?"},
-    {"id": "Q02", "text": "Quel est le projet ou le sujet dont vous souhaitez parler aujourd'hui ?"},
-    {"id": "Q03", "text": "Qu'est-ce qui a été le plus difficile dans cette expérience ?"},
-    {"id": "Q04", "text": "Qu'est-ce qui a particulièrement bien fonctionné ?"},
-    {"id": "Q05", "text": "Si vous deviez recommencer, que feriez-vous différemment ?"}
+  "context": "Retour d'expérience libre sur un projet ou une situation vécue.",
+  "objective": "Comprendre le contexte, les difficultés, les points positifs et les enseignements.",
+  "language": "fr-FR",
+  "tags": ["demonstration", "retour-experience"],
+  "participants": [
+    {"id": "P1", "name": "Interviewer", "role": "interviewer"},
+    {"id": "P2", "name": "Interviewé", "role": "interviewee"}
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Contexte",
+      "questions": [
+        {
+          "id": "Q01",
+          "text": "Pouvez-vous vous présenter en quelques phrases ?",
+          "intent": "Situer le point de vue de la personne interrogée.",
+          "required": true,
+          "audience": ["P2"],
+          "followUps": [
+            {"id": "Q01-R1", "text": "Quel était votre rôle au moment des faits ?", "kind": "planned"}
+          ]
+        },
+        {
+          "id": "Q02",
+          "text": "Quel est le projet ou le sujet dont vous souhaitez parler aujourd'hui ?",
+          "intent": "Établir le contexte partagé de l'entretien.",
+          "required": true,
+          "audience": ["P2"],
+          "followUps": [
+            {"id": "Q02-R1", "text": "Quel était l'objectif principal ?", "kind": "planned"},
+            {"id": "Q02-R2", "text": "Qui étaient les principaux acteurs ?", "kind": "planned"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Retour d'expérience",
+      "questions": [
+        {
+          "id": "Q03",
+          "text": "Qu'est-ce qui a été le plus difficile dans cette expérience ?",
+          "intent": "Faire émerger les obstacles et leurs causes.",
+          "required": true,
+          "audience": ["P2"],
+          "followUps": [
+            {"id": "Q03-R1", "text": "Pouvez-vous donner un exemple concret ?", "kind": "planned"},
+            {"id": "Q03-R2", "text": "Quelle en a été la conséquence ?", "kind": "planned"}
+          ]
+        },
+        {
+          "id": "Q04",
+          "text": "Qu'est-ce qui a particulièrement bien fonctionné ?",
+          "intent": "Identifier ce qui mérite d'être conservé ou reproduit.",
+          "required": true,
+          "audience": ["P2"],
+          "followUps": [
+            {"id": "Q04-R1", "text": "Pourquoi cela a-t-il bien fonctionné selon vous ?", "kind": "planned"}
+          ]
+        },
+        {
+          "id": "Q05",
+          "text": "Si vous deviez recommencer, que feriez-vous différemment ?",
+          "intent": "Faire apparaître les enseignements et améliorations souhaitées.",
+          "required": true,
+          "audience": ["P2"],
+          "followUps": [
+            {"id": "Q05-R1", "text": "Quelle serait la première chose à changer ?", "kind": "planned"}
+          ]
+        }
+      ]
+    }
   ]
 }

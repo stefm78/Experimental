@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#172554">
-  <meta name="description" content="Prototype d'interview vocale hors ligne avec transcription locale.">
-  <title>Interview hors ligne</title>
+  <meta name="description" content="Moteur local d'interview structurée avec transcription et export IA.">
+  <title>Interview locale structurée</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="./styles.css">
@@ -13,14 +13,31 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div><p class="eyebrow">PROTOTYPE LOCAL-FIRST</p><h1>Interview hors ligne</h1></div>
+      <div><p class="eyebrow">INTERVIEW RUNTIME · LOCAL-FIRST</p><h1>Interview structurée</h1></div>
       <span id="networkBadge" class="badge">…</span>
     </header>
 
     <section id="setupView" class="card">
-      <h2>Préparer cet appareil</h2>
-      <p class="lead">Les questions, le moteur de transcription et vos réponses restent utilisables localement après la préparation initiale.</p>
-      <div class="privacy-callout"><strong>Confidentialité du POC</strong><span>L'audio est transcrit sur l'appareil puis supprimé de la mémoire. Seul le texte est sauvegardé dans le navigateur.</span></div>
+      <div class="interview-head">
+        <div>
+          <p class="eyebrow">1 · CHARGER LE PLAN D'INTERVIEW</p>
+          <h2 id="setupTitle">Entretien de démonstration</h2>
+        </div>
+        <label class="secondary button-link small file-button">Charger un JSON<input id="interviewFile" type="file" accept="application/json,.json" hidden></label>
+      </div>
+      <p id="setupContext" class="lead"></p>
+      <p id="setupObjective" class="hint"></p>
+      <p id="loadError" class="error hidden" role="alert"></p>
+
+      <details class="participant-panel" open>
+        <summary>Participants</summary>
+        <p class="hint">Les noms et rôles peuvent être modifiés ici puis pendant l'entretien.</p>
+        <div id="setupParticipants" class="participant-list"></div>
+        <button id="setupAddParticipantBtn" class="ghost small">+ Ajouter un participant</button>
+      </details>
+
+      <div class="privacy-callout"><strong>Confidentialité</strong><span>Le questionnaire, les réponses et les métadonnées restent dans le navigateur. L'audio n'est pas persisté.</span></div>
+
       <div class="status-grid" aria-live="polite">
         <div><span>Application</span><strong id="swStatus">Vérification…</strong></div>
         <div><span>Stockage</span><strong id="storageStatus">Vérification…</strong></div>
@@ -29,60 +46,99 @@
       <div id="progressBlock" class="progress-block hidden">
         <div class="progress-row"><span id="progressLabel">Chargement…</span><span id="progressValue"></span></div>
         <progress id="modelProgress" max="100" value="0"></progress>
-        <p class="hint">La première préparation télécharge le modèle Whisper et ses composants. Les suivantes réutilisent le cache local.</p>
+        <p class="hint">La première préparation télécharge Whisper. Ensuite le navigateur réutilise son cache local.</p>
       </div>
       <p id="setupError" class="error hidden" role="alert"></p>
-      <button id="prepareBtn" class="primary">Préparer le mode hors ligne</button>
+      <div class="actions">
+        <button id="prepareBtn" class="secondary">Préparer la transcription hors ligne</button>
+        <button id="startBtn" class="primary">Démarrer l'entretien →</button>
+      </div>
       <button id="resumeBtn" class="secondary hidden">Reprendre l'entretien en cours</button>
-      <p class="hint">Conseil : une fois « prêt », activez le mode avion, fermez la page, rouvrez-la puis poursuivez l'entretien.</p>
+      <p class="hint">La saisie clavier fonctionne même sans Whisper. Le moteur vocal est chargé à la demande lors du premier enregistrement.</p>
     </section>
 
     <section id="sttLabCard" class="card compact">
       <div class="interview-head">
-        <div>
-          <p class="eyebrow">STT CAPABILITY LAB</p>
-          <h2>Tester d'abord ce que le device sait faire</h2>
-        </div>
-        <div class="actions"><a class="primary button-link small" href="./device-stt-capability.html">Device / navigateur →</a><a class="secondary button-link small" href="./stt-benchmark.html">Whisper simple</a><a class="secondary button-link small" href="./stt-deep-benchmark.html">Matrice Whisper</a></div>
+        <div><p class="eyebrow">STT LAB</p><h2>Tests du moteur vocal</h2></div>
+        <div class="actions"><a class="secondary button-link small" href="./device-stt-capability.html">Device / navigateur</a><a class="secondary button-link small" href="./stt-benchmark.html">Whisper simple</a><a class="secondary button-link small" href="./stt-deep-benchmark.html">Matrice Whisper</a></div>
       </div>
-      <p class="hint">Commencez par Web Speech et la dictée du système. Whisper reste le fallback local contrôlé et peut être comparé sur la même prise audio.</p>
     </section>
 
     <section id="interviewView" class="card hidden">
       <div class="interview-head">
-        <div><p id="interviewTitle" class="eyebrow">ENTRETIEN</p><h2 id="questionCounter">Question 1 / 5</h2></div>
+        <div>
+          <p id="sectionTitle" class="eyebrow">SECTION</p>
+          <h2 id="questionCounter">Question 1 / 5</h2>
+        </div>
         <button id="homeBtn" class="ghost small">Accueil</button>
       </div>
       <progress id="questionProgress" max="5" value="1"></progress>
+
+      <details class="participant-panel compact-details">
+        <summary>Participants et locuteurs</summary>
+        <div id="interviewParticipants" class="participant-list"></div>
+        <button id="interviewAddParticipantBtn" class="ghost small">+ Ajouter un participant</button>
+      </details>
+
       <p id="questionText" class="question"></p>
+      <p id="questionIntent" class="question-intent hidden"></p>
+
+      <section class="speaker-panel" aria-label="Locuteur actif">
+        <div class="speaker-title"><strong>Qui parle maintenant ?</strong><span id="activeSpeakerLabel" class="hint"></span></div>
+        <div id="speakerButtons" class="speaker-buttons"></div>
+      </section>
+
+      <section id="turnsSection" class="conversation-section hidden">
+        <h3>Conversation captée</h3>
+        <div id="turnsList" class="turns-list"></div>
+      </section>
+
       <div class="recorder-panel">
         <div id="recordState" class="record-state">Prêt à enregistrer</div>
         <div id="timer" class="timer">00:00</div>
-        <button id="recordBtn" class="record" aria-pressed="false">🎤 Répondre</button>
+        <button id="recordBtn" class="record" aria-pressed="false">🎤 Parler</button>
         <button id="stopBtn" class="danger hidden">■ Terminer</button>
       </div>
       <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Transcription locale en cours…</span></div>
-      <label for="answerText">Réponse transcrite</label>
-      <textarea id="answerText" rows="8" placeholder="Votre réponse apparaîtra ici. Vous pouvez aussi la saisir ou la corriger au clavier."></textarea>
+
+      <div class="composer-head">
+        <label for="answerText">Nouvelle prise de parole</label>
+        <span id="composerSpeaker" class="speaker-chip"></span>
+      </div>
+      <textarea id="answerText" rows="6" placeholder="La transcription apparaît ici. Corrigez-la si nécessaire, puis ajoutez la prise de parole."></textarea>
       <p id="answerMeta" class="hint"></p>
+      <div class="actions compact-actions">
+        <button id="addTurnBtn" class="secondary">Ajouter la prise de parole</button>
+        <button id="clearComposerBtn" class="ghost">Effacer le brouillon</button>
+      </div>
+
+      <details id="followUpsPanel" class="followups-panel">
+        <summary id="followUpsSummary">Relances possibles</summary>
+        <p class="hint">Elles sont facultatives. Cliquer sur une relance l'ajoute à la conversation.</p>
+        <div id="plannedFollowUps" class="followup-list"></div>
+        <div class="adhoc-followup">
+          <input id="adHocFollowUpText" type="text" placeholder="Ajouter une relance spontanée…">
+          <button id="addAdHocFollowUpBtn" class="ghost small">+ Ajouter</button>
+        </div>
+      </details>
+
       <p id="interviewError" class="error hidden" role="alert"></p>
       <div class="actions">
         <button id="prevBtn" class="ghost">← Précédente</button>
-        <button id="retryBtn" class="secondary">Recommencer la réponse</button>
         <button id="validateBtn" class="primary">Valider et continuer →</button>
       </div>
     </section>
 
     <section id="doneView" class="card hidden">
       <p class="eyebrow">ENTRETIEN TERMINÉ</p>
-      <h2>Les réponses sont enregistrées localement.</h2>
+      <h2>Le jeu d'interview est prêt à être réutilisé par une IA.</h2>
       <p id="doneSummary" class="lead"></p>
       <div class="actions stack-mobile">
-        <button id="reviewBtn" class="secondary">Relire les réponses</button>
+        <button id="reviewBtn" class="secondary">Relire / corriger</button>
         <button id="exportTxtBtn" class="primary">Exporter TXT</button>
-        <button id="exportJsonBtn" class="primary">Exporter JSON</button>
+        <button id="exportJsonBtn" class="primary">Exporter JSON pour IA</button>
       </div>
-      <button id="newSessionBtn" class="danger-outline">Effacer et recommencer</button>
+      <button id="newSessionBtn" class="danger-outline">Nouvelle session</button>
     </section>
 
     <section class="card compact diagnostics">
@@ -93,17 +149,14 @@
           <div><dt>Connexion</dt><dd id="diagNetwork">—</dd></div>
           <div><dt>Service worker</dt><dd id="diagSw">—</dd></div>
           <div><dt>Stockage persistant</dt><dd id="diagPersist">—</dd></div>
-          <div><dt>Modèle</dt><dd id="diagModel">onnx-community/whisper-tiny · q4 · WASM</dd></div>
-          <div><dt>Étape STT</dt><dd id="diagStage">—</dd></div>
+          <div><dt>Modèle</dt><dd>onnx-community/whisper-tiny · q4 · WASM</dd></div>
         </dl>
-        <p class="hint">Le rapport ne contient ni audio ni texte de vos réponses.</p>
-        <button id="copyDiagBtn" class="secondary">Copier le diagnostic complet</button>
+        <button id="copyDiagBtn" class="secondary">Copier le diagnostic</button>
         <p id="copyDiagStatus" class="hint" aria-live="polite"></p>
-        <label for="diagnosticOutput">Rapport complet</label>
-        <textarea id="diagnosticOutput" rows="18" readonly class="hidden" spellcheck="false"></textarea>
+        <textarea id="diagnosticOutput" rows="12" readonly class="hidden" spellcheck="false"></textarea>
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=13"></script>
+  <script type="module" src="./app.js?v=14"></script>
 </body>
 </html>
