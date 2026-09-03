@@ -7,7 +7,8 @@ Le runtime charge un JSON `offline-interview.interview-spec.v1` et exporte un JS
 - le fichier d'entrée décrit **quoi demander**, pas les réponses ;
 - les participants ont un `id` stable, un `name` modifiable et un `role` ;
 - l'interview est structurée en `sections`, puis `questions` ;
-- une question peut avoir une `intent`, une `audience` et des `followUps` facultatives ;
+- une question peut avoir une `label`, une `intent`, une `audience`, un `estimatedMinutes` et des `followUps` facultatives ;
+- l'interview peut fournir `estimatedDurationMinutes` pour piloter le temps sans imposer un compte à rebours ;
 - les relances prévues sont des suggestions, jamais des étapes obligatoires ;
 - pendant l'entretien, les réponses sont stockées comme une suite de `turns` attribuées à un `speakerId` ;
 - l'audio n'est pas exporté ni persisté.
@@ -23,6 +24,7 @@ Le runtime charge un JSON `offline-interview.interview-spec.v1` et exporte un JS
   "context": "Contexte métier libre.",
   "objective": "Lever les ambiguïtés avant décision.",
   "language": "fr-FR",
+  "estimatedDurationMinutes": 20,
   "participants": [
     {"id": "P1", "name": "Interviewer", "role": "interviewer"},
     {"id": "P2", "name": "Interviewé", "role": "interviewee"}
@@ -34,9 +36,11 @@ Le runtime charge un JSON `offline-interview.interview-spec.v1` et exporte un JS
       "questions": [
         {
           "id": "Q1",
+          "label": "Besoin principal",
           "text": "Quel problème cherchez-vous à résoudre ?",
           "intent": "Comprendre le besoin réel.",
           "required": true,
+          "estimatedMinutes": 4,
           "audience": ["P2"],
           "followUps": [
             {"id": "Q1-R1", "text": "Pouvez-vous donner un exemple concret ?", "kind": "planned"}
@@ -62,7 +66,7 @@ L'export JSON contient :
 
 - la métadonnée de l'interview ;
 - le snapshot des participants ;
-- la session et son niveau de complétude ;
+- la session, son niveau de complétude et le temps actif passé globalement/par question ;
 - chaque section et question d'origine ;
 - les relances planifiées ;
 - les `turns` dans l'ordre, avec `speakerId`, nom/rôle résolus, type (`answer` ou `follow_up`), source (`speech` ou `keyboard`), texte final et, si disponible, transcription brute.
