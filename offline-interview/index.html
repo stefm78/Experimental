@@ -20,8 +20,8 @@
     <section id="setupView" class="setup-card">
       <header class="setup-header">
         <div>
-          <p class="eyebrow">PRÉPARER L’ENTRETIEN</p>
-          <h2 id="setupTitle">Entretien de démonstration</h2>
+          <h1 id="setupTitle">Entretien de démonstration</h1>
+          <p id="setupMeta" class="setup-meta">Interview · ~0 min</p>
         </div>
         <label class="ghost button-link small file-button">Changer de questionnaire<input id="interviewFile" type="file" accept="application/json,.json" hidden></label>
       </header>
@@ -60,8 +60,8 @@
       </div>
 
       <details class="setup-settings">
-        <summary>Confidentialité et transcription</summary>
-        <p>Les réponses restent dans ce navigateur. La transcription système peut, selon le navigateur ou l’OS, utiliser un service distant. Whisper reste le secours local.</p>
+        <summary>Transcription et confidentialité</summary>
+        <p>La voix est transcrite automatiquement. Le texte de l’entretien reste dans ce navigateur ; l’audio n’est pas conservé par l’application.</p>
         <div class="setup-status" aria-live="polite">
           <span>Application <strong id="swStatus">Vérification…</strong></span>
           <span>Stockage <strong id="storageStatus">Vérification…</strong></span>
@@ -169,24 +169,24 @@
         </div>
 
         <section id="captureDock" class="capture-dock" aria-label="Capturer une prise de parole">
+          <div class="live-transcript-slot">
+            <div id="liveTranscriptPreview" class="live-transcript" aria-live="polite"></div>
+          </div>
+
           <div class="capture-state-row">
             <div class="capture-state-copy">
               <span class="recording-dot" aria-hidden="true"></span>
-              <strong id="captureModeLabel">Prêt</strong>
+              <strong id="captureModeLabel">PRÊT</strong>
               <span id="recordState" class="record-state">Cliquez sur la personne qui parle</span>
             </div>
             <span id="timer" class="timer">00:00</span>
           </div>
 
-          <div class="speaker-row">
-            <span class="speaker-row-label">Qui parle ?</span>
-            <div id="speakerButtons" class="speaker-buttons"></div>
-          </div>
+          <div id="speakerButtons" class="speaker-buttons"></div>
 
-          <p id="speakerHelp" class="speaker-help">Un clic démarre sa prise de parole. Un autre nom change immédiatement de locuteur.</p>
-          <div id="liveTranscriptPreview" class="live-transcript hidden" aria-live="polite"></div>
+          <p id="speakerHelp" class="speaker-help">Cliquez sur un nom pour commencer. Pendant l’enregistrement, changez de nom en un clic.</p>
           <span id="activeSpeakerLabel" class="sr-only"></span>
-          <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Finalisation de la transcription…</span></div>
+          <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Finalisation…</span></div>
         </section>
       </section>
     </section>
@@ -229,6 +229,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=21"></script>
+  <script type="module" src="./app.js?v=22"></script>
 </body>
 </html>
