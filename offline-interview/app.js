@@ -1291,7 +1291,6 @@ async function handleRecordingStopped() {
   const nextSpeakerId = queuedSpeakerId;
   queuedSpeakerId = null;
 
-  ui.recordBtn.disabled = true;
   ui.addTurnBtn.disabled = true;
   ui.validateBtn.disabled = true;
   updateCaptureUi();
@@ -1342,7 +1341,6 @@ async function handleRecordingStopped() {
   } finally {
     chunks = [];
     show(ui.transcribing, false);
-    ui.recordBtn.disabled = false;
     ui.addTurnBtn.disabled = false;
     ui.validateBtn.disabled = false;
     recordingSpeakerId = null;
