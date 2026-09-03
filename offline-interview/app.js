@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v27';
+const BUILD_ID = '2026-09-03.interview-runtime-v27-1';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -57,9 +57,6 @@ let resolveRecordingCompletion = null;
 let captureFinalizing = false;
 let queuedRecordingQuestionId = null;
 let recordingCaptureId = null;
-let recordingUsesBoundedAudio = false;
-let boundedPendingCount = 0;
-let boundedTranscriptionQueue = Promise.resolve();
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -550,31 +547,17 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   if (!isRecording() || !recordingSpeakerId || !recordingQuestionId) return false;
   if (!nextSpeakerId || !nextQuestionId) return false;
   if (nextSpeakerId === recordingSpeakerId && nextQuestionId === recordingQuestionId) return true;
+  if (!systemSpeechSession?.takeSegment) return false;
+
+  const snapshot = systemSpeechSession.takeSegment();
+  const text = cleanText(snapshot?.text);
+  if (!meaningfulTranscript(text)) return false;
 
   const previousSpeakerId = recordingSpeakerId;
   const previousQuestionId = recordingQuestionId;
   const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
-  const systemSnapshot = systemSpeechSession?.takeSegment?.() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
-
-  let audioPromise;
-  try {
-    audioPromise = rotateAudioRecorderAtBoundary();
-  } catch (error) {
-    diagnosticError = `Frontière audio: ${error?.message || error}`;
-    return false;
-  }
-
-  // From the first semantic boundary onward, browser SpeechRecognition remains useful
-  // for the live preview only. Canonical speaker/question attribution comes from the
-  // audio segment physically closed at the click boundary.
-  recordingUsesBoundedAudio = true;
-  enqueueBoundedAudioTurn({
-    audioPromise,
-    questionId: previousQuestionId,
-    speakerId: previousSpeakerId,
-    durationSeconds,
-    fallbackSnapshot: systemSnapshot
-  });
+  const source = snapshot.mode === 'local' ? 'system-local' : 'system';
+  const rawTranscript = snapshot.finalText || text;
 
   recordingSpeakerId = nextSpeakerId;
   recordingQuestionId = nextQuestionId;
@@ -582,12 +565,22 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   session.updatedAt = nowIso();
   startedRecordingAt = performance.now();
   composerDurationSeconds = 0;
+  chunks = [];
   ui.timer.textContent = '00:00';
   if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
 
   renderSpeakerButtons();
   renderQuestionNav();
   updateCaptureUi();
+
+  await appendAnswerTurn({
+    questionId: previousQuestionId,
+    speakerId: previousSpeakerId,
+    text,
+    source,
+    rawTranscript,
+    durationSeconds
+  });
   await persistSession();
   return true;
 }
@@ -691,7 +684,6 @@ async function finishActiveCaptureBeforeLeaving(message) {
   if (captureFinalizing || recordingCompletionPromise) {
     if (recordingCompletionPromise) await recordingCompletionPromise;
   }
-  await boundedTranscriptionQueue;
   return true;
 }
 
@@ -1308,10 +1300,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=27', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=27-1', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v27' : 'installé · v27';
+    ui.diagSw.textContent = reg.active ? 'actif · v27.1' : 'installé · v27.1';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1436,110 +1428,6 @@ function preferredMimeType() {
   return ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(t => MediaRecorder.isTypeSupported?.(t)) || '';
 }
 
-function rotateAudioRecorderAtBoundary() {
-  if (!recorder || recorder.state === 'inactive' || !stream) throw new Error('MediaRecorder inactif');
-
-  const previousRecorder = recorder;
-  const previousChunks = chunks;
-  const previousType = previousRecorder.mimeType || preferredMimeType() || 'audio/webm';
-  let settled = false;
-  let resolveAudio;
-  let rejectAudio;
-  const audioPromise = new Promise((resolve, reject) => {
-    resolveAudio = resolve;
-    rejectAudio = reject;
-  });
-
-  // Detach the old recorder from global mutable chunk state before creating the next
-  // recorder. Its last dataavailable event must stay with the previous speaker.
-  previousRecorder.ondataavailable = event => {
-    if (event.data?.size) previousChunks.push(event.data);
-  };
-  previousRecorder.onerror = event => {
-    if (settled) return;
-    settled = true;
-    rejectAudio(event?.error || new Error('MediaRecorder boundary error'));
-  };
-  previousRecorder.onstop = () => {
-    if (settled) return;
-    settled = true;
-    resolveAudio(new Blob(previousChunks, { type: previousType }));
-  };
-
-  // Start the next recorder on the already-open microphone before closing the previous
-  // one. The overlap is only the synchronous handoff and avoids a warm-up hole.
-  const mimeType = preferredMimeType();
-  const nextRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-  const nextChunks = [];
-  nextRecorder.ondataavailable = event => { if (event.data?.size) nextChunks.push(event.data); };
-  nextRecorder.onstop = handleRecordingStopped;
-  nextRecorder.start(500);
-  recorder = nextRecorder;
-  chunks = nextChunks;
-
-  try { previousRecorder.requestData(); } catch {}
-  try {
-    previousRecorder.stop();
-  } catch (error) {
-    if (!settled) {
-      settled = true;
-      rejectAudio(error);
-    }
-  }
-  return audioPromise;
-}
-
-async function transcribeBoundedAudio(blob) {
-  if (!blob?.size) return '';
-  if (!transcriber) await prepareModel();
-  const samples = await blobTo16kMono(blob);
-  const result = await transcriber(samples, {
-    language: 'french',
-    task: 'transcribe',
-    chunk_length_s: 30,
-    stride_length_s: 5
-  });
-  return cleanText(result?.text);
-}
-
-function enqueueBoundedAudioTurn({ audioPromise, questionId, speakerId, durationSeconds, fallbackSnapshot }) {
-  boundedPendingCount += 1;
-  const task = async () => {
-    try {
-      const blob = await audioPromise;
-      let text = '';
-      let source = 'whisper-local-boundary';
-      try {
-        text = await transcribeBoundedAudio(blob);
-      } catch (error) {
-        diagnosticError = `Whisper frontière: ${error?.message || error}`;
-        text = cleanText(fallbackSnapshot?.text || fallbackSnapshot?.finalText);
-        source = fallbackSnapshot?.mode === 'local'
-          ? 'system-local-boundary-fallback'
-          : 'system-boundary-fallback';
-      }
-      if (!meaningfulTranscript(text)) {
-        diagnosticError = diagnosticError || 'Frontière audio sans texte exploitable';
-        return;
-      }
-      await appendAnswerTurn({
-        questionId,
-        speakerId,
-        text,
-        source,
-        rawTranscript: text,
-        durationSeconds
-      });
-    } catch (error) {
-      diagnosticError = `Finalisation frontière: ${error?.message || error}`;
-      showError(ui.interviewError, 'Une prise de parole bornée n’a pas pu être transcrite.');
-    }
-  };
-  boundedTranscriptionQueue = boundedTranscriptionQueue.then(task, task).finally(() => {
-    boundedPendingCount = Math.max(0, boundedPendingCount - 1);
-  });
-  return boundedTranscriptionQueue;
-}
 async function startRecording(speakerId = session?.activeSpeakerId, questionId = currentEntry()?.question?.id || null) {
   showError(ui.interviewError);
   if (isRecording() || captureFinalizing || !speakerId) return;
@@ -1549,7 +1437,6 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     recordingSpeakerId = speakerId;
     recordingQuestionId = questionId;
     recordingCaptureId = uuid('capture');
-    recordingUsesBoundedAudio = false;
     recordingCompletionPromise = new Promise(resolve => { resolveRecordingCompletion = resolve; });
     const reusableStream = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
     if (!reusableStream) {
@@ -1638,44 +1525,21 @@ async function handleRecordingStopped() {
     if (!chunks.length) return;
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
     const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
-    let text = '';
-    let source = '';
-    let rawTranscript = '';
+    let text = cleanText(systemSnapshot.text);
+    let source = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
+    let rawTranscript = systemSnapshot.finalText || text;
 
-    if (recordingUsesBoundedAudio) {
-      // Preserve turn order: earlier click-bounded segments are canonicalized first.
-      await boundedTranscriptionQueue;
+    if (!text) {
       show(ui.transcribing, true);
-      ui.recordState.textContent = 'Finalisation de la frontière audio…';
-      try {
-        text = await transcribeBoundedAudio(blob);
-        source = 'whisper-local-boundary';
-        rawTranscript = text;
-      } catch (error) {
-        diagnosticError = `Whisper frontière finale: ${error?.message || error}`;
-        text = cleanText(systemSnapshot.text);
-        source = systemSnapshot.mode === 'local'
-          ? 'system-local-boundary-fallback'
-          : 'system-boundary-fallback';
-        rawTranscript = systemSnapshot.finalText || text;
-      }
-    } else {
-      text = cleanText(systemSnapshot.text);
-      source = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
-      rawTranscript = systemSnapshot.finalText || text;
-
-      if (!text) {
-        show(ui.transcribing, true);
-        ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
-          ? 'Transcription Whisper locale…'
-          : 'Aucun texte système · secours Whisper…';
-        if (!transcriber) await prepareModel();
-        const samples = await blobTo16kMono(blob);
-        const result = await transcriber(samples, { language: 'french', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
-        text = cleanText(result?.text);
-        source = 'whisper-local';
-        rawTranscript = text;
-      }
+      ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
+        ? 'Transcription Whisper locale…'
+        : 'Aucun texte système · secours Whisper…';
+      if (!transcriber) await prepareModel();
+      const samples = await blobTo16kMono(blob);
+      const result = await transcriber(samples, { language: 'french', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
+      text = cleanText(result?.text);
+      source = 'whisper-local';
+      rawTranscript = text;
     }
 
     if (text) {
@@ -1709,7 +1573,6 @@ async function handleRecordingStopped() {
     recordingSpeakerId = null;
     recordingQuestionId = null;
     recorder = null;
-    recordingUsesBoundedAudio = false;
     captureFinalizing = false;
     const keepMicrophoneOpen = Boolean(nextSpeakerId && participantById(nextSpeakerId));
     if (!keepMicrophoneOpen) {

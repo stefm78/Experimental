@@ -1,0 +1,80 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v27-1-runtime-recovery",
+  "version": "1.0",
+  "title": "Test UX V27.1 — récupération runtime Chrome",
+  "context": "Ce test court valide uniquement la récupération après l'échec runtime V27. Il vérifie la stabilité Chrome, la cohérence du rendu microphone, l'absence de Whisper obligatoire à chaque changement de locuteur et le maintien du transfert explicite de question. La précision fine de frontière locuteur reste un sujet séparé.",
+  "objective": "Confirmer que l'entretien redevient fluide et utilisable sans blocage de page ni hallucinations répétitives provoquées par les changements de locuteur.",
+  "language": "fr-FR",
+  "tags": ["ux", "v27-1", "runtime-recovery", "chrome", "stability"],
+  "estimatedDurationMinutes": 7,
+  "participants": [
+    { "id": "P1", "name": "Interviewer", "role": "interviewer" },
+    { "id": "P2", "name": "Testeur", "role": "interviewee" },
+    { "id": "P3", "name": "Second participant", "role": "interviewee" }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Stabilité interactive",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Dix changements rapides",
+          "text": "Pendant environ une minute, alternez au moins dix fois entre Testeur et Second participant. Chaque personne dit une phrase naturelle de cinq à dix mots après son clic. Vérifiez surtout que les boutons répondent immédiatement et que la page ne se fige pas.",
+          "intent": "Détecter toute régression CPU, mémoire ou blocage du thread principal liée aux changements de locuteur.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": ["P2", "P3"],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Conversation continue",
+          "text": "Parlez pendant au moins quarante-cinq secondes avec quatre changements de locuteur. Continuez à naviguer dans l'interface pendant que le transcript live s'allonge. Notez toute attente anormale, message de page non réactive ou commande qui cesse de répondre.",
+          "intent": "Valider la fluidité du runtime après plusieurs segments et un transcript live long.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": ["P1", "P2", "P3"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Cohérence UX et cache",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Microphone et ON AIR",
+          "text": "Pendant l'enregistrement, vérifiez que le pictogramme microphone est visible à gauche de ON AIR, sans carré vide ni dépendance apparente à un emoji. Faites cette vérification sur les deux profils Chrome si possible.",
+          "intent": "Valider le remplacement du glyph emoji par un SVG déterministe.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Transfert explicite",
+          "text": "Commencez à parler ici, affichez ensuite la question 5 sans arrêter l'enregistrement, puis utilisez uniquement le bouton « Basculer sur la question 5 → ». Vérifiez que la navigation seule ne transfère pas l'enregistrement et que le bouton reste fluide.",
+          "intent": "Revalider le modèle de question propriétaire et le libellé de transfert sans réintroduire Whisper par frontière.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "followUps": []
+        },
+        {
+          "id": "Q5",
+          "label": "Verdict recovery",
+          "text": "Après le test, la page est-elle restée réactive et les changements de locuteur ont-ils évité les longues hallucinations répétitives observées en V27 ? Signalez séparément tout éventuel mot encore attribué au mauvais locuteur : ce défaut de frontière reste suivi mais ne doit pas être confondu avec la stabilité runtime.",
+          "intent": "Décider uniquement du statut RUNTIME_RECOVERY_PASS ou HOLD pour V27.1.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}
