@@ -17,6 +17,23 @@
       <span id="networkBadge" class="badge">…</span>
     </header>
 
+    <section id="authoringKitCard" class="card compact">
+      <div class="interview-head">
+        <div>
+          <p class="eyebrow">0 · PRÉPARER L'INTERVIEW AVEC UNE IA</p>
+          <h2>Kit de génération d'interview</h2>
+        </div>
+      </div>
+      <p class="lead">Donnez le kit à une IA avec votre contexte. Elle doit produire un JSON directement chargeable dans cette page.</p>
+      <p class="hint">Message conseillé : « Utilise le kit joint. Voici mon contexte : … Génère l'interview utile pour lever les ambiguïtés. Retourne uniquement le JSON final compatible. »</p>
+      <div class="actions">
+        <a class="primary button-link" href="./INTERVIEW_AUTHORING_KIT.md" download>↓ Télécharger le kit IA</a>
+        <button id="copyAuthoringKitBtn" class="secondary">Copier les instructions IA</button>
+        <a class="ghost button-link" href="./interview-spec.schema.json" download>Schéma JSON</a>
+      </div>
+      <p id="authoringKitStatus" class="hint" aria-live="polite"></p>
+    </section>
+
     <section id="setupView" class="card">
       <div class="interview-head">
         <div>
@@ -157,6 +174,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=14"></script>
+  <script type="module" src="./app.js?v=15"></script>
 </body>
 </html>
