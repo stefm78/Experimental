@@ -627,10 +627,12 @@ function renderSpeakerButtons() {
     const queued = isRecording() && participant.id === queuedSpeakerId;
     const active = participant.id === session.activeSpeakerId;
     button.className = `speaker-button${active ? ' active' : ''}${recording ? ' recording' : ''}${queued ? ' queued' : ''}`;
-    button.textContent = recording ? `■ ${participant.name}` : `🎙 ${participant.name}`;
+    button.textContent = participant.name;
+    button.dataset.captureState = recording ? 'recording' : queued ? 'queued' : 'idle';
     button.title = recording
       ? `Terminer la prise de parole de ${participant.name}`
       : `Démarrer une prise de parole attribuée à ${participant.name}`;
+    button.setAttribute('aria-label', button.title);
     button.setAttribute('aria-pressed', recording ? 'true' : 'false');
     button.addEventListener('click', () => handleSpeakerButtonClick(participant.id));
     ui.speakerButtons.append(button);
@@ -723,6 +725,9 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
   renderTurns();
   renderQuestionNav();
   renderInterviewMetrics();
+  requestAnimationFrame(() => {
+    ui.turnsList?.lastElementChild?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
   return true;
 }
 
@@ -758,6 +763,7 @@ function renderTurns() {
     head.className = 'turn-head';
 
     const select = document.createElement('select');
+    select.className = 'turn-speaker-select';
     select.setAttribute('aria-label', 'Locuteur de la prise de parole');
     for (const p of participantsSource()) {
       const option = document.createElement('option');
@@ -800,8 +806,14 @@ function renderTurns() {
     head.append(select, type, remove);
 
     const text = document.createElement('textarea');
-    text.rows = turn.type === 'follow_up' ? 2 : 4;
+    text.className = 'turn-text';
+    text.rows = turn.type === 'follow_up' ? 2 : 3;
     text.value = turn.text;
+    const resizeTurnText = () => {
+      text.style.height = 'auto';
+      text.style.height = Math.min(320, Math.max(56, text.scrollHeight)) + 'px';
+    };
+    text.addEventListener('input', resizeTurnText);
     text.addEventListener('change', async () => {
       turn.text = cleanText(text.value);
       turn.updatedAt = nowIso();
@@ -819,6 +831,7 @@ function renderTurns() {
     meta.textContent = bits.join(' · ');
     card.append(head, text, meta);
     ui.turnsList.append(card);
+    requestAnimationFrame(resizeTurnText);
   }
 }
 
