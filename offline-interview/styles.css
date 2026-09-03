@@ -126,3 +126,44 @@
   .home-button{opacity:.55}
   .home-button:hover{opacity:1}
 }
+
+
+/* Dream Team UX v21 · iteration 1 — setup */
+.setup-card{background:#fff;border:1px solid #dfe5ee;border-radius:20px;padding:clamp(22px,3vw,34px);box-shadow:0 12px 34px rgba(30,52,84,.07);margin-bottom:12px}
+.setup-header{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;padding-bottom:18px;border-bottom:1px solid #edf1f6}
+.setup-header h2{margin:.25rem 0 0;font-size:clamp(1.35rem,2.2vw,1.9rem)}
+.setup-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);gap:28px;padding:24px 0}
+.setup-brief{min-width:0}
+.setup-objective{margin:0 0 16px;font-size:1rem;line-height:1.55;color:#41516a}
+.setup-context{font-size:.84rem;color:#64748b}
+.setup-context summary{cursor:pointer;font-weight:750;color:#52627a}
+.setup-context p{line-height:1.55;margin:10px 0 0}
+.setup-people{padding-left:24px;border-left:1px solid #edf1f6}
+.setup-section-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.setup-section-title h3{margin:0;font-size:1rem}
+.setup-people .participant-list{margin:12px 0 0}
+.setup-footer{display:flex;align-items:center;justify-content:flex-end;gap:14px;padding-top:18px;border-top:1px solid #edf1f6}
+.setup-footer #resumeBtn{margin-right:auto}
+.setup-start{min-width:210px}
+.setup-settings{margin-top:14px;padding-top:12px;border-top:1px solid #edf1f6;color:#64748b;font-size:.8rem}
+.setup-settings summary{cursor:pointer;font-weight:750;color:#64748b}
+.setup-settings p{line-height:1.5;max-width:850px}
+.setup-status{display:flex;gap:18px;flex-wrap:wrap;margin:10px 0}
+.setup-status span{display:flex;gap:5px}
+.setup-status strong{color:#334155}
+.setup-tools{margin:8px 4px 18px;color:#7a8699;font-size:.76rem}
+.setup-tools summary{cursor:pointer;display:inline-block;font-weight:700}
+.setup-tools-links{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+.setup-tools-links a{color:#64748b}
+.setup-card .authoring-shortcut{justify-content:flex-start;margin:22px 0 0;font-size:.76rem}
+.setup-card .authoring-status{text-align:left}
+@media(max-width:820px){
+  .setup-grid{grid-template-columns:1fr;gap:18px}
+  .setup-people{padding-left:0;padding-top:18px;border-left:0;border-top:1px solid #edf1f6}
+}
+@media(max-width:640px){
+  .setup-header{display:grid}
+  .setup-footer{display:grid}
+  .setup-footer #resumeBtn{margin:0}
+  .setup-start{min-width:0}
+}
