@@ -623,7 +623,7 @@ async function handleSpeakerButtonClick(participantId) {
 
   if (captureFinalizing) {
     queuedSpeakerId = participantId;
-    queuedRecordingQuestionId = recordingQuestionId || queuedRecordingQuestionId;
+    queuedRecordingQuestionId = queuedRecordingQuestionId || recordingQuestionId;
     await selectSpeaker(participantId);
     ui.recordState.textContent = 'Finalisation du propos précédent…';
     return;
@@ -664,6 +664,7 @@ function updateCaptureUi() {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'PRÊT';
     ui.recordState.textContent = 'Cliquez sur la personne qui parle';
   }
+  renderCaptureTransfer();
 }
 
 function renderSpeakerButtons() {
@@ -1344,6 +1345,7 @@ async function handleRecordingStopped() {
   ui.addTurnBtn.disabled = true;
   ui.validateBtn.disabled = true;
   updateCaptureUi();
+  renderQuestionNav();
   try {
     if (!chunks.length) return;
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
@@ -1408,6 +1410,7 @@ async function handleRecordingStopped() {
     if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
     ui.timer.textContent = '00:00';
     renderSpeakerButtons();
+    renderQuestionNav();
 
     if (nextSpeakerId && participantById(nextSpeakerId)) {
       await selectSpeaker(nextSpeakerId);
