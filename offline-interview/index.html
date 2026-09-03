@@ -17,59 +17,72 @@
       <span id="networkBadge" class="badge">…</span>
     </header>
 
-    <div id="authoringKitCard" class="authoring-shortcut" aria-label="Aide pour créer un questionnaire">
-      <span>Pas encore de questionnaire ?</span>
-      <a href="./INTERVIEW_AUTHORING_KIT.md" download="interview-ai-generator.md">Fichier à donner à une IA</a>
-      <button id="copyAuthoringKitBtn" class="link-button" type="button">Copier</button>
-      <span id="authoringKitStatus" class="authoring-status" aria-live="polite"></span>
-    </div>
-
-    <section id="setupView" class="card">
-      <div class="interview-head">
+    <section id="setupView" class="setup-card">
+      <header class="setup-header">
         <div>
-          <p class="eyebrow">1 · CHARGER LE PLAN D'INTERVIEW</p>
+          <p class="eyebrow">PRÉPARER L’ENTRETIEN</p>
           <h2 id="setupTitle">Entretien de démonstration</h2>
         </div>
-        <label class="secondary button-link small file-button">Charger un JSON<input id="interviewFile" type="file" accept="application/json,.json" hidden></label>
+        <label class="ghost button-link small file-button">Changer de questionnaire<input id="interviewFile" type="file" accept="application/json,.json" hidden></label>
+      </header>
+
+      <div class="setup-grid">
+        <section class="setup-brief">
+          <p id="setupObjective" class="setup-objective"></p>
+          <details class="setup-context">
+            <summary>Contexte de l’entretien</summary>
+            <p id="setupContext"></p>
+          </details>
+
+          <div id="authoringKitCard" class="authoring-shortcut" aria-label="Aide pour créer un questionnaire">
+            <span>Besoin d’un autre questionnaire ?</span>
+            <a href="./INTERVIEW_AUTHORING_KIT.md" download="interview-ai-generator.md">Fichier à donner à une IA</a>
+            <button id="copyAuthoringKitBtn" class="link-button" type="button">Copier</button>
+            <span id="authoringKitStatus" class="authoring-status" aria-live="polite"></span>
+          </div>
+        </section>
+
+        <section class="setup-people">
+          <div class="setup-section-title">
+            <h3>Participants</h3>
+            <button id="setupAddParticipantBtn" class="ghost small">+ Ajouter</button>
+          </div>
+          <div id="setupParticipants" class="participant-list"></div>
+        </section>
       </div>
-      <p id="setupContext" class="lead"></p>
-      <p id="setupObjective" class="hint"></p>
+
       <p id="loadError" class="error hidden" role="alert"></p>
-
-      <details class="participant-panel" open>
-        <summary>Participants</summary>
-        <p class="hint">Les noms et rôles peuvent être modifiés ici puis pendant l'entretien.</p>
-        <div id="setupParticipants" class="participant-list"></div>
-        <button id="setupAddParticipantBtn" class="ghost small">+ Ajouter un participant</button>
-      </details>
-
-      <div class="privacy-callout"><strong>Confidentialité</strong><span>Les réponses restent dans ce navigateur. La transcription système peut, selon le navigateur ou l’OS, utiliser un service distant. Whisper reste le secours local.</span></div>
-
-      <div class="status-grid" aria-live="polite">
-        <div><span>Application</span><strong id="swStatus">Vérification…</strong></div>
-        <div><span>Stockage</span><strong id="storageStatus">Vérification…</strong></div>
-        <div><span>Transcription</span><strong id="modelStatus">Détection…</strong></div>
-      </div>
-      <div id="progressBlock" class="progress-block hidden">
-        <div class="progress-row"><span id="progressLabel">Chargement…</span><span id="progressValue"></span></div>
-        <progress id="modelProgress" max="100" value="0"></progress>
-        <p class="hint">La première préparation télécharge Whisper. Ensuite le navigateur réutilise son cache local.</p>
-      </div>
       <p id="setupError" class="error hidden" role="alert"></p>
-      <div class="actions">
-        <button id="prepareBtn" class="secondary">Préparer Whisper de secours</button>
-        <button id="startBtn" class="primary">Démarrer l'entretien →</button>
+
+      <div class="setup-footer">
+        <button id="resumeBtn" class="link-button hidden">Voir le dernier entretien</button>
+        <button id="startBtn" class="primary setup-start">Commencer l’entretien →</button>
       </div>
-      <button id="resumeBtn" class="secondary hidden">Reprendre l'entretien en cours</button>
-      <p class="hint">Par défaut, « Parler » utilise la transcription système. Si elle est absente ou ne renvoie aucun texte, Whisper prend le relais localement.</p>
+
+      <details class="setup-settings">
+        <summary>Confidentialité et transcription</summary>
+        <p>Les réponses restent dans ce navigateur. La transcription système peut, selon le navigateur ou l’OS, utiliser un service distant. Whisper reste le secours local.</p>
+        <div class="setup-status" aria-live="polite">
+          <span>Application <strong id="swStatus">Vérification…</strong></span>
+          <span>Stockage <strong id="storageStatus">Vérification…</strong></span>
+          <span>Transcription <strong id="modelStatus">Détection…</strong></span>
+        </div>
+        <div id="progressBlock" class="progress-block hidden">
+          <div class="progress-row"><span id="progressLabel">Chargement…</span><span id="progressValue"></span></div>
+          <progress id="modelProgress" max="100" value="0"></progress>
+        </div>
+        <button id="prepareBtn" class="ghost small">Préparer Whisper de secours</button>
+      </details>
     </section>
 
-    <section id="sttLabCard" class="card compact">
-      <div class="interview-head">
-        <div><p class="eyebrow">STT LAB</p><h2>Tests du moteur vocal</h2></div>
-        <div class="actions"><a class="secondary button-link small" href="./device-stt-capability.html">Device / navigateur</a><a class="secondary button-link small" href="./stt-benchmark.html">Whisper simple</a><a class="secondary button-link small" href="./stt-deep-benchmark.html">Matrice Whisper</a></div>
+    <details id="sttLabCard" class="setup-tools">
+      <summary>Outils de diagnostic vocal</summary>
+      <div class="setup-tools-links">
+        <a href="./device-stt-capability.html">Device / navigateur</a>
+        <a href="./stt-benchmark.html">Whisper simple</a>
+        <a href="./stt-deep-benchmark.html">Matrice Whisper</a>
       </div>
-    </section>
+    </details>
 
     <section id="interviewView" class="interview-layout hidden">
       <aside id="questionSidebar" class="question-sidebar" aria-label="Navigation dans les questions">
