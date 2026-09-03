@@ -167,3 +167,49 @@
   .setup-footer #resumeBtn{margin:0}
   .setup-start{min-width:0}
 }
+
+
+/* Dream Team UX v21 · iteration 2 — recording-first interview */
+.question-tools{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;margin:0 0 14px}
+.question-tools .question-intent-details,.question-tools .followups-panel{margin:0}
+.question-tools .followups-panel[open],.question-tools .question-intent-details[open]{flex-basis:100%}
+.capture-dock{padding:14px 16px 13px;border:1px solid #d8e0eb;background:rgba(255,255,255,.985);transition:border-color .15s ease,box-shadow .15s ease,background .15s ease}
+.capture-state-row{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px}
+.capture-state-copy{display:flex;align-items:center;gap:8px;min-width:0}
+.capture-state-copy strong{font-size:.72rem;letter-spacing:.08em;color:#52627a}
+.recording-dot{width:9px;height:9px;border-radius:999px;background:#cbd5e1;box-shadow:0 0 0 4px rgba(203,213,225,.22);flex:none}
+.capture-state-row .timer{font-size:1rem;font-weight:800;letter-spacing:.02em;color:#475569}
+.speaker-row{display:flex;align-items:center;gap:12px}
+.speaker-row-label{font-size:.78rem;font-weight:800;color:#64748b;white-space:nowrap}
+.capture-dock .speaker-buttons{flex:1;display:flex;gap:8px;flex-wrap:wrap}
+.capture-dock .speaker-button{min-width:112px;min-height:46px;border-radius:12px;background:#f8fafc;border:1px solid #d8e0eb;color:#1f2937;font-weight:800}
+.capture-dock .speaker-button::before{display:none}
+.capture-dock .speaker-button.active:not(.recording){background:#eef3fb;border-color:#b8c5d8;color:#172554}
+.capture-dock .speaker-button.recording{background:#b42318;border-color:#b42318;color:#fff;box-shadow:0 0 0 4px rgba(180,35,24,.12)}
+.capture-dock .speaker-button.recording::before{display:none}
+.capture-dock .speaker-button.queued{background:#fff7e6;border-color:#e9b949;color:#7a4b00}
+.capture-dock.is-recording{border-color:#e36a60;background:#fffafa;box-shadow:0 14px 36px rgba(180,35,24,.14)}
+.capture-dock.is-recording .recording-dot{background:#d92d20;box-shadow:0 0 0 5px rgba(217,45,32,.13);animation:recordingPulse 1.35s ease-in-out infinite}
+.capture-dock.is-recording #captureModeLabel{color:#b42318}
+.capture-dock.is-recording .record-state{color:#7a271a;font-weight:750}
+.capture-dock.is-finalizing{border-color:#d6b45f;background:#fffdf7}
+.capture-dock.is-finalizing .recording-dot{background:#d6a338}
+.capture-dock.is-finalizing #captureModeLabel{color:#806000}
+@keyframes recordingPulse{0%,100%{transform:scale(1);box-shadow:0 0 0 4px rgba(217,45,32,.12)}50%{transform:scale(1.18);box-shadow:0 0 0 8px rgba(217,45,32,.06)}}
+.capture-dock .speaker-help{margin:8px 0 0 92px;font-size:.74rem;color:#8a96a8}
+.live-transcript{margin:10px 0 0;padding:9px 11px;border-radius:10px;background:#fff;border:1px solid #f0d4d1;color:#475569;font-size:.82rem;line-height:1.45;max-height:68px;overflow:auto}
+.capture-dock .transcribing{margin:10px 0 0;font-size:.8rem}
+.question-sidebar .sidebar-participants{margin-top:18px;border-top:1px solid #edf1f5;padding-top:12px}
+.question-sidebar .question-nav{margin-top:16px}
+.question-sidebar .sidebar-finish{margin-top:12px}
+@media(min-width:1000px){
+  .interview-layout{grid-template-columns:minmax(270px,315px) minmax(0,1fr)}
+  .interview-main{padding:26px 34px 120px}
+  .question{max-width:980px;font-size:clamp(1.8rem,2.55vw,2.45rem)}
+}
+@media(max-width:759px){
+  .speaker-row{display:grid;gap:8px}
+  .capture-dock .speaker-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .capture-dock .speaker-button{min-width:0}
+  .capture-dock .speaker-help{margin-left:0}
+}
