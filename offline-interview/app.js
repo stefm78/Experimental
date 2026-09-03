@@ -862,6 +862,13 @@ function renderTurns() {
     type.className = 'turn-type';
     type.textContent = turn.type === 'follow_up' ? (turn.followUpKind === 'ad_hoc' ? 'Relance spontanée' : 'Relance') : (/system|whisper|speech/.test(turn.source || '') ? 'Voix' : 'Texte');
 
+    const meta = document.createElement('span');
+    meta.className = 'turn-meta-inline';
+    const metaBits = [];
+    if (turn.durationSeconds) metaBits.push(Math.round(turn.durationSeconds) + ' s');
+    if (turn.createdAt) metaBits.push(new Date(turn.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+    meta.textContent = metaBits.join(' · ');
+
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'ghost small icon-button';
@@ -876,15 +883,15 @@ function renderTurns() {
       renderQuestionNav();
       renderInterviewMetrics();
     });
-    head.append(select, type, remove);
+    head.append(select, type, meta, remove);
 
     const text = document.createElement('textarea');
     text.className = 'turn-text';
-    text.rows = turn.type === 'follow_up' ? 2 : 3;
+    text.rows = turn.type === 'follow_up' ? 2 : 1;
     text.value = turn.text;
     const resizeTurnText = () => {
       text.style.height = 'auto';
-      text.style.height = Math.min(320, Math.max(56, text.scrollHeight)) + 'px';
+      text.style.height = Math.min(280, Math.max(34, text.scrollHeight)) + 'px';
     };
     text.addEventListener('input', resizeTurnText);
     text.addEventListener('change', async () => {
@@ -896,13 +903,7 @@ function renderTurns() {
       renderInterviewMetrics();
     });
 
-    const meta = document.createElement('p');
-    meta.className = 'hint turn-meta';
-    const bits = [];
-    if (turn.durationSeconds) bits.push(`${Math.round(turn.durationSeconds)} s`);
-    if (turn.createdAt) bits.push(new Date(turn.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
-    meta.textContent = bits.join(' · ');
-    card.append(head, text, meta);
+    card.append(head, text);
     ui.turnsList.append(card);
     requestAnimationFrame(resizeTurnText);
   }
@@ -1261,7 +1262,10 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     recordingQuestionId = questionId;
     recordingCaptureId = uuid('capture');
     recordingCompletionPromise = new Promise(resolve => { resolveRecordingCompletion = resolve; });
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+    const reusableStream = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
+    if (!reusableStream) {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+    }
     const mimeType = preferredMimeType();
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     chunks = [];
@@ -1306,8 +1310,7 @@ function stopRecording() {
   updateCaptureUi();
   setTimeout(() => {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
-    stream?.getTracks().forEach(track => track.stop());
-  }, 450);
+  }, 120);
 }
 async function blobTo16kMono(blob) {
   const arrayBuffer = await blob.arrayBuffer();
@@ -1394,7 +1397,11 @@ async function handleRecordingStopped() {
     recordingQuestionId = null;
     recorder = null;
     captureFinalizing = false;
-    stream = null;
+    const keepMicrophoneOpen = Boolean(nextSpeakerId && participantById(nextSpeakerId));
+    if (!keepMicrophoneOpen) {
+      stream?.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
     try { resolveRecordingCompletion?.(); } catch {}
     resolveRecordingCompletion = null;
     recordingCompletionPromise = null;
