@@ -190,16 +190,27 @@
         </section>
       </section>
     </section>
-    <section id="doneView" class="card hidden">
+    <section id="doneView" class="done-panel hidden">
+      <div class="done-icon" aria-hidden="true">✓</div>
       <p class="eyebrow">ENTRETIEN TERMINÉ</p>
-      <h2>Le jeu d'interview est prêt à être réutilisé par une IA.</h2>
-      <p id="doneSummary" class="lead"></p>
-      <div class="actions stack-mobile">
-        <button id="reviewBtn" class="secondary">Relire / corriger</button>
-        <button id="exportTxtBtn" class="primary">Exporter TXT</button>
-        <button id="exportJsonBtn" class="primary">Exporter JSON pour IA</button>
+      <h2>Le résultat est prêt.</h2>
+      <p id="doneSummary" class="done-summary"></p>
+
+      <div class="done-stats">
+        <div><strong id="doneQuestionStat">0 / 0</strong><span>questions abordées</span></div>
+        <div><strong id="doneTurnStat">0</strong><span>prises de parole</span></div>
+        <div><strong id="doneTimeStat">0 min</strong><span>temps actif</span></div>
       </div>
-      <button id="newSessionBtn" class="danger-outline">Nouvelle session</button>
+
+      <div class="done-export">
+        <button id="exportJsonBtn" class="primary done-primary">Exporter le résultat JSON</button>
+        <button id="exportTxtBtn" class="ghost">Exporter en texte</button>
+      </div>
+
+      <div class="done-secondary">
+        <button id="reviewBtn" class="link-button">Relire / corriger</button>
+        <button id="newSessionBtn" class="link-button done-new-session">Nouvelle session</button>
+      </div>
     </section>
 
     <section class="card compact diagnostics">
@@ -218,6 +229,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=20"></script>
+  <script type="module" src="./app.js?v=21"></script>
 </body>
 </html>
