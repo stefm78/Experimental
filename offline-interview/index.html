@@ -76,10 +76,12 @@
         <div class="question-sidebar-head">
           <p class="eyebrow">INTERVIEW</p>
           <h2 id="sidebarInterviewTitle">Interview</h2>
-          <div class="sidebar-time-row">
+          <div class="sidebar-progress-row">
+            <span id="sidebarProgressSummary">0 / 0 abordées</span>
             <span id="sidebarTimeSummary">0 min / ~0 min</span>
-            <button id="pauseBtn" class="link-button" type="button" aria-pressed="false">Ⅱ Pause</button>
           </div>
+          <progress id="sidebarTimeProgress" class="sidebar-time-progress" max="1" value="0"></progress>
+          <button id="pauseBtn" class="link-button sidebar-pause" type="button" aria-pressed="false">Ⅱ Pause</button>
         </div>
 
         <details class="sidebar-participants">
