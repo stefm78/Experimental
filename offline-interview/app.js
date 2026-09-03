@@ -784,22 +784,43 @@ function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', raw
     updatedAt: nowIso()
   };
 }
+
+function meaningfulTranscript(value) {
+  const text = cleanText(value);
+  return Boolean(text && /[\p{L}\p{N}]/u.test(text));
+}
+
+function comparableTranscript(value) {
+  return cleanText(value)
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
 async function appendAnswerTurn({ questionId, speakerId, text, source, rawTranscript = null, durationSeconds = 0 }) {
   const clean = cleanText(text);
-  if (!clean || !questionId || !speakerId) return false;
+  if (!meaningfulTranscript(clean) || !questionId || !speakerId) return false;
   const response = responseFor(questionId);
   const last = [...(response.turns || [])].reverse().find(turn => turn.type === 'answer');
   if (last && last.speakerId === speakerId) {
     const previous = cleanText(last.text);
-    const same = previous === clean;
-    const nearDuplicate = previous.length > 40 && clean.length > 40 && (clean.startsWith(previous) || previous.startsWith(clean));
-    const recent = last.createdAt && (Date.now() - new Date(last.createdAt).getTime()) < 5000;
+    const previousComparable = comparableTranscript(previous);
+    const cleanComparable = comparableTranscript(clean);
+    const same = previousComparable === cleanComparable;
+    const nearDuplicate = previousComparable.length > 20 && cleanComparable.length > 20 &&
+      (cleanComparable.startsWith(previousComparable) || previousComparable.startsWith(cleanComparable));
+    const recent = last.createdAt && (Date.now() - new Date(last.createdAt).getTime()) < 7000;
     if (recent && (same || nearDuplicate)) {
-      if (clean.length > previous.length) {
+      if (cleanComparable.length > previousComparable.length) {
         last.text = clean;
         last.rawTranscript = rawTranscript || clean;
         last.updatedAt = nowIso();
         last.durationSeconds = Math.max(Number(last.durationSeconds) || 0, Number(durationSeconds) || 0);
+        const speaker = participantById(speakerId) || session?.participantHistory?.[speakerId] || null;
+        last.speakerNameSnapshot = last.speakerNameSnapshot || speaker?.name || null;
+        last.speakerRoleSnapshot = last.speakerRoleSnapshot || speaker?.role || null;
         await persistSession();
         renderTurns();
       }
@@ -1012,7 +1033,17 @@ function finishInterview() {
 }
 
 function exportPayload() {
-  const participants = clone(session.participants || []);
+  const activeIds = new Set((session.participants || []).map(p => p.id));
+  const historyValues = Object.values(session.participantHistory || {});
+  const participants = historyValues.length
+    ? historyValues.map(p => ({
+        id: p.id,
+        name: p.name,
+        role: p.role,
+        active: activeIds.has(p.id),
+        removedAt: p.removedAt || null
+      }))
+    : clone(session.participants || []).map(p => ({ ...p, active: true, removedAt: null }));
   const participantMap = new Map(participants.map(p => [p.id, p]));
   let answeredQuestions = 0;
   let followUpsUsed = 0;
@@ -1029,8 +1060,8 @@ function exportPayload() {
           id: turn.id,
           type: turn.type,
           speakerId: turn.speakerId,
-          speakerName: p?.name || null,
-          speakerRole: p?.role || null,
+          speakerName: turn.speakerNameSnapshot || p?.name || null,
+          speakerRole: turn.speakerRoleSnapshot || p?.role || null,
           text: turn.text,
           source: turn.source,
           rawTranscript: turn.rawTranscript,
@@ -1210,12 +1241,10 @@ async function detectRuntimeSystemSpeech() {
   return systemSpeechCapability;
 }
 
-function applySystemText({ text, finalText, mode }) {
-  if (!text) return;
-  ui.answerText.value = text;
-  composerSource = mode === 'local' ? 'system-local' : 'system';
-  composerRawTranscript = finalText || text;
-  if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = text;
+function applySystemText({ text }) {
+  if (!text || !ui.liveTranscriptPreview) return;
+  ui.liveTranscriptPreview.textContent = text;
+  ui.liveTranscriptPreview.scrollTop = ui.liveTranscriptPreview.scrollHeight;
 }
 function progressCallback(item) {
   show(ui.progressBlock, true);
@@ -1452,6 +1481,20 @@ async function resumeInterview() {
   interview = normalizeSpec(session.interviewSpec || interview);
   session.interviewSpec = clone(interview);
   if (!Array.isArray(session.participants) || !session.participants.length) session.participants = clone(interview.participants);
+  if (!session.participantHistory || typeof session.participantHistory !== 'object') {
+    session.participantHistory = Object.fromEntries(session.participants.map(p => [p.id, { ...clone(p), removedAt: null }]));
+    for (const response of Object.values(session.responses || {})) {
+      for (const turn of response.turns || []) {
+        if (!turn.speakerId || session.participantHistory[turn.speakerId]) continue;
+        session.participantHistory[turn.speakerId] = {
+          id: turn.speakerId,
+          name: turn.speakerNameSnapshot || turn.speakerId,
+          role: turn.speakerRoleSnapshot || 'other',
+          removedAt: null
+        };
+      }
+    }
+  }
   if (!session.responses || typeof session.responses !== 'object') session.responses = {};
   if (!session.questionSeconds || typeof session.questionSeconds !== 'object') session.questionSeconds = {};
   if (!Number.isFinite(Number(session.activeSeconds))) session.activeSeconds = 0;
