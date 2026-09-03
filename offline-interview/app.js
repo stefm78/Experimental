@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v19';
+const BUILD_ID = '2026-09-03.interview-runtime-v20';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -18,8 +18,8 @@ const ui = {
   interviewFile: $('interviewFile'), loadError: $('loadError'), setupParticipants: $('setupParticipants'), setupAddParticipantBtn: $('setupAddParticipantBtn'),
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
-  sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'),
-  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarTimeSummary: $('sidebarTimeSummary'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'),
+  sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
+  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
   recordState: $('recordState'), timer: $('timer'), recordBtn: $('recordBtn'), stopBtn: $('stopBtn'), transcribing: $('transcribing'),
@@ -75,6 +75,7 @@ function setView(name) {
   show(ui.doneView, name === 'done');
   show(ui.sttLabCard, name === 'setup');
   show(ui.authoringKitCard, name === 'setup');
+  document.body.classList.toggle('interview-mode', name === 'interview');
   if (name === 'interview') startSessionClock();
   else stopSessionClock();
 }
@@ -439,11 +440,16 @@ function renderInterviewMetrics() {
   const totalEstimate = estimatedTotalMinutes();
   const remaining = remainingEstimatedMinutes();
   if (ui.interviewProgressSummary) ui.interviewProgressSummary.textContent = answered + ' / ' + all.length + ' abordées';
+  if (ui.sidebarProgressSummary) ui.sidebarProgressSummary.textContent = answered + ' / ' + all.length + ' abordées';
   if (ui.timeProgressLabel) ui.timeProgressLabel.textContent = elapsedMinutesLabel(elapsedSeconds) + ' écoulées · ~' + Math.max(0, Math.round(remaining)) + ' min prévues restantes';
   if (ui.sidebarTimeSummary) ui.sidebarTimeSummary.textContent = elapsedMinutesLabel(elapsedSeconds) + ' / ~' + Math.round(totalEstimate) + ' min';
   if (ui.timeProgress) {
     ui.timeProgress.max = Math.max(1, totalEstimate);
     ui.timeProgress.value = Math.min(totalEstimate, elapsedMinutes);
+  }
+  if (ui.sidebarTimeProgress) {
+    ui.sidebarTimeProgress.max = Math.max(1, totalEstimate);
+    ui.sidebarTimeProgress.value = Math.min(totalEstimate, elapsedMinutes);
   }
   if (ui.pauseBtn) {
     ui.pauseBtn.textContent = session.paused ? '▶ Reprendre' : 'Ⅱ Pause';
@@ -454,8 +460,7 @@ function renderInterviewMetrics() {
 function questionNavLabel(question) {
   const explicit = cleanText(question.label);
   if (explicit) return explicit;
-  const text = cleanText(question.text);
-  return text.length > 46 ? text.slice(0, 43) + '…' : text;
+  return cleanText(question.text);
 }
 
 function renderQuestionNav() {
@@ -476,6 +481,7 @@ function renderQuestionNav() {
       const row = document.createElement('button');
       row.type = 'button';
       row.className = 'question-nav-item' + (answered ? ' answered' : '') + (current ? ' current' : '');
+      row.title = question.text;
       if (current) row.setAttribute('aria-current', 'step');
       const state = document.createElement('span');
       state.className = 'question-nav-state';
@@ -626,10 +632,12 @@ function renderSpeakerButtons() {
     const queued = isRecording() && participant.id === queuedSpeakerId;
     const active = participant.id === session.activeSpeakerId;
     button.className = `speaker-button${active ? ' active' : ''}${recording ? ' recording' : ''}${queued ? ' queued' : ''}`;
-    button.textContent = recording ? `■ ${participant.name}` : `🎙 ${participant.name}`;
+    button.textContent = participant.name;
+    button.dataset.captureState = recording ? 'recording' : queued ? 'queued' : 'idle';
     button.title = recording
       ? `Terminer la prise de parole de ${participant.name}`
       : `Démarrer une prise de parole attribuée à ${participant.name}`;
+    button.setAttribute('aria-label', button.title);
     button.setAttribute('aria-pressed', recording ? 'true' : 'false');
     button.addEventListener('click', () => handleSpeakerButtonClick(participant.id));
     ui.speakerButtons.append(button);
@@ -638,6 +646,10 @@ function renderSpeakerButtons() {
   ui.activeSpeakerLabel.textContent = active
     ? (isRecording() ? `${active.name} · enregistrement en cours` : `${active.name} · prêt`)
     : '';
+  if (ui.speakerHelp) {
+    const hasTurns = Object.values(session.responses || {}).some(r => (r.turns || []).some(t => t.type === 'answer'));
+    ui.speakerHelp.classList.toggle('hidden', hasTurns || isRecording());
+  }
   updateComposerSpeaker();
 }
 function updateComposerSpeaker() {
@@ -652,7 +664,7 @@ function resetComposer() {
   composerDurationSeconds = 0;
   composerSource = 'keyboard';
   composerRawTranscript = null;
-  ui.recordState.textContent = 'Prêt à enregistrer';
+  ui.recordState.textContent = 'Choisissez un locuteur';
   ui.timer.textContent = '00:00';
 }
 
@@ -672,8 +684,9 @@ function renderQuestion() {
   ui.questionProgress.max = all.length;
   ui.questionProgress.value = session.currentIndex + 1;
   ui.questionText.textContent = question.text;
-  ui.questionIntent.textContent = question.intent ? 'Pourquoi cette question : ' + question.intent : '';
-  show(ui.questionIntent, Boolean(question.intent));
+  ui.questionIntent.textContent = question.intent || '';
+  show(ui.questionIntentDetails, Boolean(question.intent));
+  if (ui.questionIntentDetails) ui.questionIntentDetails.open = false;
   ui.prevBtn.disabled = session.currentIndex === 0;
   ui.validateBtn.textContent = session.currentIndex === all.length - 1 ? 'Terminer l’entretien' : 'Question suivante →';
   showError(ui.interviewError);
@@ -717,6 +730,9 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
   renderTurns();
   renderQuestionNav();
   renderInterviewMetrics();
+  requestAnimationFrame(() => {
+    ui.turnsList?.lastElementChild?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  });
   return true;
 }
 
@@ -752,6 +768,7 @@ function renderTurns() {
     head.className = 'turn-head';
 
     const select = document.createElement('select');
+    select.className = 'turn-speaker-select';
     select.setAttribute('aria-label', 'Locuteur de la prise de parole');
     for (const p of participantsSource()) {
       const option = document.createElement('option');
@@ -794,8 +811,14 @@ function renderTurns() {
     head.append(select, type, remove);
 
     const text = document.createElement('textarea');
-    text.rows = turn.type === 'follow_up' ? 2 : 4;
+    text.className = 'turn-text';
+    text.rows = turn.type === 'follow_up' ? 2 : 3;
     text.value = turn.text;
+    const resizeTurnText = () => {
+      text.style.height = 'auto';
+      text.style.height = Math.min(320, Math.max(56, text.scrollHeight)) + 'px';
+    };
+    text.addEventListener('input', resizeTurnText);
     text.addEventListener('change', async () => {
       turn.text = cleanText(text.value);
       turn.updatedAt = nowIso();
@@ -813,6 +836,7 @@ function renderTurns() {
     meta.textContent = bits.join(' · ');
     card.append(head, text, meta);
     ui.turnsList.append(card);
+    requestAnimationFrame(resizeTurnText);
   }
 }
 
@@ -1024,10 +1048,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=19', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=20', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v19' : 'installé · v19';
+    ui.diagSw.textContent = reg.active ? 'actif · v20' : 'installé · v20';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1465,6 +1489,24 @@ ui.exportJsonBtn.addEventListener('click', exportJson);
 ui.newSessionBtn.addEventListener('click', resetSession);
 ui.copyDiagBtn.addEventListener('click', copyDiagnosticReport);
 ui.copyAuthoringKitBtn.addEventListener('click', copyAuthoringKit);
+
+document.addEventListener('keydown', event => {
+  if (ui.interviewView?.classList.contains('hidden')) return;
+  if (event.key === 'Escape' && isRecording()) {
+    event.preventDefault();
+    queuedSpeakerId = null;
+    stopRecording();
+    return;
+  }
+  if (!event.altKey) return;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+    event.preventDefault();
+    goNextQuestion();
+  } else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+    event.preventDefault();
+    goPrevious();
+  }
+});
 ui.answerText.addEventListener('input', () => {
   if (composerSource !== 'speech') composerSource = 'keyboard';
 });
