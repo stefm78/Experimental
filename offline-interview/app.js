@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v24';
+const BUILD_ID = '2026-09-03.interview-runtime-v25';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -19,10 +19,10 @@ const ui = {
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
-  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'),
+  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), topOnAir: $('topOnAir'), topOnAirSpeaker: $('topOnAirSpeaker'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
-  captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'),
+  captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'), captureQuestionContext: $('captureQuestionContext'), captureQuestionStatus: $('captureQuestionStatus'), captureQuestionLabel: $('captureQuestionLabel'), moveCaptureBtn: $('moveCaptureBtn'),
   answerText: $('answerText'), answerMeta: $('answerMeta'), composerSpeaker: $('composerSpeaker'), addTurnBtn: $('addTurnBtn'), clearComposerBtn: $('clearComposerBtn'),
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
   interviewError: $('interviewError'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
@@ -585,6 +585,64 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   return true;
 }
 
+function captureQuestionEntry() {
+  if (!recordingQuestionId) return null;
+  return flattenedQuestions().find(entry => entry.question.id === recordingQuestionId) || null;
+}
+
+function renderCaptureQuestionContext() {
+  if (!session) return;
+  const recording = isRecording();
+  const finalizing = captureFinalizing && Boolean(recordingQuestionId);
+  const active = recording || finalizing;
+  show(ui.captureQuestionContext, active);
+  show(ui.topOnAir, recording);
+
+  if (!active) {
+    show(ui.moveCaptureBtn, false);
+    if (ui.topOnAirSpeaker) ui.topOnAirSpeaker.textContent = '';
+    return;
+  }
+
+  const owner = captureQuestionEntry();
+  const viewed = currentEntry();
+  const ownerIndex = owner ? flattenedQuestions().findIndex(entry => entry.question.id === owner.question.id) : -1;
+  const viewedIndex = session.currentIndex;
+  const ownerLabel = owner ? ((ownerIndex + 1) + '. ' + (owner.question.label || questionNavLabel(owner.question))) : 'Question en cours';
+  const differs = Boolean(recording && viewed?.question?.id && viewed.question.id !== recordingQuestionId);
+
+  if (ui.captureQuestionStatus) {
+    ui.captureQuestionStatus.textContent = differs ? 'L’enregistrement reste sur' : 'Enregistrement sur';
+  }
+  if (ui.captureQuestionLabel) ui.captureQuestionLabel.textContent = ownerLabel;
+
+  if (ui.topOnAirSpeaker && recording) {
+    const speaker = participantById(recordingSpeakerId);
+    ui.topOnAirSpeaker.textContent = speaker ? '· ' + speaker.name : '';
+  }
+
+  show(ui.moveCaptureBtn, differs);
+  if (differs && ui.moveCaptureBtn) {
+    const targetLabel = viewed?.question?.label || ('question ' + (viewedIndex + 1));
+    ui.moveCaptureBtn.textContent = 'Continuer sur ' + targetLabel + ' →';
+  }
+}
+
+async function moveRecordingToViewedQuestion() {
+  if (!isRecording() || !recordingSpeakerId) return;
+  const targetQuestionId = currentEntry()?.question?.id || null;
+  if (!targetQuestionId || targetQuestionId === recordingQuestionId) return;
+
+  const rotated = await rotateLiveSegment(recordingSpeakerId, targetQuestionId);
+  if (!rotated) {
+    queuedSpeakerId = recordingSpeakerId;
+    queuedRecordingQuestionId = targetQuestionId;
+    ui.recordState.textContent = 'Changement de question…';
+    stopRecording();
+  }
+  renderCaptureQuestionContext();
+}
+
 async function togglePause() {
   if (!session) return;
   if (!session.paused) flushSessionClock();
@@ -599,17 +657,8 @@ async function goToQuestion(index) {
   const all = flattenedQuestions();
   if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;
   flushSessionClock();
-  const targetQuestionId = all[index]?.question?.id || null;
 
-  if (isRecording() && targetQuestionId && targetQuestionId !== recordingQuestionId) {
-    const rotated = await rotateLiveSegment(recordingSpeakerId, targetQuestionId);
-    if (!rotated) {
-      queuedSpeakerId = recordingSpeakerId;
-      queuedRecordingQuestionId = targetQuestionId;
-      ui.recordState.textContent = 'Changement de question…';
-      stopRecording();
-    }
-  } else if (!isRecording() && !captureFinalizing) {
+  if (!isRecording() && !captureFinalizing) {
     await addComposerTurn();
   }
 
@@ -751,6 +800,7 @@ function updateCaptureUi() {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'PRÊT';
     ui.recordState.textContent = 'Cliquez sur la personne qui parle';
   }
+  renderCaptureQuestionContext();
 }
 
 function renderSpeakerButtons() {
@@ -784,6 +834,7 @@ function renderSpeakerButtons() {
     ui.speakerHelp.classList.toggle('hidden', hasTurns || isRecording() || captureFinalizing);
   }
   updateCaptureUi();
+  renderCaptureQuestionContext();
   updateComposerSpeaker();
 }
 function updateComposerSpeaker() {
@@ -830,6 +881,7 @@ function renderQuestion() {
   renderFollowUps();
   renderQuestionNav();
   renderInterviewMetrics();
+  renderCaptureQuestionContext();
 }
 
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
@@ -1688,6 +1740,7 @@ ui.adHocFollowUpText.addEventListener('keydown', event => {
 ui.validateBtn.addEventListener('click', goNextQuestion);
 ui.prevBtn.addEventListener('click', goPrevious);
 ui.pauseBtn?.addEventListener('click', togglePause);
+ui.moveCaptureBtn?.addEventListener('click', moveRecordingToViewedQuestion);
 ui.sidebarFinishBtn?.addEventListener('click', completeInterview);
 ui.reviewBtn.addEventListener('click', async () => {
   session.completed = false;
