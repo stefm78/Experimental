@@ -117,6 +117,7 @@
             <div class="interview-clock">
               <div class="interview-clock-copy">
                 <strong id="sessionClockText">00:00</strong>
+                <span aria-hidden="true">·</span>
                 <span id="sessionRemainingText">~0 min restantes</span>
               </div>
               <button id="pauseBtn" class="ghost small clock-button" type="button" aria-pressed="false">Ⅱ Pause</button>
@@ -148,7 +149,6 @@
               </div>
             </details>
 
-            <button id="moveCaptureBtn" class="move-capture hidden" type="button">Basculer l’enregistrement sur cette question</button>
           </div>
         </div>
 
@@ -215,8 +215,8 @@
       </div>
 
       <div class="done-export">
-        <button id="exportJsonBtn" class="primary done-primary">Exporter le résultat JSON</button>
-        <button id="exportTxtBtn" class="ghost">Exporter en texte</button>
+        <button id="exportJsonBtn" class="primary done-primary">Exporter pour une IA</button>
+        <button id="exportTxtBtn" class="ghost">Exporter une version lisible</button>
       </div>
 
       <div class="done-secondary">
@@ -241,6 +241,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=23"></script>
+  <script type="module" src="./app.js?v=24"></script>
 </body>
 </html>
