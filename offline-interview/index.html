@@ -91,10 +91,9 @@
           <h2 id="sidebarInterviewTitle">Interview</h2>
           <div class="sidebar-progress-row">
             <span id="sidebarProgressSummary">0 / 0 abordées</span>
-            <span id="sidebarTimeSummary">0 min / ~0 min</span>
+            <span id="sidebarTimeSummary">~0 min restantes</span>
           </div>
           <progress id="sidebarTimeProgress" class="sidebar-time-progress" max="1" value="0"></progress>
-          <button id="pauseBtn" class="link-button sidebar-pause" type="button" aria-pressed="false">Ⅱ Pause</button>
         </div>
 
         <nav id="questionNav" class="question-nav"></nav>
@@ -109,63 +108,76 @@
       </aside>
 
       <section class="interview-main">
-        <header class="question-header">
-          <div>
-            <p id="sectionTitle" class="eyebrow">SECTION</p>
-            <h2 id="questionCounter">1 / 5</h2>
+        <div class="question-sticky">
+          <header class="question-header">
+            <div>
+              <p id="sectionTitle" class="eyebrow">SECTION</p>
+              <h2 id="questionCounter">1 / 5</h2>
+            </div>
+            <div class="interview-clock">
+              <div class="interview-clock-copy">
+                <strong id="sessionClockText">00:00</strong>
+                <span id="sessionRemainingText">~0 min restantes</span>
+              </div>
+              <button id="pauseBtn" class="ghost small clock-button" type="button" aria-pressed="false">Ⅱ Pause</button>
+              <button id="homeBtn" class="ghost small home-button" title="Revenir à l’accueil" aria-label="Revenir à l’accueil">Accueil</button>
+            </div>
+          </header>
+
+          <div class="interview-metrics mobile-only-metrics" aria-live="polite">
+            <strong id="interviewProgressSummary">0 / 0 abordées</strong>
+            <span id="timeProgressLabel">0 min écoulées · temps restant estimé</span>
           </div>
-          <button id="homeBtn" class="ghost small home-button" title="Revenir à l’accueil" aria-label="Revenir à l’accueil">Accueil</button>
-        </header>
+          <progress id="timeProgress" class="time-progress mobile-only-metrics" max="1" value="0"></progress>
+          <progress id="questionProgress" class="question-progress-mobile" max="5" value="1"></progress>
 
-        <div class="interview-metrics mobile-only-metrics" aria-live="polite">
-          <strong id="interviewProgressSummary">0 / 0 abordées</strong>
-          <span id="timeProgressLabel">0 min écoulées · temps restant estimé</span>
+          <p id="questionText" class="question"></p>
+
+          <div class="question-tools">
+            <details id="questionIntentDetails" class="question-intent-details">
+              <summary>Pourquoi cette question ?</summary>
+              <p id="questionIntent" class="question-intent"></p>
+            </details>
+
+            <details id="followUpsPanel" class="followups-panel">
+              <summary id="followUpsSummary">Relances possibles</summary>
+              <div id="plannedFollowUps" class="followup-list"></div>
+              <div class="adhoc-followup">
+                <input id="adHocFollowUpText" type="text" placeholder="Relance spontanée…">
+                <button id="addAdHocFollowUpBtn" class="ghost small">+ Ajouter</button>
+              </div>
+            </details>
+
+            <button id="moveCaptureBtn" class="move-capture hidden" type="button">Basculer l’enregistrement sur cette question</button>
+          </div>
         </div>
-        <progress id="timeProgress" class="time-progress mobile-only-metrics" max="1" value="0"></progress>
-        <progress id="questionProgress" class="question-progress-mobile" max="5" value="1"></progress>
 
-        <p id="questionText" class="question"></p>
+        <div class="conversation-scroll">
+          <section id="turnsSection" class="conversation-section hidden">
+            <h3>Conversation</h3>
+            <div id="turnsList" class="turns-list"></div>
+          </section>
 
-        <div class="question-tools">
-          <details id="questionIntentDetails" class="question-intent-details">
-            <summary>Pourquoi cette question ?</summary>
-            <p id="questionIntent" class="question-intent"></p>
-          </details>
-
-          <details id="followUpsPanel" class="followups-panel">
-            <summary id="followUpsSummary">Relances possibles</summary>
-            <div id="plannedFollowUps" class="followup-list"></div>
-            <div class="adhoc-followup">
-              <input id="adHocFollowUpText" type="text" placeholder="Relance spontanée…">
-              <button id="addAdHocFollowUpBtn" class="ghost small">+ Ajouter</button>
+          <details class="manual-entry">
+            <summary>Ajouter un propos manuellement</summary>
+            <div class="composer-head">
+              <label for="answerText">Texte</label>
+              <span id="composerSpeaker" class="speaker-chip"></span>
+            </div>
+            <textarea id="answerText" rows="5" placeholder="Saisir un propos manuellement…"></textarea>
+            <p id="answerMeta" class="hint"></p>
+            <div class="actions compact-actions">
+              <button id="addTurnBtn" class="secondary">Ajouter</button>
+              <button id="clearComposerBtn" class="ghost">Effacer</button>
             </div>
           </details>
-        </div>
 
-        <section id="turnsSection" class="conversation-section hidden">
-          <h3>Conversation</h3>
-          <div id="turnsList" class="turns-list"></div>
-        </section>
+          <p id="interviewError" class="error hidden" role="alert"></p>
 
-        <details class="manual-entry">
-          <summary>Ajouter un propos manuellement</summary>
-          <div class="composer-head">
-            <label for="answerText">Texte</label>
-            <span id="composerSpeaker" class="speaker-chip"></span>
+          <div class="actions interview-nav-actions">
+            <button id="prevBtn" class="ghost">← Précédente</button>
+            <button id="validateBtn" class="primary">Question suivante →</button>
           </div>
-          <textarea id="answerText" rows="5" placeholder="Saisir un propos manuellement…"></textarea>
-          <p id="answerMeta" class="hint"></p>
-          <div class="actions compact-actions">
-            <button id="addTurnBtn" class="secondary">Ajouter</button>
-            <button id="clearComposerBtn" class="ghost">Effacer</button>
-          </div>
-        </details>
-
-        <p id="interviewError" class="error hidden" role="alert"></p>
-
-        <div class="actions interview-nav-actions">
-          <button id="prevBtn" class="ghost">← Précédente</button>
-          <button id="validateBtn" class="primary">Question suivante →</button>
         </div>
 
         <section id="captureDock" class="capture-dock" aria-label="Capturer une prise de parole">
@@ -175,7 +187,7 @@
 
           <div class="capture-state-row">
             <div class="capture-state-copy">
-              <span class="recording-dot" aria-hidden="true"></span>
+              <span class="recording-mic" aria-hidden="true">🎙</span>
               <strong id="captureModeLabel">PRÊT</strong>
               <span id="recordState" class="record-state">Cliquez sur la personne qui parle</span>
             </div>
@@ -229,6 +241,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=22"></script>
+  <script type="module" src="./app.js?v=23"></script>
 </body>
 </html>

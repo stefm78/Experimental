@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v22';
+const BUILD_ID = '2026-09-03.interview-runtime-v23';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -19,7 +19,7 @@ const ui = {
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
-  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'),
+  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), moveCaptureBtn: $('moveCaptureBtn'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
   captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'),
@@ -447,7 +447,9 @@ function renderInterviewMetrics() {
   if (ui.interviewProgressSummary) ui.interviewProgressSummary.textContent = answered + ' / ' + all.length + ' abordées';
   if (ui.sidebarProgressSummary) ui.sidebarProgressSummary.textContent = answered + ' / ' + all.length + ' abordées';
   if (ui.timeProgressLabel) ui.timeProgressLabel.textContent = elapsedMinutesLabel(elapsedSeconds) + ' écoulées · ~' + Math.max(0, Math.round(remaining)) + ' min prévues restantes';
-  if (ui.sidebarTimeSummary) ui.sidebarTimeSummary.textContent = elapsedMinutesLabel(elapsedSeconds) + ' écoulées · ~' + Math.max(0, Math.round(remaining)) + ' min restantes';
+  if (ui.sidebarTimeSummary) ui.sidebarTimeSummary.textContent = '~' + Math.max(0, Math.round(remaining)) + ' min restantes';
+  if (ui.sessionClockText) ui.sessionClockText.textContent = formatTime(elapsedSeconds);
+  if (ui.sessionRemainingText) ui.sessionRemainingText.textContent = '~' + Math.max(0, Math.round(remaining)) + ' min restantes';
   if (ui.timeProgress) {
     ui.timeProgress.max = Math.max(1, totalEstimate);
     ui.timeProgress.value = Math.min(totalEstimate, elapsedMinutes);
@@ -483,28 +485,51 @@ function renderQuestionNav() {
       const index = flatIndex++;
       const answered = questionHasAnswer(question.id);
       const current = index === session.currentIndex;
-      const recordingTarget = Boolean((isRecording() || captureFinalizing) && recordingQuestionId === question.id);
+      const recordingTarget = Boolean(isRecording() && recordingQuestionId === question.id);
+      const finalizingTarget = Boolean(captureFinalizing && recordingQuestionId === question.id);
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = 'question-nav-item' + (answered ? ' answered' : '') + (current ? ' current' : '') + (recordingTarget ? ' on-air' : '');
+      row.className = 'question-nav-item' + (answered ? ' answered' : '') + (current ? ' current' : '') + (recordingTarget ? ' on-air' : '') + (finalizingTarget ? ' finalizing' : '');
       row.title = question.text;
       if (current) row.setAttribute('aria-current', 'step');
       const state = document.createElement('span');
       state.className = 'question-nav-state';
-      state.textContent = recordingTarget ? '●' : current ? '›' : answered ? '✓' : '';
+      state.textContent = recordingTarget ? '🎙' : finalizingTarget ? '…' : current ? '›' : answered ? '✓' : '';
       const label = document.createElement('span');
       label.className = 'question-nav-label';
       label.textContent = (index + 1) + '. ' + questionNavLabel(question);
       const duration = document.createElement('span');
       duration.className = 'question-nav-duration';
       const spent = activeQuestionSeconds(question.id);
-      duration.textContent = recordingTarget ? 'ON AIR' : (spent >= 30 ? elapsedMinutesLabel(spent) : '~' + estimatedQuestionMinutes(question) + ' min');
+      duration.textContent = recordingTarget ? 'ON AIR' : finalizingTarget ? 'TRAITEMENT' : (spent >= 30 ? elapsedMinutesLabel(spent) : '~' + estimatedQuestionMinutes(question) + ' min');
       row.append(state, label, duration);
       row.addEventListener('click', () => goToQuestion(index));
       group.append(row);
     }
     ui.questionNav.append(group);
   }
+}
+
+
+function renderCaptureTransfer() {
+  if (!ui.moveCaptureBtn || !session) return;
+  const viewedQuestionId = currentEntry()?.question?.id || null;
+  const canMove = Boolean(isRecording() && recordingQuestionId && viewedQuestionId && recordingQuestionId !== viewedQuestionId);
+  show(ui.moveCaptureBtn, canMove);
+  if (canMove) {
+    const label = currentEntry()?.question?.label || 'cette question';
+    ui.moveCaptureBtn.textContent = 'Basculer ici · ' + label;
+  }
+}
+
+async function moveRecordingToViewedQuestion() {
+  if (!isRecording() || !recordingSpeakerId) return;
+  const targetQuestionId = currentEntry()?.question?.id || null;
+  if (!targetQuestionId || targetQuestionId === recordingQuestionId) return;
+  queuedSpeakerId = recordingSpeakerId;
+  queuedRecordingQuestionId = targetQuestionId;
+  ui.recordState.textContent = 'Bascule vers la question affichée…';
+  stopRecording();
 }
 
 async function togglePause() {
@@ -598,7 +623,7 @@ async function handleSpeakerButtonClick(participantId) {
 
   if (captureFinalizing) {
     queuedSpeakerId = participantId;
-    queuedRecordingQuestionId = recordingQuestionId || queuedRecordingQuestionId;
+    queuedRecordingQuestionId = queuedRecordingQuestionId || recordingQuestionId;
     await selectSpeaker(participantId);
     ui.recordState.textContent = 'Finalisation du propos précédent…';
     return;
@@ -639,6 +664,7 @@ function updateCaptureUi() {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'PRÊT';
     ui.recordState.textContent = 'Cliquez sur la personne qui parle';
   }
+  renderCaptureTransfer();
 }
 
 function renderSpeakerButtons() {
@@ -672,6 +698,7 @@ function renderSpeakerButtons() {
     ui.speakerHelp.classList.toggle('hidden', hasTurns || isRecording() || captureFinalizing);
   }
   updateCaptureUi();
+  renderCaptureTransfer();
   updateComposerSpeaker();
 }
 function updateComposerSpeaker() {
@@ -718,6 +745,7 @@ function renderQuestion() {
   renderFollowUps();
   renderQuestionNav();
   renderInterviewMetrics();
+  renderCaptureTransfer();
 }
 
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
@@ -835,6 +863,13 @@ function renderTurns() {
     type.className = 'turn-type';
     type.textContent = turn.type === 'follow_up' ? (turn.followUpKind === 'ad_hoc' ? 'Relance spontanée' : 'Relance') : (/system|whisper|speech/.test(turn.source || '') ? 'Voix' : 'Texte');
 
+    const meta = document.createElement('span');
+    meta.className = 'turn-meta-inline';
+    const metaBits = [];
+    if (turn.durationSeconds) metaBits.push(Math.round(turn.durationSeconds) + ' s');
+    if (turn.createdAt) metaBits.push(new Date(turn.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
+    meta.textContent = metaBits.join(' · ');
+
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'ghost small icon-button';
@@ -849,15 +884,15 @@ function renderTurns() {
       renderQuestionNav();
       renderInterviewMetrics();
     });
-    head.append(select, type, remove);
+    head.append(select, type, meta, remove);
 
     const text = document.createElement('textarea');
     text.className = 'turn-text';
-    text.rows = turn.type === 'follow_up' ? 2 : 3;
+    text.rows = turn.type === 'follow_up' ? 2 : 1;
     text.value = turn.text;
     const resizeTurnText = () => {
       text.style.height = 'auto';
-      text.style.height = Math.min(320, Math.max(56, text.scrollHeight)) + 'px';
+      text.style.height = Math.min(280, Math.max(34, text.scrollHeight)) + 'px';
     };
     text.addEventListener('input', resizeTurnText);
     text.addEventListener('change', async () => {
@@ -869,13 +904,7 @@ function renderTurns() {
       renderInterviewMetrics();
     });
 
-    const meta = document.createElement('p');
-    meta.className = 'hint turn-meta';
-    const bits = [];
-    if (turn.durationSeconds) bits.push(`${Math.round(turn.durationSeconds)} s`);
-    if (turn.createdAt) bits.push(new Date(turn.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }));
-    meta.textContent = bits.join(' · ');
-    card.append(head, text, meta);
+    card.append(head, text);
     ui.turnsList.append(card);
     requestAnimationFrame(resizeTurnText);
   }
@@ -1095,10 +1124,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=22', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=23', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v22' : 'installé · v22';
+    ui.diagSw.textContent = reg.active ? 'actif · v23' : 'installé · v23';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1234,7 +1263,10 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     recordingQuestionId = questionId;
     recordingCaptureId = uuid('capture');
     recordingCompletionPromise = new Promise(resolve => { resolveRecordingCompletion = resolve; });
-    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+    const reusableStream = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
+    if (!reusableStream) {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+    }
     const mimeType = preferredMimeType();
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     chunks = [];
@@ -1279,8 +1311,7 @@ function stopRecording() {
   updateCaptureUi();
   setTimeout(() => {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
-    stream?.getTracks().forEach(track => track.stop());
-  }, 450);
+  }, 120);
 }
 async function blobTo16kMono(blob) {
   const arrayBuffer = await blob.arrayBuffer();
@@ -1314,6 +1345,7 @@ async function handleRecordingStopped() {
   ui.addTurnBtn.disabled = true;
   ui.validateBtn.disabled = true;
   updateCaptureUi();
+  renderQuestionNav();
   try {
     if (!chunks.length) return;
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
@@ -1367,13 +1399,18 @@ async function handleRecordingStopped() {
     recordingQuestionId = null;
     recorder = null;
     captureFinalizing = false;
-    stream = null;
+    const keepMicrophoneOpen = Boolean(nextSpeakerId && participantById(nextSpeakerId));
+    if (!keepMicrophoneOpen) {
+      stream?.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
     try { resolveRecordingCompletion?.(); } catch {}
     resolveRecordingCompletion = null;
     recordingCompletionPromise = null;
     if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
     ui.timer.textContent = '00:00';
     renderSpeakerButtons();
+    renderQuestionNav();
 
     if (nextSpeakerId && participantById(nextSpeakerId)) {
       await selectSpeaker(nextSpeakerId);
@@ -1518,6 +1555,7 @@ ui.adHocFollowUpText.addEventListener('keydown', event => {
 ui.validateBtn.addEventListener('click', goNextQuestion);
 ui.prevBtn.addEventListener('click', goPrevious);
 ui.pauseBtn?.addEventListener('click', togglePause);
+ui.moveCaptureBtn?.addEventListener('click', moveRecordingToViewedQuestion);
 ui.sidebarFinishBtn?.addEventListener('click', completeInterview);
 ui.reviewBtn.addEventListener('click', async () => {
   session.completed = false;
