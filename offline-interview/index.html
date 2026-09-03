@@ -111,7 +111,7 @@
         <p id="questionIntent" class="question-intent hidden"></p>
 
         <section class="speaker-panel" aria-label="Locuteur actif">
-          <div class="speaker-title"><strong>Qui parle maintenant ?</strong><span id="activeSpeakerLabel" class="hint"></span></div>
+          <div class="speaker-title"><strong>Cliquez sur la personne qui parle</strong><span id="activeSpeakerLabel" class="hint"></span></div><p class="speaker-help">Un clic démarre sa prise de parole. Cliquez sur un autre nom pour changer de locuteur ; le propos précédent est enregistré automatiquement.</p>
           <div id="speakerButtons" class="speaker-buttons"></div>
         </section>
 
@@ -120,24 +120,29 @@
           <div id="turnsList" class="turns-list"></div>
         </section>
 
-        <div class="recorder-panel">
-          <div id="recordState" class="record-state">Prêt à enregistrer</div>
-          <div id="timer" class="timer">00:00</div>
-          <button id="recordBtn" class="record" aria-pressed="false">🎤 Parler</button>
+        <div class="capture-status" aria-live="polite">
+          <div>
+            <div id="recordState" class="record-state">Choisissez un locuteur pour commencer</div>
+            <div id="timer" class="timer">00:00</div>
+          </div>
+          <button id="recordBtn" class="record hidden" aria-pressed="false">🎤 Parler</button>
           <button id="stopBtn" class="danger hidden">■ Terminer</button>
         </div>
         <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Transcription en cours…</span></div>
 
-        <div class="composer-head">
-          <label for="answerText">Nouvelle prise de parole</label>
-          <span id="composerSpeaker" class="speaker-chip"></span>
-        </div>
-        <textarea id="answerText" rows="6" placeholder="La transcription apparaît ici. Corrigez-la si nécessaire, puis ajoutez la prise de parole."></textarea>
-        <p id="answerMeta" class="hint"></p>
-        <div class="actions compact-actions">
-          <button id="addTurnBtn" class="secondary">Ajouter la prise de parole</button>
-          <button id="clearComposerBtn" class="ghost">Effacer le brouillon</button>
-        </div>
+        <details class="manual-entry">
+          <summary>Ajouter ou corriger un propos manuellement</summary>
+          <div class="composer-head">
+            <label for="answerText">Texte</label>
+            <span id="composerSpeaker" class="speaker-chip"></span>
+          </div>
+          <textarea id="answerText" rows="5" placeholder="Saisir un propos manuellement…"></textarea>
+          <p id="answerMeta" class="hint"></p>
+          <div class="actions compact-actions">
+            <button id="addTurnBtn" class="secondary">Ajouter</button>
+            <button id="clearComposerBtn" class="ghost">Effacer</button>
+          </div>
+        </details>
 
         <details id="followUpsPanel" class="followups-panel">
           <summary id="followUpsSummary">Relances possibles</summary>
@@ -184,6 +189,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=18"></script>
+  <script type="module" src="./app.js?v=19"></script>
 </body>
 </html>
