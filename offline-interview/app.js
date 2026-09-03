@@ -1,4 +1,4 @@
-const BUILD_ID = '2026-09-03.interview-runtime-v14';
+const BUILD_ID = '2026-09-03.interview-runtime-v15';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -11,7 +11,7 @@ const SPEC_KEY = 'last-interview-spec';
 
 const $ = id => document.getElementById(id);
 const ui = {
-  setupView: $('setupView'), interviewView: $('interviewView'), doneView: $('doneView'), sttLabCard: $('sttLabCard'),
+  setupView: $('setupView'), interviewView: $('interviewView'), doneView: $('doneView'), sttLabCard: $('sttLabCard'), authoringKitCard: $('authoringKitCard'),
   networkBadge: $('networkBadge'), setupTitle: $('setupTitle'), setupContext: $('setupContext'), setupObjective: $('setupObjective'),
   interviewFile: $('interviewFile'), loadError: $('loadError'), setupParticipants: $('setupParticipants'), setupAddParticipantBtn: $('setupAddParticipantBtn'),
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
@@ -24,7 +24,8 @@ const ui = {
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
   interviewError: $('interviewError'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
   doneSummary: $('doneSummary'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), newSessionBtn: $('newSessionBtn'),
-  diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput')
+  diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput'),
+  copyAuthoringKitBtn: $('copyAuthoringKitBtn'), authoringKitStatus: $('authoringKitStatus')
 };
 
 let interview = null;
@@ -59,6 +60,7 @@ function setView(name) {
   show(ui.interviewView, name === 'interview');
   show(ui.doneView, name === 'done');
   show(ui.sttLabCard, name === 'setup');
+  show(ui.authoringKitCard, name === 'setup');
 }
 
 function updateNetwork() {
@@ -741,10 +743,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=14', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=15', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v14' : 'installé · v14';
+    ui.diagSw.textContent = reg.active ? 'actif · v15' : 'installé · v15';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -929,6 +931,34 @@ async function resumeInterview() {
   if (session.completed) finishInterview(); else renderQuestion();
 }
 
+async function copyAuthoringKit() {
+  ui.copyAuthoringKitBtn.disabled = true;
+  ui.authoringKitStatus.textContent = 'Chargement du kit…';
+  try {
+    const response = await fetch('./INTERVIEW_AUTHORING_KIT.md');
+    if (!response.ok) throw new Error('Kit IA introuvable');
+    const text = await response.text();
+    try {
+      await navigator.clipboard.writeText(text);
+      ui.authoringKitStatus.textContent = 'Instructions copiées. Collez-les dans votre IA avec votre contexte.';
+    } catch {
+      const area = document.createElement('textarea');
+      area.value = text;
+      area.style.position = 'fixed';
+      area.style.opacity = '0';
+      document.body.append(area);
+      area.select();
+      const copied = document.execCommand?.('copy') || false;
+      area.remove();
+      ui.authoringKitStatus.textContent = copied ? 'Instructions copiées.' : 'Copie automatique refusée : téléchargez le kit IA.';
+    }
+  } catch (error) {
+    ui.authoringKitStatus.textContent = `Impossible de copier le kit : ${error.message || error}`;
+  } finally {
+    ui.copyAuthoringKitBtn.disabled = false;
+  }
+}
+
 async function copyDiagnosticReport() {
   const report = {
     schema: 'offline-interview.diagnostic.v2',
@@ -1030,6 +1060,7 @@ ui.exportTxtBtn.addEventListener('click', exportTxt);
 ui.exportJsonBtn.addEventListener('click', exportJson);
 ui.newSessionBtn.addEventListener('click', resetSession);
 ui.copyDiagBtn.addEventListener('click', copyDiagnosticReport);
+ui.copyAuthoringKitBtn.addEventListener('click', copyAuthoringKit);
 ui.answerText.addEventListener('input', () => {
   if (composerSource !== 'speech') composerSource = 'keyboard';
 });
