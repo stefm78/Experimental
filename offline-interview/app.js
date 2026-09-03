@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v18';
+const BUILD_ID = '2026-09-03.interview-runtime-v19';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -49,6 +49,11 @@ let systemSpeechSession = null;
 let sessionClockTimer = null;
 let sessionClockLastMs = null;
 let sessionClockPersistTicks = 0;
+let recordingSpeakerId = null;
+let recordingQuestionId = null;
+let queuedSpeakerId = null;
+let recordingCompletionPromise = null;
+let resolveRecordingCompletion = null;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -503,7 +508,13 @@ async function goToQuestion(index) {
   const all = flattenedQuestions();
   if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;
   flushSessionClock();
-  await addComposerTurn();
+  if (isRecording()) {
+    queuedSpeakerId = null;
+    stopRecording();
+    if (recordingCompletionPromise) await recordingCompletionPromise;
+  } else {
+    await addComposerTurn();
+  }
   session.currentIndex = index;
   session.completed = false;
   session.completedAt = null;
@@ -516,7 +527,13 @@ async function goToQuestion(index) {
 async function completeInterview() {
   if (!session) return;
   flushSessionClock();
-  await addComposerTurn();
+  if (isRecording()) {
+    queuedSpeakerId = null;
+    stopRecording();
+    if (recordingCompletionPromise) await recordingCompletionPromise;
+  } else {
+    await addComposerTurn();
+  }
   session.completed = true;
   session.completedAt = nowIso();
   session.updatedAt = nowIso();
@@ -554,6 +571,41 @@ async function loadInterviewFile(file) {
   }
 }
 
+function isRecording() {
+  return Boolean(recorder && recorder.state !== 'inactive');
+}
+
+async function selectSpeaker(participantId) {
+  if (!session || !participantById(participantId)) return;
+  session.activeSpeakerId = participantId;
+  session.updatedAt = nowIso();
+  await persistSession();
+  renderSpeakerButtons();
+  updateComposerSpeaker();
+}
+
+async function handleSpeakerButtonClick(participantId) {
+  if (!session || !participantById(participantId)) return;
+  showError(ui.interviewError);
+
+  if (isRecording()) {
+    if (participantId === recordingSpeakerId) {
+      queuedSpeakerId = null;
+      stopRecording();
+      return;
+    }
+    queuedSpeakerId = participantId;
+    await selectSpeaker(participantId);
+    ui.recordState.textContent = 'Changement de locuteur…';
+    stopRecording();
+    return;
+  }
+
+  if (cleanText(ui.answerText.value)) await addComposerTurn();
+  await selectSpeaker(participantId);
+  await startRecording(participantId);
+}
+
 function renderSpeakerButtons() {
   const participants = participantsSource();
   if (!participants.length) return;
@@ -562,20 +614,22 @@ function renderSpeakerButtons() {
   for (const participant of participants) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `speaker-button ${participant.id === session.activeSpeakerId ? 'active' : ''}`;
-    button.textContent = participant.name;
-    button.title = roleLabel(participant.role);
-    button.addEventListener('click', async () => {
-      session.activeSpeakerId = participant.id;
-      session.updatedAt = nowIso();
-      await persistSession();
-      renderSpeakerButtons();
-      updateComposerSpeaker();
-    });
+    const recording = isRecording() && participant.id === recordingSpeakerId;
+    const queued = isRecording() && participant.id === queuedSpeakerId;
+    const active = participant.id === session.activeSpeakerId;
+    button.className = `speaker-button${active ? ' active' : ''}${recording ? ' recording' : ''}${queued ? ' queued' : ''}`;
+    button.textContent = recording ? `■ ${participant.name}` : `🎙 ${participant.name}`;
+    button.title = recording
+      ? `Terminer la prise de parole de ${participant.name}`
+      : `Démarrer une prise de parole attribuée à ${participant.name}`;
+    button.setAttribute('aria-pressed', recording ? 'true' : 'false');
+    button.addEventListener('click', () => handleSpeakerButtonClick(participant.id));
     ui.speakerButtons.append(button);
   }
-  const active = participantById(session.activeSpeakerId);
-  ui.activeSpeakerLabel.textContent = active ? `${active.name} · ${roleLabel(active.role)}` : '';
+  const active = participantById(recordingSpeakerId || session.activeSpeakerId);
+  ui.activeSpeakerLabel.textContent = active
+    ? (isRecording() ? `${active.name} · enregistrement en cours` : `${active.name} · prêt`)
+    : '';
   updateComposerSpeaker();
 }
 function updateComposerSpeaker() {
@@ -637,28 +691,42 @@ function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', raw
     updatedAt: nowIso()
   };
 }
+async function appendAnswerTurn({ questionId, speakerId, text, source, rawTranscript = null, durationSeconds = 0 }) {
+  const clean = cleanText(text);
+  if (!clean || !questionId || !speakerId) return false;
+  const response = responseFor(questionId);
+  response.turns.push(createTurn({
+    type: 'answer',
+    speakerId,
+    text: clean,
+    source,
+    rawTranscript,
+    durationSeconds
+  }));
+  response.status = 'draft';
+  session.updatedAt = nowIso();
+  await persistSession();
+  renderTurns();
+  renderQuestionNav();
+  renderInterviewMetrics();
+  return true;
+}
+
 async function addComposerTurn() {
   const entry = currentEntry();
   if (!entry) return false;
   const text = cleanText(ui.answerText.value);
   if (!text) return false;
-  const response = responseFor(entry.question.id);
-  response.turns.push(createTurn({
-    type: 'answer',
+  const added = await appendAnswerTurn({
+    questionId: entry.question.id,
     speakerId: session.activeSpeakerId,
     text,
     source: composerSource,
     rawTranscript: composerRawTranscript,
     durationSeconds: composerDurationSeconds
-  }));
-  response.status = 'draft';
-  session.updatedAt = nowIso();
-  await persistSession();
-  resetComposer();
-  renderTurns();
-  renderQuestionNav();
-  renderInterviewMetrics();
-  return true;
+  });
+  if (added) resetComposer();
+  return added;
 }
 
 function renderTurns() {
@@ -948,10 +1016,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=18', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=19', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v18' : 'installé · v18';
+    ui.diagSw.textContent = reg.active ? 'actif · v19' : 'installé · v19';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1081,11 +1149,15 @@ async function prepareModel() {
 function preferredMimeType() {
   return ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find(t => MediaRecorder.isTypeSupported?.(t)) || '';
 }
-async function startRecording() {
+async function startRecording(speakerId = session?.activeSpeakerId) {
   showError(ui.interviewError);
+  if (isRecording() || !speakerId) return;
   try {
     try { systemSpeechSession?.abort(); } catch {}
     systemSpeechSession = null;
+    recordingSpeakerId = speakerId;
+    recordingQuestionId = currentEntry()?.question?.id || null;
+    recordingCompletionPromise = new Promise(resolve => { resolveRecordingCompletion = resolve; });
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
     const mimeType = preferredMimeType();
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
@@ -1099,8 +1171,8 @@ async function startRecording() {
       mode: systemSpeechCapability.mode,
       onText: applySystemText,
       onState: state => {
-        if (state === 'listening-local') ui.recordState.textContent = `Écoute système locale · ${participantById(session.activeSpeakerId)?.name || 'locuteur'}`;
-        else if (state === 'listening') ui.recordState.textContent = `Écoute système · ${participantById(session.activeSpeakerId)?.name || 'locuteur'}`;
+        if (state === 'listening-local') ui.recordState.textContent = `Écoute système locale · ${participantById(recordingSpeakerId)?.name || 'locuteur'}`;
+        else if (state === 'listening') ui.recordState.textContent = `Écoute système · ${participantById(recordingSpeakerId)?.name || 'locuteur'}`;
         else if (state === 'speech-local') ui.recordState.textContent = 'Transcription système locale…';
         else if (state === 'speech') ui.recordState.textContent = 'Transcription système…';
       },
@@ -1112,7 +1184,8 @@ async function startRecording() {
     ui.recordBtn.setAttribute('aria-pressed', 'true');
     show(ui.recordBtn, false);
     show(ui.stopBtn, true);
-    if (!usingSystem) ui.recordState.textContent = `Enregistrement pour Whisper · ${participantById(session.activeSpeakerId)?.name || 'locuteur'}`;
+    if (!usingSystem) ui.recordState.textContent = `Enregistrement pour Whisper · ${participantById(recordingSpeakerId)?.name || 'locuteur'}`;
+    renderSpeakerButtons();
     timerHandle = setInterval(() => { ui.timer.textContent = formatTime((performance.now() - startedRecordingAt) / 1000); }, 250);
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1150,37 +1223,55 @@ async function blobTo16kMono(blob) {
   return samples;
 }
 async function handleRecordingStopped() {
-  if (!chunks.length) return;
+  const speakerId = recordingSpeakerId;
+  const questionId = recordingQuestionId;
+  const durationSeconds = composerDurationSeconds;
+  const nextSpeakerId = queuedSpeakerId;
+  queuedSpeakerId = null;
+
   ui.recordBtn.disabled = true;
   ui.addTurnBtn.disabled = true;
   ui.validateBtn.disabled = true;
   try {
+    if (!chunks.length) return;
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
     const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
-    const systemText = cleanText(systemSnapshot.text);
+    let text = cleanText(systemSnapshot.text);
+    let source = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
+    let rawTranscript = systemSnapshot.finalText || text;
 
-    if (systemText) {
-      ui.answerText.value = systemText;
-      composerSource = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
-      composerRawTranscript = systemSnapshot.finalText || systemText;
-      ui.answerMeta.textContent = `${systemSnapshot.mode === 'local' ? 'Transcription système locale' : 'Transcription système'} · ${Math.round(composerDurationSeconds)} s · vérifiez puis ajoutez la prise de parole`;
-      ui.recordState.textContent = 'Transcription terminée';
-      return;
+    if (!text) {
+      show(ui.transcribing, true);
+      ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
+        ? 'Transcription Whisper locale…'
+        : 'Aucun texte système · secours Whisper…';
+      if (!transcriber) await prepareModel();
+      const samples = await blobTo16kMono(blob);
+      const result = await transcriber(samples, { language: 'french', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
+      text = cleanText(result?.text);
+      source = 'whisper-local';
+      rawTranscript = text;
     }
 
-    show(ui.transcribing, true);
-    ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
-      ? 'Transcription Whisper locale…'
-      : 'Aucun texte système · secours Whisper…';
-    if (!transcriber) await prepareModel();
-    const samples = await blobTo16kMono(blob);
-    const result = await transcriber(samples, { language: 'french', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
-    const text = cleanText(result?.text);
-    ui.answerText.value = text;
-    composerSource = 'whisper-local';
-    composerRawTranscript = text;
-    ui.answerMeta.textContent = `Whisper local (secours) · ${Math.round(composerDurationSeconds)} s · vérifiez puis ajoutez la prise de parole`;
-    ui.recordState.textContent = text ? 'Transcription terminée' : 'Aucun texte reconnu';
+    if (text) {
+      await appendAnswerTurn({
+        questionId,
+        speakerId,
+        text,
+        source,
+        rawTranscript,
+        durationSeconds
+      });
+      ui.recordState.textContent = `Propos enregistré · ${participantById(speakerId)?.name || 'locuteur'}`;
+      ui.answerText.value = '';
+      ui.answerMeta.textContent = '';
+      composerRawTranscript = null;
+      composerSource = 'keyboard';
+      composerDurationSeconds = 0;
+    } else {
+      ui.recordState.textContent = 'Aucun texte reconnu';
+      showError(ui.interviewError, 'Aucun texte n’a été reconnu pour cette prise de parole.');
+    }
   } catch (error) {
     diagnosticError = String(error?.message || error);
     showError(ui.interviewError, `La transcription a échoué : ${error.message || error}`);
@@ -1191,6 +1282,19 @@ async function handleRecordingStopped() {
     ui.recordBtn.disabled = false;
     ui.addTurnBtn.disabled = false;
     ui.validateBtn.disabled = false;
+    recordingSpeakerId = null;
+    recordingQuestionId = null;
+    recorder = null;
+    stream = null;
+    try { resolveRecordingCompletion?.(); } catch {}
+    resolveRecordingCompletion = null;
+    recordingCompletionPromise = null;
+    renderSpeakerButtons();
+
+    if (nextSpeakerId && participantById(nextSpeakerId)) {
+      await selectSpeaker(nextSpeakerId);
+      await startRecording(nextSpeakerId);
+    }
   }
 }
 async function startInterview() {
@@ -1312,7 +1416,7 @@ ui.prepareBtn.addEventListener('click', () => prepareModel().catch(() => {}));
 ui.startBtn.addEventListener('click', startInterview);
 ui.resumeBtn.addEventListener('click', resumeInterview);
 ui.homeBtn.addEventListener('click', async () => { flushSessionClock(); await addComposerTurn(); await persistSession(); renderSetup(); });
-ui.recordBtn.addEventListener('click', startRecording);
+ui.recordBtn.addEventListener('click', () => startRecording(session?.activeSpeakerId));
 ui.stopBtn.addEventListener('click', stopRecording);
 ui.addTurnBtn.addEventListener('click', async () => {
   const added = await addComposerTurn();
