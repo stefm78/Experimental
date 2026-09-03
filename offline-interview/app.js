@@ -407,6 +407,7 @@ function startSessionClock() {
     sessionClockPersistTicks += 1;
     if (sessionClockPersistTicks >= 10) {
       sessionClockPersistTicks = 0;
+      renderQuestionNav();
       persistSession().catch(() => {});
     }
   }, 1000);
@@ -724,6 +725,8 @@ function renderTurns() {
       turn.updatedAt = nowIso();
       text.value = turn.text;
       await persistSession();
+      renderQuestionNav();
+      renderInterviewMetrics();
     });
 
     const meta = document.createElement('p');
@@ -1204,6 +1207,7 @@ async function resumeInterview() {
   if (!session.questionSeconds || typeof session.questionSeconds !== 'object') session.questionSeconds = {};
   if (!Number.isFinite(Number(session.activeSeconds))) session.activeSeconds = 0;
   if (typeof session.paused !== 'boolean') session.paused = false;
+  session.paused = false;
   if (session.completed) finishInterview(); else renderQuestion();
 }
 
