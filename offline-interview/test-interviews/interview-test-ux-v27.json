@@ -1,0 +1,174 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v27-audio-bounded-speaker-transitions",
+  "version": "1.0",
+  "title": "Test UX V27 — frontières audio et transfert explicite",
+  "context": "Ce questionnaire valide la V27 après le test terrain V26. Il cible exclusivement la frontière temporelle entre locuteurs/questions, la visibilité du micro et le libellé du transfert explicite. Le modèle produit de question propriétaire reste inchangé.",
+  "objective": "Vérifier que le clic de changement crée une frontière audio fiable sans décaler les derniers mots vers le locuteur suivant, tout en conservant la navigation libre, le transcript live et un ON AIR clair.",
+  "language": "fr-FR",
+  "tags": [
+    "ux",
+    "v27",
+    "audio-boundary",
+    "speaker-attribution",
+    "explicit-transfer",
+    "on-air"
+  ],
+  "estimatedDurationMinutes": 13,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    },
+    {
+      "id": "P3",
+      "name": "Second participant",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Frontières de locuteurs",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Mots uniques au clic",
+          "text": "Alternez quatre fois sans pause. Testeur dit exactement « alpha bravo charlie delta echo ». Cliquez ensuite sur Second participant AVANT qu’il commence, puis il dit « foxtrot golf hotel india juliet ». Cliquez sur Testeur AVANT qu’il commence, puis il dit « kilo lima mike novembre oscar ». Cliquez sur Second participant AVANT qu’il commence, puis il dit « papa quebec romeo sierra tango ». Vérifiez que chaque groupe reste intégralement chez son locuteur.",
+          "intent": "Valider que l’attribution canonique suit la frontière audio au clic et non le retard d’arrivée de SpeechRecognition.",
+          "required": true,
+          "estimatedMinutes": 3,
+          "audience": [
+            "P2",
+            "P3"
+          ],
+          "followUps": [
+            {
+              "id": "Q1-R1",
+              "text": "Un mot prononcé avant un clic apparaît-il encore chez le locuteur sélectionné après ce clic ?",
+              "kind": "planned"
+            }
+          ]
+        },
+        {
+          "id": "Q2",
+          "label": "Décompte 1 à 20",
+          "text": "Comptez sans pause : Testeur 1 à 5 ; cliquez sur Second participant puis il dit 6 à 10 ; cliquez sur Testeur puis il dit 11 à 15 ; cliquez sur Second participant puis il dit 16 à 20. Notez séparément les nombres mal reconnus et les nombres attribués au mauvais locuteur.",
+          "intent": "Distinguer qualité STT et exactitude de la frontière de locuteur.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2",
+            "P3"
+          ],
+          "followUps": [
+            {
+              "id": "Q2-R1",
+              "text": "Quels nombres sont mal reconnus, et lesquels sont réellement attribués au mauvais locuteur ?",
+              "kind": "planned"
+            }
+          ]
+        },
+        {
+          "id": "Q3",
+          "label": "Conversation naturelle",
+          "text": "Faites quatre changements de locuteur dans une conversation normale. Chaque nouveau locuteur commence seulement après son clic. Les débuts et fins de phrases appartiennent-ils maintenant à la bonne personne sans décalage systématique ?",
+          "intent": "Valider la frontière dans un usage naturel après les tests artificiels.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P1",
+            "P2",
+            "P3"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Question propriétaire",
+      "questions": [
+        {
+          "id": "Q4",
+          "label": "Navigation sans transfert",
+          "text": "Commencez une réponse ici, puis consultez Q5 et Q6 sans arrêter de parler. Vérifiez que cette question reste propriétaire de l’enregistrement et qu’aucun transfert silencieux ne se produit.",
+          "intent": "Revalider le modèle produit stabilisé.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q5",
+          "label": "Basculer par numéro",
+          "text": "Pendant que Q4 reste ON AIR, affichez cette question. Vérifiez que l’action dans la barre de capture dit « Basculer sur la question 5 → ». Dites une courte phrase AVANT le clic, cliquez, puis dites une autre phrase APRÈS le clic. La première doit rester sur Q4 et la seconde arriver ici.",
+          "intent": "Valider à la fois la copie UX et la frontière audio du transfert entre questions.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "État visuel et continuité",
+      "questions": [
+        {
+          "id": "Q6",
+          "label": "Micro et ON AIR",
+          "text": "Pendant l’enregistrement, le microphone est-il clairement visible sans grand cercle respirant, tout en laissant le badge ON AIR être le signal principal ?",
+          "intent": "Valider la correction visuelle bornée de V27.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q7",
+          "label": "Transcript live long",
+          "text": "Parlez au moins trente secondes. Vérifiez que le transcript live reste lisible et que les commandes de locuteur ne bougent pas, y compris après au moins un changement de locuteur.",
+          "intent": "Détecter une régression du live STT pendant que l’audio borné sert de canon aux transitions.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2",
+            "P3"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Verdict",
+      "questions": [
+        {
+          "id": "Q8",
+          "label": "Fiabilité de capture",
+          "text": "Après ces tests, voyez-vous encore un cas où une phrase complète est reconnue mais attribuée au mauvais locuteur ou à la mauvaise question à cause du moment du clic ?",
+          "intent": "Décider si V27 peut recevoir CAPTURE RELIABILITY PASS ou doit rester HOLD.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

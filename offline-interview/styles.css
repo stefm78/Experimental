@@ -703,3 +703,37 @@
 @media(max-width:759px){
   .recording-mic{font-size:1.55rem!important}
 }
+
+
+/* Observed UX v27 — microphone visible, compact, and subordinate to ON AIR */
+.recording-mic{
+  display:grid!important;
+  place-items:center!important;
+  width:38px!important;
+  height:38px!important;
+  min-width:38px!important;
+  min-height:38px!important;
+  padding:0!important;
+  border:1px solid #dbe3ef!important;
+  border-radius:10px!important;
+  background:#f8fafc!important;
+  box-shadow:none!important;
+  font-size:1.15rem!important;
+  line-height:1!important;
+  animation:none!important;
+}
+.capture-dock.is-recording .recording-mic{
+  background:#fff!important;
+  border-color:#e7aaa4!important;
+  box-shadow:none!important;
+  animation:none!important;
+}
+.capture-dock.is-finalizing .recording-mic{
+  background:#fff8e6!important;
+  border-color:#ead79e!important;
+  box-shadow:none!important;
+  animation:none!important;
+}
+@media(max-width:759px){
+  .recording-mic{width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;font-size:1.1rem!important}
+}
