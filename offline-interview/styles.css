@@ -240,3 +240,50 @@
   .done-export{display:grid}
   .done-primary{min-width:0}
 }
+
+
+/* Observed UX v22 — changes grounded in the 2026-09-03 real interview */
+.setup-mode .topbar{display:none}
+.setup-mode .shell{width:min(1050px,100%);padding-top:28px}
+.setup-header h1{margin:0;font-size:clamp(1.55rem,2.8vw,2.15rem);letter-spacing:-.025em}
+.setup-meta{margin:6px 0 0;color:#64748b;font-size:.88rem;font-weight:700}
+.setup-objective{font-size:.98rem}
+.setup-people .participant-id,.sidebar-participants .participant-id{display:none}
+.setup-people .participant-row{grid-template-columns:minmax(0,1fr) 150px 42px}
+.sidebar-participants .participant-row{grid-template-columns:minmax(0,1fr) 34px}
+.sidebar-participants .participant-row select{grid-column:1/2}
+.sidebar-participants .participant-row .icon-button{grid-column:2/3;grid-row:1/3}
+.setup-mode .diagnostics{display:none}
+.setup-tools{margin-top:10px}
+.setup-settings{color:#78879a}
+
+/* ON AIR question marker remains visible while the interviewer browses elsewhere */
+.question-nav-item.on-air{background:#fff3f2;border:1px solid #f2bbb6;color:#7a271a}
+.question-nav-item.on-air.current{background:#fff0ee}
+.question-nav-item.on-air .question-nav-state{color:#d92d20;animation:recordingPulse 1.35s ease-in-out infinite}
+.question-nav-item.on-air .question-nav-duration{color:#b42318;font-weight:900;letter-spacing:.05em}
+.question-nav-item.current:not(.on-air){box-shadow:inset 3px 0 0 #5b78a6}
+.sidebar-time-row,.speaker-row-label{display:none}
+
+/* Keep the live transcript above a stable, full-width speaker control row. */
+.live-transcript-slot{min-height:52px;display:flex;align-items:flex-end;margin-bottom:6px}
+.live-transcript{width:100%;min-height:42px;max-height:66px;overflow:auto;padding:8px 10px;border-radius:10px;background:#f8fafc;border:1px solid #edf1f5;color:#475569;font-size:.82rem;line-height:1.42}
+.live-transcript:empty{visibility:hidden}
+.capture-dock .speaker-buttons{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));width:100%;gap:8px}
+.capture-dock .speaker-button{width:100%;min-width:0;min-height:52px;font-size:.95rem}
+.capture-dock.is-recording{border-width:2px}
+.capture-dock.is-recording #captureModeLabel{font-size:.8rem;font-weight:950;letter-spacing:.1em}
+.capture-dock.is-recording .timer{color:#b42318;font-size:1.1rem}
+.capture-dock .speaker-help{margin:7px 0 0;text-align:center}
+.capture-state-row{margin-bottom:8px}
+
+/* Give the conversation more room; controls remain stable at the bottom. */
+@media(min-width:1000px){
+  .interview-main{padding-bottom:140px}
+  .capture-dock{bottom:10px}
+}
+@media(max-width:640px){
+  .setup-people .participant-row{grid-template-columns:minmax(0,1fr) 42px}
+  .setup-people .participant-row select{grid-column:1/2}
+  .setup-people .participant-row .icon-button{grid-column:2/3;grid-row:1/3}
+}
