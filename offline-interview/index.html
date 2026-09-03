@@ -115,6 +115,11 @@
               <h2 id="questionCounter">1 / 5</h2>
             </div>
             <div class="interview-clock">
+              <div id="topOnAir" class="top-on-air hidden" aria-live="polite">
+                <span class="top-on-air-mic" aria-hidden="true">🎙</span>
+                <strong>ON AIR</strong>
+                <span id="topOnAirSpeaker"></span>
+              </div>
               <div class="interview-clock-copy">
                 <strong id="sessionClockText">00:00</strong>
                 <span aria-hidden="true">·</span>
@@ -181,6 +186,12 @@
         </div>
 
         <section id="captureDock" class="capture-dock" aria-label="Capturer une prise de parole">
+          <div id="captureQuestionContext" class="capture-question-context hidden">
+            <span id="captureQuestionStatus">Enregistrement sur</span>
+            <strong id="captureQuestionLabel"></strong>
+            <button id="moveCaptureBtn" class="move-capture hidden" type="button">Continuer sur la question affichée →</button>
+          </div>
+
           <div class="live-transcript-slot">
             <div id="liveTranscriptPreview" class="live-transcript" aria-live="polite"></div>
           </div>
@@ -241,6 +252,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=24"></script>
+  <script type="module" src="./app.js?v=25"></script>
 </body>
 </html>
