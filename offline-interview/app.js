@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v20';
+const BUILD_ID = '2026-09-03.interview-runtime-v21';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -22,11 +22,11 @@ const ui = {
   questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
-  recordState: $('recordState'), timer: $('timer'), recordBtn: $('recordBtn'), stopBtn: $('stopBtn'), transcribing: $('transcribing'),
+  captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'),
   answerText: $('answerText'), answerMeta: $('answerMeta'), composerSpeaker: $('composerSpeaker'), addTurnBtn: $('addTurnBtn'), clearComposerBtn: $('clearComposerBtn'),
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
   interviewError: $('interviewError'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
-  doneSummary: $('doneSummary'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), newSessionBtn: $('newSessionBtn'),
+  doneSummary: $('doneSummary'), doneQuestionStat: $('doneQuestionStat'), doneTurnStat: $('doneTurnStat'), doneTimeStat: $('doneTimeStat'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), newSessionBtn: $('newSessionBtn'),
   diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), diagStt: $('diagStt'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput'),
   copyAuthoringKitBtn: $('copyAuthoringKitBtn'), authoringKitStatus: $('authoringKitStatus')
 };
@@ -76,6 +76,8 @@ function setView(name) {
   show(ui.sttLabCard, name === 'setup');
   show(ui.authoringKitCard, name === 'setup');
   document.body.classList.toggle('interview-mode', name === 'interview');
+  document.body.classList.toggle('setup-mode', name === 'setup');
+  document.body.classList.toggle('done-mode', name === 'done');
   if (name === 'interview') startSessionClock();
   else stopSessionClock();
 }
@@ -620,6 +622,24 @@ async function handleSpeakerButtonClick(participantId) {
   await startRecording(participantId);
 }
 
+function updateCaptureUi() {
+  const recording = isRecording();
+  const active = participantById(recordingSpeakerId || session?.activeSpeakerId);
+  ui.captureDock?.classList.toggle('is-recording', recording);
+  ui.captureDock?.classList.toggle('is-finalizing', captureFinalizing && !recording);
+
+  if (recording) {
+    if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'ENREGISTREMENT';
+    ui.recordState.textContent = active ? `${active.name} · cliquez à nouveau pour arrêter` : 'Enregistrement en cours';
+  } else if (captureFinalizing) {
+    if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'FINALISATION';
+    ui.recordState.textContent = 'Transcription du propos précédent…';
+  } else {
+    if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'PRÊT';
+    ui.recordState.textContent = 'Cliquez sur la personne qui parle';
+  }
+}
+
 function renderSpeakerButtons() {
   const participants = participantsSource();
   if (!participants.length) return;
@@ -629,14 +649,14 @@ function renderSpeakerButtons() {
     const button = document.createElement('button');
     button.type = 'button';
     const recording = isRecording() && participant.id === recordingSpeakerId;
-    const queued = isRecording() && participant.id === queuedSpeakerId;
+    const queued = (isRecording() || captureFinalizing) && participant.id === queuedSpeakerId;
     const active = participant.id === session.activeSpeakerId;
     button.className = `speaker-button${active ? ' active' : ''}${recording ? ' recording' : ''}${queued ? ' queued' : ''}`;
-    button.textContent = participant.name;
+    button.textContent = recording ? `● ${participant.name}` : participant.name;
     button.dataset.captureState = recording ? 'recording' : queued ? 'queued' : 'idle';
     button.title = recording
-      ? `Terminer la prise de parole de ${participant.name}`
-      : `Démarrer une prise de parole attribuée à ${participant.name}`;
+      ? `Arrêter la prise de parole de ${participant.name}`
+      : `Enregistrer une prise de parole de ${participant.name}`;
     button.setAttribute('aria-label', button.title);
     button.setAttribute('aria-pressed', recording ? 'true' : 'false');
     button.addEventListener('click', () => handleSpeakerButtonClick(participant.id));
@@ -648,8 +668,9 @@ function renderSpeakerButtons() {
     : '';
   if (ui.speakerHelp) {
     const hasTurns = Object.values(session.responses || {}).some(r => (r.turns || []).some(t => t.type === 'answer'));
-    ui.speakerHelp.classList.toggle('hidden', hasTurns || isRecording());
+    ui.speakerHelp.classList.toggle('hidden', hasTurns || isRecording() || captureFinalizing);
   }
+  updateCaptureUi();
   updateComposerSpeaker();
 }
 function updateComposerSpeaker() {
@@ -664,8 +685,12 @@ function resetComposer() {
   composerDurationSeconds = 0;
   composerSource = 'keyboard';
   composerRawTranscript = null;
-  ui.recordState.textContent = 'Choisissez un locuteur';
   ui.timer.textContent = '00:00';
+  if (ui.liveTranscriptPreview) {
+    ui.liveTranscriptPreview.textContent = '';
+    show(ui.liveTranscriptPreview, false);
+  }
+  updateCaptureUi();
 }
 
 function renderQuestion() {
@@ -908,7 +933,13 @@ function finishInterview() {
   const all = flattenedQuestions();
   const answered = all.filter(({ question }) => (session.responses[question.id]?.turns || []).some(t => t.type === 'answer' && cleanText(t.text))).length;
   const turns = Object.values(session.responses || {}).reduce((sum, r) => sum + (r.turns?.length || 0), 0);
-  ui.doneSummary.textContent = `${answered} question${answered > 1 ? 's' : ''} répondue${answered > 1 ? 's' : ''} sur ${all.length} · ${turns} prise${turns > 1 ? 's' : ''} de parole structurée${turns > 1 ? 's' : ''}.`;
+  const activeMinutes = Math.max(1, Math.round((Number(session.activeSeconds) || 0) / 60));
+  ui.doneSummary.textContent = answered === all.length
+    ? 'Toutes les questions ont été abordées.'
+    : `${all.length - answered} question${all.length - answered > 1 ? 's' : ''} reste${all.length - answered > 1 ? 'nt' : ''} non abordée${all.length - answered > 1 ? 's' : ''}.`;
+  if (ui.doneQuestionStat) ui.doneQuestionStat.textContent = `${answered} / ${all.length}`;
+  if (ui.doneTurnStat) ui.doneTurnStat.textContent = String(turns);
+  if (ui.doneTimeStat) ui.doneTimeStat.textContent = `${activeMinutes} min`;
 }
 
 function exportPayload() {
@@ -1048,10 +1079,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=20', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=21', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v20' : 'installé · v20';
+    ui.diagSw.textContent = reg.active ? 'actif · v21' : 'installé · v21';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1115,9 +1146,10 @@ function applySystemText({ text, finalText, mode }) {
   ui.answerText.value = text;
   composerSource = mode === 'local' ? 'system-local' : 'system';
   composerRawTranscript = finalText || text;
-  ui.answerMeta.textContent = mode === 'local'
-    ? 'Transcription système locale · vérifiez puis ajoutez la prise de parole'
-    : 'Transcription système · vérifiez puis ajoutez la prise de parole';
+  if (ui.liveTranscriptPreview) {
+    ui.liveTranscriptPreview.textContent = text;
+    show(ui.liveTranscriptPreview, true);
+  }
 }
 function progressCallback(item) {
   show(ui.progressBlock, true);
@@ -1135,7 +1167,6 @@ async function prepareModel() {
   showError(ui.setupError);
   showError(ui.interviewError);
   ui.prepareBtn.disabled = true;
-  ui.recordBtn.disabled = true;
   ui.modelStatus.textContent = navigator.onLine ? 'Téléchargement…' : 'Chargement depuis cache…';
   show(ui.progressBlock, true);
   try {
@@ -1174,7 +1205,6 @@ async function prepareModel() {
     throw error;
   } finally {
     ui.prepareBtn.disabled = false;
-    ui.recordBtn.disabled = false;
   }
 }
 
@@ -1213,10 +1243,11 @@ async function startRecording(speakerId = session?.activeSpeakerId) {
     const usingSystem = Boolean(systemSpeechSession?.start());
 
     startedRecordingAt = performance.now();
-    ui.recordBtn.setAttribute('aria-pressed', 'true');
-    show(ui.recordBtn, false);
-    show(ui.stopBtn, true);
-    if (!usingSystem) ui.recordState.textContent = `Enregistrement pour Whisper · ${participantById(recordingSpeakerId)?.name || 'locuteur'}`;
+    if (ui.liveTranscriptPreview) {
+      ui.liveTranscriptPreview.textContent = '';
+      show(ui.liveTranscriptPreview, false);
+    }
+    if (!usingSystem) ui.recordState.textContent = `Enregistrement · ${participantById(recordingSpeakerId)?.name || 'locuteur'}`;
     renderSpeakerButtons();
     timerHandle = setInterval(() => { ui.timer.textContent = formatTime((performance.now() - startedRecordingAt) / 1000); }, 250);
   } catch (error) {
@@ -1236,12 +1267,10 @@ function stopRecording() {
   clearInterval(timerHandle);
   try { systemSpeechSession?.stop(); } catch {}
   ui.recordState.textContent = 'Finalisation…';
-  show(ui.stopBtn, false);
-  ui.recordBtn.setAttribute('aria-pressed', 'false');
+  updateCaptureUi();
   setTimeout(() => {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
     stream?.getTracks().forEach(track => track.stop());
-    show(ui.recordBtn, true);
   }, 450);
 }
 async function blobTo16kMono(blob) {
@@ -1268,9 +1297,9 @@ async function handleRecordingStopped() {
   const nextSpeakerId = queuedSpeakerId;
   queuedSpeakerId = null;
 
-  ui.recordBtn.disabled = true;
   ui.addTurnBtn.disabled = true;
   ui.validateBtn.disabled = true;
+  updateCaptureUi();
   try {
     if (!chunks.length) return;
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
@@ -1318,7 +1347,6 @@ async function handleRecordingStopped() {
   } finally {
     chunks = [];
     show(ui.transcribing, false);
-    ui.recordBtn.disabled = false;
     ui.addTurnBtn.disabled = false;
     ui.validateBtn.disabled = false;
     recordingSpeakerId = null;
@@ -1329,6 +1357,11 @@ async function handleRecordingStopped() {
     try { resolveRecordingCompletion?.(); } catch {}
     resolveRecordingCompletion = null;
     recordingCompletionPromise = null;
+    if (ui.liveTranscriptPreview) {
+      ui.liveTranscriptPreview.textContent = '';
+      show(ui.liveTranscriptPreview, false);
+    }
+    ui.timer.textContent = '00:00';
     renderSpeakerButtons();
 
     if (nextSpeakerId && participantById(nextSpeakerId)) {
@@ -1456,8 +1489,6 @@ ui.prepareBtn.addEventListener('click', () => prepareModel().catch(() => {}));
 ui.startBtn.addEventListener('click', startInterview);
 ui.resumeBtn.addEventListener('click', resumeInterview);
 ui.homeBtn.addEventListener('click', async () => { flushSessionClock(); await addComposerTurn(); await persistSession(); renderSetup(); });
-ui.recordBtn.addEventListener('click', () => startRecording(session?.activeSpeakerId));
-ui.stopBtn.addEventListener('click', stopRecording);
 ui.addTurnBtn.addEventListener('click', async () => {
   const added = await addComposerTurn();
   if (!added) showError(ui.interviewError, 'La prise de parole est vide.');
