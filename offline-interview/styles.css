@@ -737,3 +737,12 @@
 @media(max-width:759px){
   .recording-mic{width:36px!important;height:36px!important;min-width:36px!important;min-height:36px!important;font-size:1.1rem!important}
 }
+
+
+/* V27.1 — deterministic microphone glyph, independent from emoji fonts */
+.recording-mic svg{
+  width:18px!important;
+  height:18px!important;
+  display:block!important;
+  fill:currentColor!important;
+}
