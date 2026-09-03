@@ -97,13 +97,14 @@
           <button id="pauseBtn" class="link-button sidebar-pause" type="button" aria-pressed="false">Ⅱ Pause</button>
         </div>
 
+        <nav id="questionNav" class="question-nav"></nav>
+
         <details class="sidebar-participants">
           <summary>Participants</summary>
           <div id="interviewParticipants" class="participant-list"></div>
           <button id="interviewAddParticipantBtn" class="ghost small">+ Ajouter</button>
         </details>
 
-        <nav id="questionNav" class="question-nav"></nav>
         <button id="sidebarFinishBtn" class="ghost small sidebar-finish" type="button">Terminer l’entretien</button>
       </aside>
 
@@ -125,19 +126,21 @@
 
         <p id="questionText" class="question"></p>
 
-        <details id="questionIntentDetails" class="question-intent-details">
-          <summary>Pourquoi cette question ?</summary>
-          <p id="questionIntent" class="question-intent"></p>
-        </details>
+        <div class="question-tools">
+          <details id="questionIntentDetails" class="question-intent-details">
+            <summary>Pourquoi cette question ?</summary>
+            <p id="questionIntent" class="question-intent"></p>
+          </details>
 
-        <details id="followUpsPanel" class="followups-panel">
-          <summary id="followUpsSummary">Relances possibles</summary>
-          <div id="plannedFollowUps" class="followup-list"></div>
-          <div class="adhoc-followup">
-            <input id="adHocFollowUpText" type="text" placeholder="Relance spontanée…">
-            <button id="addAdHocFollowUpBtn" class="ghost small">+ Ajouter</button>
-          </div>
-        </details>
+          <details id="followUpsPanel" class="followups-panel">
+            <summary id="followUpsSummary">Relances possibles</summary>
+            <div id="plannedFollowUps" class="followup-list"></div>
+            <div class="adhoc-followup">
+              <input id="adHocFollowUpText" type="text" placeholder="Relance spontanée…">
+              <button id="addAdHocFollowUpBtn" class="ghost small">+ Ajouter</button>
+            </div>
+          </details>
+        </div>
 
         <section id="turnsSection" class="conversation-section hidden">
           <h3>Conversation</h3>
@@ -165,22 +168,25 @@
           <button id="validateBtn" class="primary">Question suivante →</button>
         </div>
 
-        <section class="capture-dock" aria-label="Capturer une prise de parole">
-          <div class="capture-dock-top">
-            <div class="capture-instruction">
-              <strong>Qui parle ?</strong>
-              <span id="speakerHelp" class="speaker-help">Cliquez sur un nom pour commencer.</span>
+        <section id="captureDock" class="capture-dock" aria-label="Capturer une prise de parole">
+          <div class="capture-state-row">
+            <div class="capture-state-copy">
+              <span class="recording-dot" aria-hidden="true"></span>
+              <strong id="captureModeLabel">Prêt</strong>
+              <span id="recordState" class="record-state">Cliquez sur la personne qui parle</span>
             </div>
-            <div class="capture-live" aria-live="polite">
-              <span id="recordState" class="record-state">Choisissez un locuteur</span>
-              <span id="timer" class="timer">00:00</span>
-            </div>
+            <span id="timer" class="timer">00:00</span>
           </div>
-          <div id="speakerButtons" class="speaker-buttons"></div>
+
+          <div class="speaker-row">
+            <span class="speaker-row-label">Qui parle ?</span>
+            <div id="speakerButtons" class="speaker-buttons"></div>
+          </div>
+
+          <p id="speakerHelp" class="speaker-help">Un clic démarre sa prise de parole. Un autre nom change immédiatement de locuteur.</p>
+          <div id="liveTranscriptPreview" class="live-transcript hidden" aria-live="polite"></div>
           <span id="activeSpeakerLabel" class="sr-only"></span>
-          <button id="recordBtn" class="record hidden" aria-pressed="false">Parler</button>
-          <button id="stopBtn" class="danger hidden">Terminer</button>
-          <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Transcription en cours…</span></div>
+          <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Finalisation de la transcription…</span></div>
         </section>
       </section>
     </section>
