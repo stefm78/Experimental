@@ -302,6 +302,13 @@ function renderParticipantEditor(container) {
       if (session?.participantHistory?.[participant.id]) {
         session.participantHistory[participant.id].name = participant.name;
       }
+      if (session) {
+        for (const response of Object.values(session.responses || {})) {
+          for (const turn of response.turns || []) {
+            if (turn.speakerId === participant.id) turn.speakerNameSnapshot = participant.name;
+          }
+        }
+      }
       await persistRuntimeMetadata();
       renderParticipantsEverywhere(container);
       if (session) { renderSpeakerButtons(); renderTurns(); }
@@ -320,6 +327,13 @@ function renderParticipantEditor(container) {
       participant.role = normalizeRole(role.value);
       if (session?.participantHistory?.[participant.id]) {
         session.participantHistory[participant.id].role = participant.role;
+      }
+      if (session) {
+        for (const response of Object.values(session.responses || {})) {
+          for (const turn of response.turns || []) {
+            if (turn.speakerId === participant.id) turn.speakerRoleSnapshot = participant.role;
+          }
+        }
       }
       await persistRuntimeMetadata();
       renderParticipantsEverywhere(container);
