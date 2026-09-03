@@ -82,3 +82,29 @@
   .capture-dock .speaker-button{flex:1 1 120px}
   .conversation-section,.manual-entry{margin-bottom:18px}
 }
+
+
+/* Dream Team UX · iteration 2 — conversation-first capture */
+.capture-dock .speaker-button{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;background:#f8fafc;color:#24324a;border:1px solid #d7dee9;box-shadow:none}
+.capture-dock .speaker-button::before{content:"";width:8px;height:8px;border-radius:999px;background:#cbd5e1;flex:none}
+.capture-dock .speaker-button:hover{background:#f1f5f9;border-color:#c5cfdd}
+.capture-dock .speaker-button.active{background:#eef3fb;color:#172554;border-color:#aebdd4}
+.capture-dock .speaker-button.recording{background:#172554;color:#fff;border-color:#172554;box-shadow:0 0 0 3px rgba(23,37,84,.10)}
+.capture-dock .speaker-button.recording::before{background:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.18)}
+.capture-dock .speaker-button.queued{background:#eaf1ff;color:#1d4ed8;border-color:#93b4ef}
+.capture-dock .speaker-button.queued::before{background:#2563eb}
+.turns-list{gap:6px}
+.turn-card{padding:10px 12px;border-color:transparent;background:#f8fafc;border-radius:12px}
+.turn-card:hover{border-color:#e2e8f0;background:#fbfdff}
+.turn-card.follow-up-turn{background:#fffaf0;border-color:#f7e7bd}
+.turn-head{display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.turn-speaker-select{appearance:auto;max-width:260px;padding:3px 24px 3px 0;border:0;background:transparent;color:#334155;font-weight:800;font-size:.82rem}
+.turn-speaker-select:focus{outline:2px solid rgba(37,99,235,.16);border:0}
+.turn-type{margin-left:auto;font-size:.66rem;color:#94a3b8}
+.turn-card:not(.follow-up-turn) .turn-type{display:none}
+.turn-head .icon-button{margin-left:auto;padding:2px 7px;border:0;background:transparent;color:#94a3b8}
+.turn-text{display:block;width:100%;min-height:56px;padding:4px 0 0;border:0;background:transparent;resize:none;overflow:auto;line-height:1.55;color:#1f2937}
+.turn-text:focus{outline:0;border:0;background:#fff}
+.turn-meta{margin:3px 0 0;font-size:.7rem;color:#a0aabc}
+.conversation-section h3{display:none}
+.manual-entry summary,.question-intent-details summary,.followups-panel summary{user-select:none}
