@@ -70,6 +70,8 @@ export function createSystemSpeechSession({
   let resultSeen = false;
   let lastError = null;
   let restartTimer = null;
+  let boundaryText = '';
+  let boundaryUntil = 0;
 
   const publish = () => {
     const text = [finalText, interimText].filter(Boolean).join(' ').trim();
@@ -81,8 +83,25 @@ export function createSystemSpeechSession({
   recognition.onresult = event => {
     let interim = '';
     for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      const transcript = String(event.results[i]?.[0]?.transcript || '').trim();
+      let transcript = String(event.results[i]?.[0]?.transcript || '').trim();
       if (!transcript) continue;
+
+      if (boundaryText && Date.now() < boundaryUntil) {
+        const normalize = value => String(value || '')
+          .toLocaleLowerCase()
+          .normalize('NFKD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^\p{L}\p{N}]+/gu, ' ')
+          .trim();
+        const previous = normalize(boundaryText);
+        const candidate = normalize(transcript);
+        if (candidate && previous && (previous.endsWith(candidate) || previous === candidate)) {
+          continue;
+        }
+      } else if (Date.now() >= boundaryUntil) {
+        boundaryText = '';
+      }
+
       resultSeen = true;
       if (event.results[i].isFinal) {
         finalText = [finalText, transcript].filter(Boolean).join(' ').trim();
@@ -145,6 +164,23 @@ export function createSystemSpeechSession({
         resultSeen,
         lastError
       };
+    },
+    takeSegment() {
+      const text = [finalText, interimText].filter(Boolean).join(' ').trim();
+      const segment = {
+        text,
+        finalText: finalText || text,
+        mode,
+        resultSeen,
+        lastError
+      };
+      boundaryText = text;
+      boundaryUntil = Date.now() + 2200;
+      finalText = '';
+      interimText = '';
+      resultSeen = false;
+      lastError = null;
+      return segment;
     }
   };
 }
