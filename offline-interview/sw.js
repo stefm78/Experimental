@@ -1,4 +1,4 @@
-const VERSION = 'offline-interview-v15';
+const VERSION = 'offline-interview-v16';
 const SHELL_CACHE = `${VERSION}-shell`;
 const SHELL = [
   './', './index.html', './styles.css', './app.js?v=15',
