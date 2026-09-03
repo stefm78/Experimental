@@ -13,7 +13,7 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div><p class="eyebrow">INTERVIEW RUNTIME · LOCAL-FIRST</p><h1>Interview structurée</h1></div>
+      <div><p class="eyebrow">INTERVIEW STRUCTURÉE</p><h1>Interview structurée</h1></div>
       <span id="networkBadge" class="badge">…</span>
     </header>
 
@@ -43,12 +43,12 @@
         <button id="setupAddParticipantBtn" class="ghost small">+ Ajouter un participant</button>
       </details>
 
-      <div class="privacy-callout"><strong>Confidentialité</strong><span>Le questionnaire, les réponses et les métadonnées restent dans le navigateur. L'audio n'est pas persisté.</span></div>
+      <div class="privacy-callout"><strong>Confidentialité</strong><span>Les réponses restent dans ce navigateur. La transcription système peut, selon le navigateur ou l’OS, utiliser un service distant. Whisper reste le secours local.</span></div>
 
       <div class="status-grid" aria-live="polite">
         <div><span>Application</span><strong id="swStatus">Vérification…</strong></div>
         <div><span>Stockage</span><strong id="storageStatus">Vérification…</strong></div>
-        <div><span>Moteur STT</span><strong id="modelStatus">Non chargé</strong></div>
+        <div><span>Transcription</span><strong id="modelStatus">Détection…</strong></div>
       </div>
       <div id="progressBlock" class="progress-block hidden">
         <div class="progress-row"><span id="progressLabel">Chargement…</span><span id="progressValue"></span></div>
@@ -57,11 +57,11 @@
       </div>
       <p id="setupError" class="error hidden" role="alert"></p>
       <div class="actions">
-        <button id="prepareBtn" class="secondary">Préparer la transcription hors ligne</button>
+        <button id="prepareBtn" class="secondary">Préparer Whisper de secours</button>
         <button id="startBtn" class="primary">Démarrer l'entretien →</button>
       </div>
       <button id="resumeBtn" class="secondary hidden">Reprendre l'entretien en cours</button>
-      <p class="hint">La saisie clavier fonctionne même sans Whisper. Le moteur vocal est chargé à la demande lors du premier enregistrement.</p>
+      <p class="hint">Par défaut, « Parler » utilise la transcription système. Si elle est absente ou ne renvoie aucun texte, Whisper prend le relais localement.</p>
     </section>
 
     <section id="sttLabCard" class="card compact">
@@ -106,7 +106,7 @@
         <button id="recordBtn" class="record" aria-pressed="false">🎤 Parler</button>
         <button id="stopBtn" class="danger hidden">■ Terminer</button>
       </div>
-      <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Transcription locale en cours…</span></div>
+      <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Transcription en cours…</span></div>
 
       <div class="composer-head">
         <label for="answerText">Nouvelle prise de parole</label>
@@ -156,7 +156,7 @@
           <div><dt>Connexion</dt><dd id="diagNetwork">—</dd></div>
           <div><dt>Service worker</dt><dd id="diagSw">—</dd></div>
           <div><dt>Stockage persistant</dt><dd id="diagPersist">—</dd></div>
-          <div><dt>Modèle</dt><dd>onnx-community/whisper-tiny · q4 · WASM</dd></div>
+          <div><dt>Transcription</dt><dd id="diagStt">Détection…</dd></div>
         </dl>
         <button id="copyDiagBtn" class="secondary">Copier le diagnostic</button>
         <p id="copyDiagStatus" class="hint" aria-live="polite"></p>
@@ -164,6 +164,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=15"></script>
+  <script type="module" src="./app.js?v=17"></script>
 </body>
 </html>

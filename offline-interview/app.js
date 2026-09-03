@@ -1,4 +1,6 @@
-const BUILD_ID = '2026-09-03.interview-runtime-v15';
+import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
+
+const BUILD_ID = '2026-09-03.interview-runtime-v17';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -24,7 +26,7 @@ const ui = {
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
   interviewError: $('interviewError'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
   doneSummary: $('doneSummary'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), newSessionBtn: $('newSessionBtn'),
-  diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput'),
+  diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), diagStt: $('diagStt'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput'),
   copyAuthoringKitBtn: $('copyAuthoringKitBtn'), authoringKitStatus: $('authoringKitStatus')
 };
 
@@ -41,6 +43,8 @@ let composerDurationSeconds = 0;
 let composerSource = 'keyboard';
 let composerRawTranscript = null;
 let diagnosticError = null;
+let systemSpeechCapability = { supported: false, mode: 'unavailable', localAvailability: null, availability: null };
+let systemSpeechSession = null;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -342,6 +346,7 @@ async function loadInterviewFile(file) {
     interview = normalizeSpec(raw);
     session = null;
     await persistSpec();
+    await detectRuntimeSystemSpeech();
     renderSetup();
     ui.interviewFile.value = '';
   } catch (error) {
@@ -378,6 +383,8 @@ function updateComposerSpeaker() {
   ui.composerSpeaker.textContent = active?.name || 'Locuteur non défini';
 }
 function resetComposer() {
+  try { systemSpeechSession?.abort(); } catch {}
+  systemSpeechSession = null;
   ui.answerText.value = '';
   ui.answerMeta.textContent = '';
   composerDurationSeconds = 0;
@@ -665,7 +672,9 @@ function exportPayload() {
     provenance: {
       appBuild: BUILD_ID,
       inputSchema: interview.schema,
-      privacy: 'No audio is included or persisted. Text and interview metadata are included.'
+      transcriptionDefault: 'system',
+      transcriptionFallback: 'whisper-local',
+      privacy: 'The app does not persist or export audio. System speech recognition may be processed locally or remotely depending on the browser/OS.'
     },
     interview: {
       id: interview.id,
@@ -743,10 +752,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=15', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=17', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v15' : 'installé · v15';
+    ui.diagSw.textContent = reg.active ? 'actif · v17' : 'installé · v17';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -773,6 +782,47 @@ async function requestPersistentStorage() {
   }
 }
 
+function systemSpeechLabel() {
+  if (systemSpeechCapability.mode === 'local') return 'Système local';
+  if (systemSpeechCapability.mode === 'standard') return 'Système';
+  return 'Whisper local';
+}
+
+function refreshSttStatus() {
+  if (systemSpeechCapability.mode === 'local') {
+    ui.modelStatus.textContent = transcriber ? 'Système local · secours prêt' : 'Système local · secours Whisper';
+    if (ui.diagStt) ui.diagStt.textContent = 'Système local · Whisper secours';
+    return;
+  }
+  if (systemSpeechCapability.mode === 'standard') {
+    ui.modelStatus.textContent = transcriber ? 'Système · secours prêt' : 'Système · secours Whisper';
+    if (ui.diagStt) ui.diagStt.textContent = 'Système (réseau possible) · Whisper secours';
+    return;
+  }
+  ui.modelStatus.textContent = transcriber ? 'Whisper local prêt' : 'Whisper de secours';
+  if (ui.diagStt) ui.diagStt.textContent = 'Système indisponible · Whisper secours';
+}
+
+async function detectRuntimeSystemSpeech() {
+  try {
+    systemSpeechCapability = await detectSystemSpeech(interview?.language || navigator.language || 'fr-FR');
+  } catch (error) {
+    diagnosticError = String(error?.message || error);
+    systemSpeechCapability = { supported: false, mode: 'unavailable', localAvailability: 'error', availability: 'error' };
+  }
+  refreshSttStatus();
+  return systemSpeechCapability;
+}
+
+function applySystemText({ text, finalText, mode }) {
+  if (!text) return;
+  ui.answerText.value = text;
+  composerSource = mode === 'local' ? 'system-local' : 'system';
+  composerRawTranscript = finalText || text;
+  ui.answerMeta.textContent = mode === 'local'
+    ? 'Transcription système locale · vérifiez puis ajoutez la prise de parole'
+    : 'Transcription système · vérifiez puis ajoutez la prise de parole';
+}
 function progressCallback(item) {
   show(ui.progressBlock, true);
   if (item.status === 'progress' && typeof item.progress === 'number') {
@@ -818,7 +868,7 @@ async function prepareModel() {
     ui.modelProgress.value = 100;
     ui.progressValue.textContent = '100 %';
     ui.progressLabel.textContent = 'Moteur prêt';
-    ui.modelStatus.textContent = 'Prêt hors ligne';
+    refreshSttStatus();
     return transcriber;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -837,12 +887,9 @@ function preferredMimeType() {
 }
 async function startRecording() {
   showError(ui.interviewError);
-  if (!transcriber) {
-    ui.recordState.textContent = 'Préparation du moteur vocal…';
-    try { await prepareModel(); }
-    catch { return; }
-  }
   try {
+    try { systemSpeechSession?.abort(); } catch {}
+    systemSpeechSession = null;
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
     const mimeType = preferredMimeType();
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
@@ -850,11 +897,26 @@ async function startRecording() {
     recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
     recorder.onstop = handleRecordingStopped;
     recorder.start(500);
+
+    systemSpeechSession = createSystemSpeechSession({
+      lang: interview?.language || 'fr-FR',
+      mode: systemSpeechCapability.mode,
+      onText: applySystemText,
+      onState: state => {
+        if (state === 'listening-local') ui.recordState.textContent = `Écoute système locale · ${participantById(session.activeSpeakerId)?.name || 'locuteur'}`;
+        else if (state === 'listening') ui.recordState.textContent = `Écoute système · ${participantById(session.activeSpeakerId)?.name || 'locuteur'}`;
+        else if (state === 'speech-local') ui.recordState.textContent = 'Transcription système locale…';
+        else if (state === 'speech') ui.recordState.textContent = 'Transcription système…';
+      },
+      onError: error => { diagnosticError = `SpeechRecognition: ${error}`; }
+    });
+    const usingSystem = Boolean(systemSpeechSession?.start());
+
     startedRecordingAt = performance.now();
     ui.recordBtn.setAttribute('aria-pressed', 'true');
     show(ui.recordBtn, false);
     show(ui.stopBtn, true);
-    ui.recordState.textContent = `Enregistrement · ${participantById(session.activeSpeakerId)?.name || 'locuteur'}`;
+    if (!usingSystem) ui.recordState.textContent = `Enregistrement pour Whisper · ${participantById(session.activeSpeakerId)?.name || 'locuteur'}`;
     timerHandle = setInterval(() => { ui.timer.textContent = formatTime((performance.now() - startedRecordingAt) / 1000); }, 250);
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -865,12 +927,15 @@ function stopRecording() {
   if (!recorder || recorder.state === 'inactive') return;
   composerDurationSeconds = (performance.now() - startedRecordingAt) / 1000;
   clearInterval(timerHandle);
-  recorder.stop();
-  stream?.getTracks().forEach(track => track.stop());
+  try { systemSpeechSession?.stop(); } catch {}
+  ui.recordState.textContent = 'Finalisation…';
   show(ui.stopBtn, false);
-  show(ui.recordBtn, true);
   ui.recordBtn.setAttribute('aria-pressed', 'false');
-  ui.recordState.textContent = 'Enregistrement terminé';
+  setTimeout(() => {
+    if (recorder && recorder.state !== 'inactive') recorder.stop();
+    stream?.getTracks().forEach(track => track.stop());
+    show(ui.recordBtn, true);
+  }, 450);
 }
 async function blobTo16kMono(blob) {
   const arrayBuffer = await blob.arrayBuffer();
@@ -890,20 +955,36 @@ async function blobTo16kMono(blob) {
 }
 async function handleRecordingStopped() {
   if (!chunks.length) return;
-  show(ui.transcribing, true);
   ui.recordBtn.disabled = true;
   ui.addTurnBtn.disabled = true;
   ui.validateBtn.disabled = true;
   try {
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+    const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
+    const systemText = cleanText(systemSnapshot.text);
+
+    if (systemText) {
+      ui.answerText.value = systemText;
+      composerSource = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
+      composerRawTranscript = systemSnapshot.finalText || systemText;
+      ui.answerMeta.textContent = `${systemSnapshot.mode === 'local' ? 'Transcription système locale' : 'Transcription système'} · ${Math.round(composerDurationSeconds)} s · vérifiez puis ajoutez la prise de parole`;
+      ui.recordState.textContent = 'Transcription terminée';
+      return;
+    }
+
+    show(ui.transcribing, true);
+    ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
+      ? 'Transcription Whisper locale…'
+      : 'Aucun texte système · secours Whisper…';
+    if (!transcriber) await prepareModel();
     const samples = await blobTo16kMono(blob);
     const result = await transcriber(samples, { language: 'french', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
     const text = cleanText(result?.text);
     ui.answerText.value = text;
-    composerSource = 'speech';
+    composerSource = 'whisper-local';
     composerRawTranscript = text;
-    ui.answerMeta.textContent = `Transcription locale · ${Math.round(composerDurationSeconds)} s · vérifiez puis ajoutez la prise de parole`;
-    ui.recordState.textContent = 'Transcription terminée';
+    ui.answerMeta.textContent = `Whisper local (secours) · ${Math.round(composerDurationSeconds)} s · vérifiez puis ajoutez la prise de parole`;
+    ui.recordState.textContent = text ? 'Transcription terminée' : 'Aucun texte reconnu';
   } catch (error) {
     diagnosticError = String(error?.message || error);
     showError(ui.interviewError, `La transcription a échoué : ${error.message || error}`);
@@ -916,7 +997,6 @@ async function handleRecordingStopped() {
     ui.validateBtn.disabled = false;
   }
 }
-
 async function startInterview() {
   session = newSession();
   await persistSession();
@@ -979,6 +1059,8 @@ async function copyDiagnosticReport() {
       sessionPresent: Boolean(session),
       serviceWorkerController: navigator.serviceWorker?.controller?.scriptURL || null,
       modelReady: Boolean(transcriber),
+      systemSpeech: systemSpeechCapability,
+      systemSpeechLastError: systemSpeechSession?.snapshot?.().lastError || null,
       lastError: diagnosticError
     },
     storage: navigator.storage?.estimate ? await navigator.storage.estimate() : null
@@ -1016,7 +1098,7 @@ async function init() {
     session = savedSession;
   }
 
-  await Promise.allSettled([registerServiceWorker(), requestPersistentStorage()]);
+  await Promise.allSettled([registerServiceWorker(), requestPersistentStorage(), detectRuntimeSystemSpeech()]);
   renderSetup();
 }
 
