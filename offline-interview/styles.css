@@ -424,3 +424,90 @@
   .capture-dock{position:fixed;left:8px;right:8px;bottom:8px}
   .turn-meta-inline{display:none}
 }
+
+
+/* Observed UX v24 — simplify mental model and strengthen live capture */
+.move-capture{display:none!important}
+
+/* One question model: the viewed question is the capture destination. */
+.question-nav-item.on-air.current{background:#fff3f1;border-color:#e78c83}
+.question-nav-item.on-air .question-nav-duration{animation:onAirGlow 1.15s ease-in-out infinite}
+
+/* Macro interview clock reads as one line. */
+.interview-clock-copy{
+  display:flex;
+  align-items:baseline;
+  gap:6px;
+  justify-items:initial;
+  line-height:1;
+}
+.interview-clock-copy strong{font-size:1.45rem}
+.interview-clock-copy span{margin:0;font-size:.74rem}
+
+/* No permanent empty transcript strip: it opens upward only while capture is live/finalizing. */
+.live-transcript-slot{display:none;min-height:0;margin:0 0 8px}
+.capture-dock.is-recording .live-transcript-slot,
+.capture-dock.is-finalizing .live-transcript-slot{display:flex}
+.live-transcript{
+  min-height:64px;
+  max-height:108px;
+  padding:10px 12px;
+  font-size:.98rem;
+  line-height:1.48;
+  scroll-behavior:smooth;
+}
+.live-transcript:empty::before{
+  content:"Écoute…";
+  color:#a0aabc;
+}
+
+/* The microphone is the dominant capture state, not decorative dots. */
+.recording-mic{
+  width:44px;
+  height:44px;
+  font-size:1.3rem;
+  background:#eef2f7;
+}
+.capture-dock.is-recording .recording-mic{
+  background:#b42318;
+  animation:micPulse 1.1s ease-in-out infinite;
+}
+.capture-state-copy{gap:10px}
+.capture-state-copy #captureModeLabel{
+  padding:4px 8px;
+  border-radius:999px;
+  font-size:.76rem;
+  letter-spacing:.09em;
+}
+.capture-dock.is-recording #captureModeLabel{
+  background:#b42318;
+  color:#fff;
+  animation:onAirGlow 1.15s ease-in-out infinite;
+}
+.capture-dock.is-finalizing #captureModeLabel{
+  background:#f4e6b5;
+  color:#6f5918;
+}
+.capture-state-row .timer{font-size:1.15rem}
+.capture-dock .speaker-button{
+  min-height:54px;
+  font-size:1rem;
+  border-radius:13px;
+}
+.capture-dock .speaker-button.recording{
+  box-shadow:0 0 0 4px rgba(180,35,24,.12);
+}
+
+/* The transcript cards show names, not interview-role jargon. */
+.turn-speaker-select{font-weight:850}
+
+/* Exceptional technical controls remain secondary. */
+.setup-settings select{font-size:.82rem}
+
+@media(max-width:759px){
+  .interview-clock-copy strong{font-size:1.1rem}
+  .interview-clock-copy span[aria-hidden="true"],
+  .interview-clock-copy #sessionRemainingText{display:none}
+  .recording-mic{width:38px;height:38px;font-size:1.1rem}
+  .live-transcript{max-height:88px;font-size:.92rem}
+}
