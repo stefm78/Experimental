@@ -26,7 +26,7 @@ const ui = {
   answerText: $('answerText'), answerMeta: $('answerMeta'), composerSpeaker: $('composerSpeaker'), addTurnBtn: $('addTurnBtn'), clearComposerBtn: $('clearComposerBtn'),
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
   interviewError: $('interviewError'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
-  doneSummary: $('doneSummary'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), newSessionBtn: $('newSessionBtn'),
+  doneSummary: $('doneSummary'), doneQuestionStat: $('doneQuestionStat'), doneTurnStat: $('doneTurnStat'), doneTimeStat: $('doneTimeStat'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), newSessionBtn: $('newSessionBtn'),
   diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), diagStt: $('diagStt'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput'),
   copyAuthoringKitBtn: $('copyAuthoringKitBtn'), authoringKitStatus: $('authoringKitStatus')
 };
@@ -933,7 +933,13 @@ function finishInterview() {
   const all = flattenedQuestions();
   const answered = all.filter(({ question }) => (session.responses[question.id]?.turns || []).some(t => t.type === 'answer' && cleanText(t.text))).length;
   const turns = Object.values(session.responses || {}).reduce((sum, r) => sum + (r.turns?.length || 0), 0);
-  ui.doneSummary.textContent = `${answered} question${answered > 1 ? 's' : ''} répondue${answered > 1 ? 's' : ''} sur ${all.length} · ${turns} prise${turns > 1 ? 's' : ''} de parole structurée${turns > 1 ? 's' : ''}.`;
+  const activeMinutes = Math.max(1, Math.round((Number(session.activeSeconds) || 0) / 60));
+  ui.doneSummary.textContent = answered === all.length
+    ? 'Toutes les questions ont été abordées.'
+    : `${all.length - answered} question${all.length - answered > 1 ? 's' : ''} reste${all.length - answered > 1 ? 'nt' : ''} non abordée${all.length - answered > 1 ? 's' : ''}.`;
+  if (ui.doneQuestionStat) ui.doneQuestionStat.textContent = `${answered} / ${all.length}`;
+  if (ui.doneTurnStat) ui.doneTurnStat.textContent = String(turns);
+  if (ui.doneTimeStat) ui.doneTimeStat.textContent = `${activeMinutes} min`;
 }
 
 function exportPayload() {
@@ -1073,10 +1079,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=20', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=21', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v20' : 'installé · v20';
+    ui.diagSw.textContent = reg.active ? 'actif · v21' : 'installé · v21';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
