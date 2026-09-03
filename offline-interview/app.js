@@ -621,7 +621,6 @@ function renderQuestion() {
   renderInterviewMetrics();
 }
 
-function createTurn(
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
   return {
     id: uuid('turn'),
@@ -801,7 +800,6 @@ async function goPrevious() {
   await goToQuestion(session.currentIndex - 1);
 }
 
-function finishInterview() {
 function finishInterview() {
   setView('done');
   const all = flattenedQuestions();
