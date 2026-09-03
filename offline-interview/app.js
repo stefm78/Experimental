@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v17';
+const BUILD_ID = '2026-09-03.interview-runtime-v18';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -19,6 +19,7 @@ const ui = {
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'),
+  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarTimeSummary: $('sidebarTimeSummary'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
   recordState: $('recordState'), timer: $('timer'), recordBtn: $('recordBtn'), stopBtn: $('stopBtn'), transcribing: $('transcribing'),
@@ -45,6 +46,9 @@ let composerRawTranscript = null;
 let diagnosticError = null;
 let systemSpeechCapability = { supported: false, mode: 'unavailable', localAvailability: null, availability: null };
 let systemSpeechSession = null;
+let sessionClockTimer = null;
+let sessionClockLastMs = null;
+let sessionClockPersistTicks = 0;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -65,6 +69,8 @@ function setView(name) {
   show(ui.doneView, name === 'done');
   show(ui.sttLabCard, name === 'setup');
   show(ui.authoringKitCard, name === 'setup');
+  if (name === 'interview') startSessionClock();
+  else stopSessionClock();
 }
 
 function updateNetwork() {
@@ -127,9 +133,11 @@ function normalizeQuestion(q, fallback) {
   })).filter(f => f.text) : [];
   return {
     id: cleanText(q?.id) || `Q${fallback}`,
+    label: cleanText(q?.label),
     text: cleanText(q?.text),
     intent: cleanText(q?.intent),
     required: q?.required !== false,
+    estimatedMinutes: Number.isFinite(Number(q?.estimatedMinutes)) && Number(q.estimatedMinutes) > 0 ? Number(q.estimatedMinutes) : null,
     audience: Array.isArray(q?.audience) ? q.audience.map(cleanText).filter(Boolean) : [],
     followUps
   };
@@ -165,6 +173,7 @@ function normalizeSpec(raw) {
     objective: cleanText(raw.objective),
     language: cleanText(raw.language) || 'fr-FR',
     tags: Array.isArray(raw.tags) ? raw.tags.map(cleanText).filter(Boolean) : [],
+    estimatedDurationMinutes: Number.isFinite(Number(raw.estimatedDurationMinutes)) && Number(raw.estimatedDurationMinutes) > 0 ? Number(raw.estimatedDurationMinutes) : null,
     participants,
     sections
   };
@@ -225,6 +234,9 @@ function newSession() {
     completedAt: null,
     currentIndex: 0,
     activeSpeakerId: interview.participants.find(p => p.role === 'interviewee')?.id || interview.participants[0]?.id || null,
+    activeSeconds: 0,
+    questionSeconds: {},
+    paused: false,
     responses: {}
   };
 }
@@ -752,10 +764,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=17', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=18', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v17' : 'installé · v17';
+    ui.diagSw.textContent = reg.active ? 'actif · v18' : 'installé · v18';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
