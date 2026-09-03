@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v23';
+const BUILD_ID = '2026-09-03.interview-runtime-v24';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -19,7 +19,7 @@ const ui = {
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
-  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), moveCaptureBtn: $('moveCaptureBtn'),
+  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
   captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'),
@@ -248,6 +248,7 @@ function newSession() {
     activeSeconds: 0,
     questionSeconds: {},
     paused: false,
+    participantHistory: Object.fromEntries(interview.participants.map(p => [p.id, { ...clone(p), removedAt: null }])),
     responses: {}
   };
 }
@@ -274,7 +275,11 @@ async function addParticipant() {
   const participant = { id: nextParticipantId(), name: 'Nouveau participant', role: 'interviewee' };
   target.push(participant);
   if (!session) interview.participants = target;
-  if (session && !session.activeSpeakerId) session.activeSpeakerId = participant.id;
+  if (session) {
+    if (!session.participantHistory || typeof session.participantHistory !== 'object') session.participantHistory = {};
+    session.participantHistory[participant.id] = { ...clone(participant), removedAt: null };
+    if (!session.activeSpeakerId) session.activeSpeakerId = participant.id;
+  }
   await persistRuntimeMetadata();
   renderParticipantsEverywhere();
   if (session) renderSpeakerButtons();
@@ -294,6 +299,16 @@ function renderParticipantEditor(container) {
     name.addEventListener('change', async () => {
       participant.name = cleanText(name.value) || participant.id;
       name.value = participant.name;
+      if (session?.participantHistory?.[participant.id]) {
+        session.participantHistory[participant.id].name = participant.name;
+      }
+      if (session) {
+        for (const response of Object.values(session.responses || {})) {
+          for (const turn of response.turns || []) {
+            if (turn.speakerId === participant.id) turn.speakerNameSnapshot = participant.name;
+          }
+        }
+      }
       await persistRuntimeMetadata();
       renderParticipantsEverywhere(container);
       if (session) { renderSpeakerButtons(); renderTurns(); }
@@ -310,6 +325,16 @@ function renderParticipantEditor(container) {
     }
     role.addEventListener('change', async () => {
       participant.role = normalizeRole(role.value);
+      if (session?.participantHistory?.[participant.id]) {
+        session.participantHistory[participant.id].role = participant.role;
+      }
+      if (session) {
+        for (const response of Object.values(session.responses || {})) {
+          for (const turn of response.turns || []) {
+            if (turn.speakerId === participant.id) turn.speakerRoleSnapshot = participant.role;
+          }
+        }
+      }
       await persistRuntimeMetadata();
       renderParticipantsEverywhere(container);
       if (session) renderSpeakerButtons();
@@ -322,11 +347,18 @@ function renderParticipantEditor(container) {
     remove.title = 'Supprimer le participant';
     remove.disabled = participantsSource().length <= 1;
     remove.addEventListener('click', async () => {
+      if (session && (recordingSpeakerId === participant.id || queuedSpeakerId === participant.id)) {
+        alert(`Terminez d’abord la prise de parole de ${participant.name} avant de supprimer ce participant.`);
+        return;
+      }
       const used = session ? Object.values(session.responses || {}).some(r => (r.turns || []).some(t => t.speakerId === participant.id)) : false;
-      if (used && !confirm(`${participant.name} est déjà associé à des prises de parole. Supprimer quand même ce participant ?`)) return;
+      if (used && !confirm(`${participant.name} est déjà associé à des prises de parole. Son nom restera conservé dans l’historique. Supprimer ce participant de la liste active ?`)) return;
       const arr = participantsSource();
       const index = arr.findIndex(p => p.id === participant.id);
       if (index >= 0) arr.splice(index, 1);
+      if (session?.participantHistory?.[participant.id]) {
+        session.participantHistory[participant.id].removedAt = nowIso();
+      }
       if (session?.activeSpeakerId === participant.id) session.activeSpeakerId = defaultActiveSpeakerId();
       await persistRuntimeMetadata();
       renderParticipantsEverywhere();
@@ -511,25 +543,46 @@ function renderQuestionNav() {
 }
 
 
-function renderCaptureTransfer() {
-  if (!ui.moveCaptureBtn || !session) return;
-  const viewedQuestionId = currentEntry()?.question?.id || null;
-  const canMove = Boolean(isRecording() && recordingQuestionId && viewedQuestionId && recordingQuestionId !== viewedQuestionId);
-  show(ui.moveCaptureBtn, canMove);
-  if (canMove) {
-    const label = currentEntry()?.question?.label || 'cette question';
-    ui.moveCaptureBtn.textContent = 'Basculer ici · ' + label;
-  }
-}
+async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
+  if (!isRecording() || !recordingSpeakerId || !recordingQuestionId) return false;
+  if (!nextSpeakerId || !nextQuestionId) return false;
+  if (nextSpeakerId === recordingSpeakerId && nextQuestionId === recordingQuestionId) return true;
+  if (!systemSpeechSession?.takeSegment) return false;
 
-async function moveRecordingToViewedQuestion() {
-  if (!isRecording() || !recordingSpeakerId) return;
-  const targetQuestionId = currentEntry()?.question?.id || null;
-  if (!targetQuestionId || targetQuestionId === recordingQuestionId) return;
-  queuedSpeakerId = recordingSpeakerId;
-  queuedRecordingQuestionId = targetQuestionId;
-  ui.recordState.textContent = 'Bascule vers la question affichée…';
-  stopRecording();
+  const snapshot = systemSpeechSession.takeSegment();
+  const text = cleanText(snapshot?.text);
+  if (!meaningfulTranscript(text)) return false;
+
+  const previousSpeakerId = recordingSpeakerId;
+  const previousQuestionId = recordingQuestionId;
+  const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
+  const source = snapshot.mode === 'local' ? 'system-local' : 'system';
+  const rawTranscript = snapshot.finalText || text;
+
+  recordingSpeakerId = nextSpeakerId;
+  recordingQuestionId = nextQuestionId;
+  session.activeSpeakerId = nextSpeakerId;
+  session.updatedAt = nowIso();
+  startedRecordingAt = performance.now();
+  composerDurationSeconds = 0;
+  chunks = [];
+  ui.timer.textContent = '00:00';
+  if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
+
+  renderSpeakerButtons();
+  renderQuestionNav();
+  updateCaptureUi();
+
+  await appendAnswerTurn({
+    questionId: previousQuestionId,
+    speakerId: previousSpeakerId,
+    text,
+    source,
+    rawTranscript,
+    durationSeconds
+  });
+  await persistSession();
+  return true;
 }
 
 async function togglePause() {
@@ -546,7 +599,20 @@ async function goToQuestion(index) {
   const all = flattenedQuestions();
   if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;
   flushSessionClock();
-  if (!isRecording() && !captureFinalizing) await addComposerTurn();
+  const targetQuestionId = all[index]?.question?.id || null;
+
+  if (isRecording() && targetQuestionId && targetQuestionId !== recordingQuestionId) {
+    const rotated = await rotateLiveSegment(recordingSpeakerId, targetQuestionId);
+    if (!rotated) {
+      queuedSpeakerId = recordingSpeakerId;
+      queuedRecordingQuestionId = targetQuestionId;
+      ui.recordState.textContent = 'Changement de question…';
+      stopRecording();
+    }
+  } else if (!isRecording() && !captureFinalizing) {
+    await addComposerTurn();
+  }
+
   session.currentIndex = index;
   session.completed = false;
   session.completedAt = null;
@@ -556,16 +622,34 @@ async function goToQuestion(index) {
   renderQuestion();
 }
 
+async function finishActiveCaptureBeforeLeaving(message) {
+  if (isRecording()) {
+    if (!confirm(message)) return false;
+    queuedSpeakerId = null;
+    queuedRecordingQuestionId = null;
+    stopRecording();
+  }
+  if (captureFinalizing || recordingCompletionPromise) {
+    if (recordingCompletionPromise) await recordingCompletionPromise;
+  }
+  return true;
+}
+
+async function returnToSetup() {
+  const ok = await finishActiveCaptureBeforeLeaving('Un enregistrement est en cours. L’arrêter, conserver sa transcription puis revenir à l’accueil ?');
+  if (!ok) return;
+  flushSessionClock();
+  await addComposerTurn();
+  await persistSession();
+  renderSetup();
+}
+
 async function completeInterview() {
   if (!session) return;
+  const ok = await finishActiveCaptureBeforeLeaving('Un enregistrement est en cours. L’arrêter, conserver sa transcription puis terminer l’entretien ?');
+  if (!ok) return;
   flushSessionClock();
-  if (isRecording()) {
-    queuedSpeakerId = null;
-    stopRecording();
-    if (recordingCompletionPromise) await recordingCompletionPromise;
-  } else {
-    await addComposerTurn();
-  }
+  await addComposerTurn();
   session.completed = true;
   session.completedAt = nowIso();
   session.updatedAt = nowIso();
@@ -635,11 +719,14 @@ async function handleSpeakerButtonClick(participantId) {
       stopRecording();
       return;
     }
-    queuedSpeakerId = participantId;
-    queuedRecordingQuestionId = recordingQuestionId;
-    await selectSpeaker(participantId);
-    ui.recordState.textContent = 'Changement de locuteur…';
-    stopRecording();
+    const rotated = await rotateLiveSegment(participantId, recordingQuestionId);
+    if (!rotated) {
+      queuedSpeakerId = participantId;
+      queuedRecordingQuestionId = recordingQuestionId;
+      await selectSpeaker(participantId);
+      ui.recordState.textContent = 'Changement de locuteur…';
+      stopRecording();
+    }
     return;
   }
 
@@ -655,7 +742,7 @@ function updateCaptureUi() {
   ui.captureDock?.classList.toggle('is-finalizing', captureFinalizing && !recording);
 
   if (recording) {
-    if (ui.captureModeLabel) ui.captureModeLabel.textContent = '● ON AIR';
+    if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'ON AIR';
     ui.recordState.textContent = active ? `${active.name} · en cours` : 'Enregistrement en cours';
   } else if (captureFinalizing) {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'FINALISATION';
@@ -664,7 +751,6 @@ function updateCaptureUi() {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'PRÊT';
     ui.recordState.textContent = 'Cliquez sur la personne qui parle';
   }
-  renderCaptureTransfer();
 }
 
 function renderSpeakerButtons() {
@@ -679,7 +765,7 @@ function renderSpeakerButtons() {
     const queued = (isRecording() || captureFinalizing) && participant.id === queuedSpeakerId;
     const active = participant.id === session.activeSpeakerId;
     button.className = `speaker-button${active ? ' active' : ''}${recording ? ' recording' : ''}${queued ? ' queued' : ''}`;
-    button.textContent = recording ? `● ${participant.name}` : participant.name;
+    button.textContent = participant.name;
     button.dataset.captureState = recording ? 'recording' : queued ? 'queued' : 'idle';
     button.title = recording
       ? `Arrêter la prise de parole de ${participant.name}`
@@ -698,7 +784,6 @@ function renderSpeakerButtons() {
     ui.speakerHelp.classList.toggle('hidden', hasTurns || isRecording() || captureFinalizing);
   }
   updateCaptureUi();
-  renderCaptureTransfer();
   updateComposerSpeaker();
 }
 function updateComposerSpeaker() {
@@ -745,14 +830,16 @@ function renderQuestion() {
   renderFollowUps();
   renderQuestionNav();
   renderInterviewMetrics();
-  renderCaptureTransfer();
 }
 
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
+  const speaker = participantById(speakerId) || session?.participantHistory?.[speakerId] || null;
   return {
     id: uuid('turn'),
     type,
     speakerId: speakerId || null,
+    speakerNameSnapshot: speaker?.name || null,
+    speakerRoleSnapshot: speaker?.role || null,
     text: cleanText(text),
     source,
     rawTranscript: rawTranscript == null ? null : String(rawTranscript),
@@ -763,22 +850,43 @@ function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', raw
     updatedAt: nowIso()
   };
 }
+
+function meaningfulTranscript(value) {
+  const text = cleanText(value);
+  return Boolean(text && /[\p{L}\p{N}]/u.test(text));
+}
+
+function comparableTranscript(value) {
+  return cleanText(value)
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+
 async function appendAnswerTurn({ questionId, speakerId, text, source, rawTranscript = null, durationSeconds = 0 }) {
   const clean = cleanText(text);
-  if (!clean || !questionId || !speakerId) return false;
+  if (!meaningfulTranscript(clean) || !questionId || !speakerId) return false;
   const response = responseFor(questionId);
   const last = [...(response.turns || [])].reverse().find(turn => turn.type === 'answer');
   if (last && last.speakerId === speakerId) {
     const previous = cleanText(last.text);
-    const same = previous === clean;
-    const nearDuplicate = previous.length > 40 && clean.length > 40 && (clean.startsWith(previous) || previous.startsWith(clean));
-    const recent = last.createdAt && (Date.now() - new Date(last.createdAt).getTime()) < 5000;
+    const previousComparable = comparableTranscript(previous);
+    const cleanComparable = comparableTranscript(clean);
+    const same = previousComparable === cleanComparable;
+    const nearDuplicate = previousComparable.length > 20 && cleanComparable.length > 20 &&
+      (cleanComparable.startsWith(previousComparable) || previousComparable.startsWith(cleanComparable));
+    const recent = last.createdAt && (Date.now() - new Date(last.createdAt).getTime()) < 7000;
     if (recent && (same || nearDuplicate)) {
-      if (clean.length > previous.length) {
+      if (cleanComparable.length > previousComparable.length) {
         last.text = clean;
         last.rawTranscript = rawTranscript || clean;
         last.updatedAt = nowIso();
         last.durationSeconds = Math.max(Number(last.durationSeconds) || 0, Number(durationSeconds) || 0);
+        const speaker = participantById(speakerId) || session?.participantHistory?.[speakerId] || null;
+        last.speakerNameSnapshot = last.speakerNameSnapshot || speaker?.name || null;
+        last.speakerRoleSnapshot = last.speakerRoleSnapshot || speaker?.role || null;
         await persistSession();
         renderTurns();
       }
@@ -842,19 +950,22 @@ function renderTurns() {
     for (const p of participantsSource()) {
       const option = document.createElement('option');
       option.value = p.id;
-      option.textContent = `${p.name} · ${roleLabel(p.role)}`;
+      option.textContent = p.name;
       option.selected = p.id === turn.speakerId;
       select.append(option);
     }
     if (!participantById(turn.speakerId) && turn.speakerId) {
       const option = document.createElement('option');
       option.value = turn.speakerId;
-      option.textContent = `${turn.speakerId} · participant supprimé`;
+      option.textContent = turn.speakerNameSnapshot || session?.participantHistory?.[turn.speakerId]?.name || 'Participant supprimé';
       option.selected = true;
       select.append(option);
     }
     select.addEventListener('change', async () => {
       turn.speakerId = select.value;
+      const speaker = participantById(turn.speakerId) || session?.participantHistory?.[turn.speakerId] || null;
+      turn.speakerNameSnapshot = speaker?.name || turn.speakerNameSnapshot || null;
+      turn.speakerRoleSnapshot = speaker?.role || turn.speakerRoleSnapshot || null;
       turn.updatedAt = nowIso();
       await persistSession();
     });
@@ -988,7 +1099,17 @@ function finishInterview() {
 }
 
 function exportPayload() {
-  const participants = clone(session.participants || []);
+  const activeIds = new Set((session.participants || []).map(p => p.id));
+  const historyValues = Object.values(session.participantHistory || {});
+  const participants = historyValues.length
+    ? historyValues.map(p => ({
+        id: p.id,
+        name: p.name,
+        role: p.role,
+        active: activeIds.has(p.id),
+        removedAt: p.removedAt || null
+      }))
+    : clone(session.participants || []).map(p => ({ ...p, active: true, removedAt: null }));
   const participantMap = new Map(participants.map(p => [p.id, p]));
   let answeredQuestions = 0;
   let followUpsUsed = 0;
@@ -1005,8 +1126,8 @@ function exportPayload() {
           id: turn.id,
           type: turn.type,
           speakerId: turn.speakerId,
-          speakerName: p?.name || null,
-          speakerRole: p?.role || null,
+          speakerName: turn.speakerNameSnapshot || p?.name || null,
+          speakerRole: turn.speakerRoleSnapshot || p?.role || null,
           text: turn.text,
           source: turn.source,
           rawTranscript: turn.rawTranscript,
@@ -1091,7 +1212,7 @@ function exportJson() {
 function exportTxt() {
   const payload = exportPayload();
   const lines = [payload.interview.title, '', payload.interview.context || '', payload.interview.objective ? `Objectif : ${payload.interview.objective}` : '', '', 'Participants :'];
-  for (const p of payload.participants) lines.push(`- ${p.name} (${roleLabel(p.role)})`);
+  for (const p of payload.participants) lines.push(`- ${p.name}${p.active === false ? ' [ancien participant]' : ''}`);
   lines.push('');
   for (const section of payload.sections) {
     lines.push(`# ${section.title}`, '');
@@ -1186,12 +1307,10 @@ async function detectRuntimeSystemSpeech() {
   return systemSpeechCapability;
 }
 
-function applySystemText({ text, finalText, mode }) {
-  if (!text) return;
-  ui.answerText.value = text;
-  composerSource = mode === 'local' ? 'system-local' : 'system';
-  composerRawTranscript = finalText || text;
-  if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = text;
+function applySystemText({ text }) {
+  if (!text || !ui.liveTranscriptPreview) return;
+  ui.liveTranscriptPreview.textContent = text;
+  ui.liveTranscriptPreview.scrollTop = ui.liveTranscriptPreview.scrollHeight;
 }
 function progressCallback(item) {
   show(ui.progressBlock, true);
@@ -1311,7 +1430,7 @@ function stopRecording() {
   updateCaptureUi();
   setTimeout(() => {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
-  }, 120);
+  }, 280);
 }
 async function blobTo16kMono(blob) {
   const arrayBuffer = await blob.arrayBuffer();
@@ -1428,6 +1547,20 @@ async function resumeInterview() {
   interview = normalizeSpec(session.interviewSpec || interview);
   session.interviewSpec = clone(interview);
   if (!Array.isArray(session.participants) || !session.participants.length) session.participants = clone(interview.participants);
+  if (!session.participantHistory || typeof session.participantHistory !== 'object') {
+    session.participantHistory = Object.fromEntries(session.participants.map(p => [p.id, { ...clone(p), removedAt: null }]));
+    for (const response of Object.values(session.responses || {})) {
+      for (const turn of response.turns || []) {
+        if (!turn.speakerId || session.participantHistory[turn.speakerId]) continue;
+        session.participantHistory[turn.speakerId] = {
+          id: turn.speakerId,
+          name: turn.speakerNameSnapshot || turn.speakerId,
+          role: turn.speakerRoleSnapshot || 'other',
+          removedAt: null
+        };
+      }
+    }
+  }
   if (!session.responses || typeof session.responses !== 'object') session.responses = {};
   if (!session.questionSeconds || typeof session.questionSeconds !== 'object') session.questionSeconds = {};
   if (!Number.isFinite(Number(session.activeSeconds))) session.activeSeconds = 0;
@@ -1536,7 +1669,7 @@ ui.interviewAddParticipantBtn.addEventListener('click', addParticipant);
 ui.prepareBtn.addEventListener('click', () => prepareModel().catch(() => {}));
 ui.startBtn.addEventListener('click', startInterview);
 ui.resumeBtn.addEventListener('click', resumeInterview);
-ui.homeBtn.addEventListener('click', async () => { flushSessionClock(); await addComposerTurn(); await persistSession(); renderSetup(); });
+ui.homeBtn.addEventListener('click', returnToSetup);
 ui.addTurnBtn.addEventListener('click', async () => {
   const added = await addComposerTurn();
   if (!added) showError(ui.interviewError, 'La prise de parole est vide.');
@@ -1555,7 +1688,6 @@ ui.adHocFollowUpText.addEventListener('keydown', event => {
 ui.validateBtn.addEventListener('click', goNextQuestion);
 ui.prevBtn.addEventListener('click', goPrevious);
 ui.pauseBtn?.addEventListener('click', togglePause);
-ui.moveCaptureBtn?.addEventListener('click', moveRecordingToViewedQuestion);
 ui.sidebarFinishBtn?.addEventListener('click', completeInterview);
 ui.reviewBtn.addEventListener('click', async () => {
   session.completed = false;
