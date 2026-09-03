@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v17';
+const BUILD_ID = '2026-09-03.interview-runtime-v18';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -19,6 +19,7 @@ const ui = {
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'),
+  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarTimeSummary: $('sidebarTimeSummary'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
   recordState: $('recordState'), timer: $('timer'), recordBtn: $('recordBtn'), stopBtn: $('stopBtn'), transcribing: $('transcribing'),
@@ -45,6 +46,9 @@ let composerRawTranscript = null;
 let diagnosticError = null;
 let systemSpeechCapability = { supported: false, mode: 'unavailable', localAvailability: null, availability: null };
 let systemSpeechSession = null;
+let sessionClockTimer = null;
+let sessionClockLastMs = null;
+let sessionClockPersistTicks = 0;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -65,6 +69,8 @@ function setView(name) {
   show(ui.doneView, name === 'done');
   show(ui.sttLabCard, name === 'setup');
   show(ui.authoringKitCard, name === 'setup');
+  if (name === 'interview') startSessionClock();
+  else stopSessionClock();
 }
 
 function updateNetwork() {
@@ -127,9 +133,11 @@ function normalizeQuestion(q, fallback) {
   })).filter(f => f.text) : [];
   return {
     id: cleanText(q?.id) || `Q${fallback}`,
+    label: cleanText(q?.label),
     text: cleanText(q?.text),
     intent: cleanText(q?.intent),
     required: q?.required !== false,
+    estimatedMinutes: Number.isFinite(Number(q?.estimatedMinutes)) && Number(q.estimatedMinutes) > 0 ? Number(q.estimatedMinutes) : null,
     audience: Array.isArray(q?.audience) ? q.audience.map(cleanText).filter(Boolean) : [],
     followUps
   };
@@ -165,6 +173,7 @@ function normalizeSpec(raw) {
     objective: cleanText(raw.objective),
     language: cleanText(raw.language) || 'fr-FR',
     tags: Array.isArray(raw.tags) ? raw.tags.map(cleanText).filter(Boolean) : [],
+    estimatedDurationMinutes: Number.isFinite(Number(raw.estimatedDurationMinutes)) && Number(raw.estimatedDurationMinutes) > 0 ? Number(raw.estimatedDurationMinutes) : null,
     participants,
     sections
   };
@@ -225,6 +234,9 @@ function newSession() {
     completedAt: null,
     currentIndex: 0,
     activeSpeakerId: interview.participants.find(p => p.role === 'interviewee')?.id || interview.participants[0]?.id || null,
+    activeSeconds: 0,
+    questionSeconds: {},
+    paused: false,
     responses: {}
   };
 }
@@ -323,11 +335,199 @@ function renderParticipantsEverywhere(skip = null) {
   if (session && ui.interviewParticipants !== skip) renderParticipantEditor(ui.interviewParticipants);
 }
 
+function estimatedTotalMinutes() {
+  const explicit = Number(interview?.estimatedDurationMinutes);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const all = flattenedQuestions();
+  const sum = all.reduce((total, entry) => total + (Number(entry.question.estimatedMinutes) > 0 ? Number(entry.question.estimatedMinutes) : 0), 0);
+  return sum > 0 ? sum : Math.max(10, all.length * 3);
+}
+
+function estimatedQuestionMinutes(question) {
+  const explicit = Number(question?.estimatedMinutes);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const total = estimatedTotalMinutes();
+  const count = Math.max(1, flattenedQuestions().length);
+  return Math.max(1, Math.round((total / count) * 2) / 2);
+}
+
+function questionHasAnswer(questionId) {
+  return (session?.responses?.[questionId]?.turns || []).some(turn => turn.type === 'answer' && cleanText(turn.text));
+}
+
+function activeQuestionSeconds(questionId) {
+  return Math.max(0, Number(session?.questionSeconds?.[questionId]) || 0);
+}
+
+function elapsedMinutesLabel(seconds) {
+  const mins = Math.max(0, seconds) / 60;
+  if (mins < 1) return '<1 min';
+  return Math.round(mins) + ' min';
+}
+
+function remainingEstimatedMinutes() {
+  if (!session) return estimatedTotalMinutes();
+  return flattenedQuestions().reduce((total, entry) => {
+    const question = entry.question;
+    if (questionHasAnswer(question.id)) return total;
+    const estimate = estimatedQuestionMinutes(question);
+    const spent = activeQuestionSeconds(question.id) / 60;
+    return total + Math.max(0, estimate - spent);
+  }, 0);
+}
+
+function flushSessionClock() {
+  if (!session || session.paused || !sessionClockLastMs || ui.interviewView?.classList.contains('hidden')) {
+    sessionClockLastMs = Date.now();
+    return;
+  }
+  const now = Date.now();
+  const delta = Math.max(0, Math.min(5, (now - sessionClockLastMs) / 1000));
+  sessionClockLastMs = now;
+  if (!delta) return;
+  session.activeSeconds = Math.max(0, Number(session.activeSeconds) || 0) + delta;
+  if (!session.questionSeconds || typeof session.questionSeconds !== 'object') session.questionSeconds = {};
+  const entry = currentEntry();
+  if (entry) session.questionSeconds[entry.question.id] = activeQuestionSeconds(entry.question.id) + delta;
+  session.updatedAt = nowIso();
+}
+
+function startSessionClock() {
+  if (!session || session.completed) return;
+  sessionClockLastMs = Date.now();
+  if (sessionClockTimer) return;
+  sessionClockTimer = setInterval(() => {
+    if (!session || session.paused || document.visibilityState !== 'visible') {
+      sessionClockLastMs = Date.now();
+      renderInterviewMetrics();
+      return;
+    }
+    flushSessionClock();
+    renderInterviewMetrics();
+    sessionClockPersistTicks += 1;
+    if (sessionClockPersistTicks >= 10) {
+      sessionClockPersistTicks = 0;
+      renderQuestionNav();
+      persistSession().catch(() => {});
+    }
+  }, 1000);
+}
+
+function stopSessionClock() {
+  if (sessionClockTimer) {
+    flushSessionClock();
+    clearInterval(sessionClockTimer);
+    sessionClockTimer = null;
+  }
+  sessionClockLastMs = null;
+  sessionClockPersistTicks = 0;
+  if (session) persistSession().catch(() => {});
+}
+
+function renderInterviewMetrics() {
+  if (!session || !interview) return;
+  const all = flattenedQuestions();
+  const answered = all.filter(entry => questionHasAnswer(entry.question.id)).length;
+  const elapsedSeconds = Math.max(0, Number(session.activeSeconds) || 0);
+  const elapsedMinutes = elapsedSeconds / 60;
+  const totalEstimate = estimatedTotalMinutes();
+  const remaining = remainingEstimatedMinutes();
+  if (ui.interviewProgressSummary) ui.interviewProgressSummary.textContent = answered + ' / ' + all.length + ' abordées';
+  if (ui.timeProgressLabel) ui.timeProgressLabel.textContent = elapsedMinutesLabel(elapsedSeconds) + ' écoulées · ~' + Math.max(0, Math.round(remaining)) + ' min prévues restantes';
+  if (ui.sidebarTimeSummary) ui.sidebarTimeSummary.textContent = elapsedMinutesLabel(elapsedSeconds) + ' / ~' + Math.round(totalEstimate) + ' min';
+  if (ui.timeProgress) {
+    ui.timeProgress.max = Math.max(1, totalEstimate);
+    ui.timeProgress.value = Math.min(totalEstimate, elapsedMinutes);
+  }
+  if (ui.pauseBtn) {
+    ui.pauseBtn.textContent = session.paused ? '▶ Reprendre' : 'Ⅱ Pause';
+    ui.pauseBtn.setAttribute('aria-pressed', session.paused ? 'true' : 'false');
+  }
+}
+
+function questionNavLabel(question) {
+  const explicit = cleanText(question.label);
+  if (explicit) return explicit;
+  const text = cleanText(question.text);
+  return text.length > 46 ? text.slice(0, 43) + '…' : text;
+}
+
+function renderQuestionNav() {
+  if (!ui.questionNav || !session) return;
+  ui.questionNav.innerHTML = '';
+  let flatIndex = 0;
+  for (const section of interview.sections) {
+    const group = document.createElement('section');
+    group.className = 'question-nav-section';
+    const title = document.createElement('div');
+    title.className = 'question-nav-section-title';
+    title.textContent = section.title;
+    group.append(title);
+    for (const question of section.questions) {
+      const index = flatIndex++;
+      const answered = questionHasAnswer(question.id);
+      const current = index === session.currentIndex;
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'question-nav-item' + (answered ? ' answered' : '') + (current ? ' current' : '');
+      if (current) row.setAttribute('aria-current', 'step');
+      const state = document.createElement('span');
+      state.className = 'question-nav-state';
+      state.textContent = current ? '●' : answered ? '✓' : '';
+      const label = document.createElement('span');
+      label.className = 'question-nav-label';
+      label.textContent = (index + 1) + '. ' + questionNavLabel(question);
+      const duration = document.createElement('span');
+      duration.className = 'question-nav-duration';
+      const spent = activeQuestionSeconds(question.id);
+      duration.textContent = spent >= 30 ? elapsedMinutesLabel(spent) : '~' + estimatedQuestionMinutes(question) + ' min';
+      row.append(state, label, duration);
+      row.addEventListener('click', () => goToQuestion(index));
+      group.append(row);
+    }
+    ui.questionNav.append(group);
+  }
+}
+
+async function togglePause() {
+  if (!session) return;
+  if (!session.paused) flushSessionClock();
+  session.paused = !session.paused;
+  session.updatedAt = nowIso();
+  sessionClockLastMs = Date.now();
+  await persistSession();
+  renderInterviewMetrics();
+}
+
+async function goToQuestion(index) {
+  const all = flattenedQuestions();
+  if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;
+  flushSessionClock();
+  await addComposerTurn();
+  session.currentIndex = index;
+  session.completed = false;
+  session.completedAt = null;
+  session.updatedAt = nowIso();
+  sessionClockLastMs = Date.now();
+  await persistSession();
+  renderQuestion();
+}
+
+async function completeInterview() {
+  if (!session) return;
+  flushSessionClock();
+  await addComposerTurn();
+  session.completed = true;
+  session.completedAt = nowIso();
+  session.updatedAt = nowIso();
+  await persistSession();
+  finishInterview();
+}
 function renderSetup() {
   setView('setup');
   ui.setupTitle.textContent = interview.title;
   ui.setupContext.textContent = interview.context || 'Aucun contexte renseigné.';
-  ui.setupObjective.textContent = interview.objective ? `Objectif : ${interview.objective}` : 'Objectif non renseigné.';
+  ui.setupObjective.textContent = interview.objective ? `Objectif : ${interview.objective} · ~${Math.round(estimatedTotalMinutes())} min` : `Durée prévue : ~${Math.round(estimatedTotalMinutes())} min`;
   renderParticipantsEverywhere();
   refreshResumeButton();
 }
@@ -402,20 +602,24 @@ function renderQuestion() {
   renderSpeakerButtons();
 
   const all = flattenedQuestions();
-  const { section, question } = entry;
+  const section = entry.section;
+  const question = entry.question;
+  if (ui.sidebarInterviewTitle) ui.sidebarInterviewTitle.textContent = interview.title;
   ui.sectionTitle.textContent = section.title.toUpperCase();
-  ui.questionCounter.textContent = `Question ${session.currentIndex + 1} / ${all.length}`;
+  ui.questionCounter.textContent = (session.currentIndex + 1) + ' / ' + all.length + (question.label ? ' · ' + question.label : '');
   ui.questionProgress.max = all.length;
   ui.questionProgress.value = session.currentIndex + 1;
   ui.questionText.textContent = question.text;
-  ui.questionIntent.textContent = question.intent ? `Pourquoi cette question : ${question.intent}` : '';
+  ui.questionIntent.textContent = question.intent ? 'Pourquoi cette question : ' + question.intent : '';
   show(ui.questionIntent, Boolean(question.intent));
   ui.prevBtn.disabled = session.currentIndex === 0;
-  ui.validateBtn.textContent = session.currentIndex === all.length - 1 ? 'Valider et terminer ✓' : 'Valider et continuer →';
+  ui.validateBtn.textContent = session.currentIndex === all.length - 1 ? 'Terminer l’entretien' : 'Question suivante →';
   showError(ui.interviewError);
   resetComposer();
   renderTurns();
   renderFollowUps();
+  renderQuestionNav();
+  renderInterviewMetrics();
 }
 
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
@@ -452,6 +656,8 @@ async function addComposerTurn() {
   await persistSession();
   resetComposer();
   renderTurns();
+  renderQuestionNav();
+  renderInterviewMetrics();
   return true;
 }
 
@@ -506,6 +712,8 @@ function renderTurns() {
       await persistSession();
       renderTurns();
       renderFollowUps();
+      renderQuestionNav();
+      renderInterviewMetrics();
     });
     head.append(select, type, remove);
 
@@ -517,6 +725,8 @@ function renderTurns() {
       turn.updatedAt = nowIso();
       text.value = turn.text;
       await persistSession();
+      renderQuestionNav();
+      renderInterviewMetrics();
     });
 
     const meta = document.createElement('p');
@@ -578,40 +788,21 @@ async function addFollowUpTurn(text, followUpId = null, followUpKind = 'ad_hoc')
   renderFollowUps();
 }
 
-async function validateCurrent() {
-  await addComposerTurn();
-  const entry = currentEntry();
-  if (!entry) return;
-  const response = responseFor(entry.question.id);
-  const hasAnswer = (response.turns || []).some(t => t.type === 'answer' && cleanText(t.text));
-  if (!hasAnswer) {
-    showError(ui.interviewError, 'Ajoutez au moins une réponse avant de valider cette question.');
+async function goNextQuestion() {
+  const all = flattenedQuestions();
+  if (!session) return;
+  if (session.currentIndex >= all.length - 1) {
+    await completeInterview();
     return;
   }
-  response.status = 'answered';
-  response.validatedAt = nowIso();
-  session.updatedAt = nowIso();
-  const all = flattenedQuestions();
-  if (session.currentIndex >= all.length - 1) {
-    session.completed = true;
-    session.completedAt = nowIso();
-    await persistSession();
-    finishInterview();
-  } else {
-    session.currentIndex += 1;
-    await persistSession();
-    renderQuestion();
-  }
+  await goToQuestion(session.currentIndex + 1);
 }
+
 async function goPrevious() {
-  await addComposerTurn();
-  if (session.currentIndex > 0) session.currentIndex -= 1;
-  session.completed = false;
-  session.completedAt = null;
-  session.updatedAt = nowIso();
-  await persistSession();
-  renderQuestion();
+  if (!session || session.currentIndex <= 0) return;
+  await goToQuestion(session.currentIndex - 1);
 }
+
 function finishInterview() {
   setView('done');
   const all = flattenedQuestions();
@@ -653,8 +844,10 @@ function exportPayload() {
       if (turns.some(t => t.type === 'answer' && cleanText(t.text))) answeredQuestions += 1;
       return {
         id: question.id,
+        label: question.label || null,
         text: question.text,
         intent: question.intent || null,
+        estimatedMinutes: estimatedQuestionMinutes(question),
         required: question.required !== false,
         audience: question.audience || [],
         plannedFollowUps: question.followUps || [],
@@ -680,6 +873,7 @@ function exportPayload() {
       id: interview.id,
       version: interview.version,
       title: interview.title,
+      estimatedDurationMinutes: estimatedTotalMinutes(),
       context: interview.context || null,
       objective: interview.objective || null,
       language: interview.language,
@@ -691,6 +885,8 @@ function exportPayload() {
       startedAt: session.startedAt,
       completedAt: session.completedAt || null,
       completed: Boolean(session.completed),
+      activeDurationSeconds: Math.round(Number(session.activeSeconds) || 0),
+      questionDurationSeconds: Object.fromEntries(Object.entries(session.questionSeconds || {}).map(([id, value]) => [id, Math.round(Number(value) || 0)])),
       completion: {
         answeredQuestions,
         totalQuestions,
@@ -752,10 +948,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=17', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=18', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v17' : 'installé · v17';
+    ui.diagSw.textContent = reg.active ? 'actif · v18' : 'installé · v18';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1008,6 +1204,10 @@ async function resumeInterview() {
   session.interviewSpec = clone(interview);
   if (!Array.isArray(session.participants) || !session.participants.length) session.participants = clone(interview.participants);
   if (!session.responses || typeof session.responses !== 'object') session.responses = {};
+  if (!session.questionSeconds || typeof session.questionSeconds !== 'object') session.questionSeconds = {};
+  if (!Number.isFinite(Number(session.activeSeconds))) session.activeSeconds = 0;
+  if (typeof session.paused !== 'boolean') session.paused = false;
+  session.paused = false;
   if (session.completed) finishInterview(); else renderQuestion();
 }
 
@@ -1111,7 +1311,7 @@ ui.interviewAddParticipantBtn.addEventListener('click', addParticipant);
 ui.prepareBtn.addEventListener('click', () => prepareModel().catch(() => {}));
 ui.startBtn.addEventListener('click', startInterview);
 ui.resumeBtn.addEventListener('click', resumeInterview);
-ui.homeBtn.addEventListener('click', async () => { await addComposerTurn(); await persistSession(); renderSetup(); });
+ui.homeBtn.addEventListener('click', async () => { flushSessionClock(); await addComposerTurn(); await persistSession(); renderSetup(); });
 ui.recordBtn.addEventListener('click', startRecording);
 ui.stopBtn.addEventListener('click', stopRecording);
 ui.addTurnBtn.addEventListener('click', async () => {
@@ -1129,8 +1329,10 @@ ui.addAdHocFollowUpBtn.addEventListener('click', async () => {
 ui.adHocFollowUpText.addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); ui.addAdHocFollowUpBtn.click(); }
 });
-ui.validateBtn.addEventListener('click', validateCurrent);
+ui.validateBtn.addEventListener('click', goNextQuestion);
 ui.prevBtn.addEventListener('click', goPrevious);
+ui.pauseBtn?.addEventListener('click', togglePause);
+ui.sidebarFinishBtn?.addEventListener('click', completeInterview);
 ui.reviewBtn.addEventListener('click', async () => {
   session.completed = false;
   session.completedAt = null;

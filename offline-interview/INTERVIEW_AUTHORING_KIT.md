@@ -1,6 +1,6 @@
 ---
 kit: offline-interview-ai-generator
-kitVersion: "1.1"
+kitVersion: "1.2"
 outputSchema: offline-interview.interview-spec.v1
 outputFormat: json
 languageDefault: fr-FR
@@ -22,6 +22,8 @@ Ajoute des relances seulement lorsqu'elles peuvent aider à obtenir un exemple, 
 
 Si les noms des participants ne sont pas connus, utilise des libellés génériques comme "Interviewer", "Interviewé 1", "Interviewé 2". Les noms pourront être modifiés plus tard dans la page Web.
 
+Estime aussi la durée réaliste de l’interview. Fournis `estimatedDurationMinutes` pour l’ensemble, puis un `estimatedMinutes` par question. Ces durées servent uniquement au pilotage de l’interviewer : elles doivent rester approximatives. Fournis aussi un `label` court par question afin qu’elle soit facilement identifiable dans la navigation desktop.
+
 Ne mène pas l'interview. Ne réponds pas aux questions. Ne fais pas de synthèse finale.
 
 ## Réponse attendue
@@ -38,7 +40,9 @@ Règles essentielles :
 - chaque `audience` référence uniquement des participants existants ;
 - les relances générées ont toujours `kind: "planned"` ;
 - aucune donnée absente du contexte ne doit être inventée ;
-- vise en général 6 à 15 questions principales, mais adapte la longueur au besoin réel.
+- vise en général 6 à 15 questions principales, mais adapte la longueur au besoin réel ;
+- fournis un `label` court et distinct pour chaque question ;
+- fournis `estimatedDurationMinutes` et `estimatedMinutes` avec des valeurs réalistes et approximatives.
 
 ## Forme du document à produire
 
@@ -52,6 +56,7 @@ Règles essentielles :
   "objective": "Ce que l'interview doit permettre de comprendre ou de lever",
   "language": "fr-FR",
   "tags": ["mot-cle"],
+  "estimatedDurationMinutes": 30,
   "participants": [
     {
       "id": "P1",
@@ -71,9 +76,11 @@ Règles essentielles :
       "questions": [
         {
           "id": "Q1",
+          "label": "Besoin principal",
           "text": "Question à poser",
           "intent": "Pourquoi cette question existe et quelle incertitude elle doit réduire",
           "required": true,
+          "estimatedMinutes": 4,
           "audience": ["P2"],
           "followUps": [
             {
@@ -110,6 +117,7 @@ Si une instruction textuelle ci-dessus semble entrer en conflit avec ce schéma,
     "objective": {"type": "string", "minLength": 1},
     "language": {"type": "string", "minLength": 2},
     "tags": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "estimatedDurationMinutes": {"type": "number", "exclusiveMinimum": 0},
     "participants": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/participant"}},
     "sections": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/section"}}
   },
@@ -140,9 +148,11 @@ Si une instruction textuelle ci-dessus semble entrer en conflit avec ce schéma,
       "required": ["id", "text", "intent", "required", "audience", "followUps"],
       "properties": {
         "id": {"type": "string", "minLength": 1},
+        "label": {"type": "string", "minLength": 1},
         "text": {"type": "string", "minLength": 1},
         "intent": {"type": "string", "minLength": 1},
         "required": {"type": "boolean"},
+        "estimatedMinutes": {"type": "number", "exclusiveMinimum": 0},
         "audience": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
         "followUps": {"type": "array", "items": {"$ref": "#/$defs/followUp"}}
       }
