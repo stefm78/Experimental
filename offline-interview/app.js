@@ -601,22 +601,27 @@ function renderQuestion() {
   renderSpeakerButtons();
 
   const all = flattenedQuestions();
-  const { section, question } = entry;
+  const section = entry.section;
+  const question = entry.question;
+  if (ui.sidebarInterviewTitle) ui.sidebarInterviewTitle.textContent = interview.title;
   ui.sectionTitle.textContent = section.title.toUpperCase();
-  ui.questionCounter.textContent = `Question ${session.currentIndex + 1} / ${all.length}`;
+  ui.questionCounter.textContent = (session.currentIndex + 1) + ' / ' + all.length + (question.label ? ' · ' + question.label : '');
   ui.questionProgress.max = all.length;
   ui.questionProgress.value = session.currentIndex + 1;
   ui.questionText.textContent = question.text;
-  ui.questionIntent.textContent = question.intent ? `Pourquoi cette question : ${question.intent}` : '';
+  ui.questionIntent.textContent = question.intent ? 'Pourquoi cette question : ' + question.intent : '';
   show(ui.questionIntent, Boolean(question.intent));
   ui.prevBtn.disabled = session.currentIndex === 0;
-  ui.validateBtn.textContent = session.currentIndex === all.length - 1 ? 'Valider et terminer ✓' : 'Valider et continuer →';
+  ui.validateBtn.textContent = session.currentIndex === all.length - 1 ? 'Terminer l’entretien' : 'Question suivante →';
   showError(ui.interviewError);
   resetComposer();
   renderTurns();
   renderFollowUps();
+  renderQuestionNav();
+  renderInterviewMetrics();
 }
 
+function createTurn(
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
   return {
     id: uuid('turn'),
@@ -651,6 +656,8 @@ async function addComposerTurn() {
   await persistSession();
   resetComposer();
   renderTurns();
+  renderQuestionNav();
+  renderInterviewMetrics();
   return true;
 }
 
@@ -705,6 +712,8 @@ function renderTurns() {
       await persistSession();
       renderTurns();
       renderFollowUps();
+      renderQuestionNav();
+      renderInterviewMetrics();
     });
     head.append(select, type, remove);
 
@@ -777,40 +786,22 @@ async function addFollowUpTurn(text, followUpId = null, followUpKind = 'ad_hoc')
   renderFollowUps();
 }
 
-async function validateCurrent() {
-  await addComposerTurn();
-  const entry = currentEntry();
-  if (!entry) return;
-  const response = responseFor(entry.question.id);
-  const hasAnswer = (response.turns || []).some(t => t.type === 'answer' && cleanText(t.text));
-  if (!hasAnswer) {
-    showError(ui.interviewError, 'Ajoutez au moins une réponse avant de valider cette question.');
+async function goNextQuestion() {
+  const all = flattenedQuestions();
+  if (!session) return;
+  if (session.currentIndex >= all.length - 1) {
+    await completeInterview();
     return;
   }
-  response.status = 'answered';
-  response.validatedAt = nowIso();
-  session.updatedAt = nowIso();
-  const all = flattenedQuestions();
-  if (session.currentIndex >= all.length - 1) {
-    session.completed = true;
-    session.completedAt = nowIso();
-    await persistSession();
-    finishInterview();
-  } else {
-    session.currentIndex += 1;
-    await persistSession();
-    renderQuestion();
-  }
+  await goToQuestion(session.currentIndex + 1);
 }
+
 async function goPrevious() {
-  await addComposerTurn();
-  if (session.currentIndex > 0) session.currentIndex -= 1;
-  session.completed = false;
-  session.completedAt = null;
-  session.updatedAt = nowIso();
-  await persistSession();
-  renderQuestion();
+  if (!session || session.currentIndex <= 0) return;
+  await goToQuestion(session.currentIndex - 1);
 }
+
+function finishInterview() {
 function finishInterview() {
   setView('done');
   const all = flattenedQuestions();
@@ -852,8 +843,10 @@ function exportPayload() {
       if (turns.some(t => t.type === 'answer' && cleanText(t.text))) answeredQuestions += 1;
       return {
         id: question.id,
+        label: question.label || null,
         text: question.text,
         intent: question.intent || null,
+        estimatedMinutes: estimatedQuestionMinutes(question),
         required: question.required !== false,
         audience: question.audience || [],
         plannedFollowUps: question.followUps || [],
@@ -879,6 +872,7 @@ function exportPayload() {
       id: interview.id,
       version: interview.version,
       title: interview.title,
+      estimatedDurationMinutes: estimatedTotalMinutes(),
       context: interview.context || null,
       objective: interview.objective || null,
       language: interview.language,
@@ -890,6 +884,8 @@ function exportPayload() {
       startedAt: session.startedAt,
       completedAt: session.completedAt || null,
       completed: Boolean(session.completed),
+      activeDurationSeconds: Math.round(Number(session.activeSeconds) || 0),
+      questionDurationSeconds: Object.fromEntries(Object.entries(session.questionSeconds || {}).map(([id, value]) => [id, Math.round(Number(value) || 0)])),
       completion: {
         answeredQuestions,
         totalQuestions,
@@ -1207,6 +1203,9 @@ async function resumeInterview() {
   session.interviewSpec = clone(interview);
   if (!Array.isArray(session.participants) || !session.participants.length) session.participants = clone(interview.participants);
   if (!session.responses || typeof session.responses !== 'object') session.responses = {};
+  if (!session.questionSeconds || typeof session.questionSeconds !== 'object') session.questionSeconds = {};
+  if (!Number.isFinite(Number(session.activeSeconds))) session.activeSeconds = 0;
+  if (typeof session.paused !== 'boolean') session.paused = false;
   if (session.completed) finishInterview(); else renderQuestion();
 }
 
@@ -1310,7 +1309,7 @@ ui.interviewAddParticipantBtn.addEventListener('click', addParticipant);
 ui.prepareBtn.addEventListener('click', () => prepareModel().catch(() => {}));
 ui.startBtn.addEventListener('click', startInterview);
 ui.resumeBtn.addEventListener('click', resumeInterview);
-ui.homeBtn.addEventListener('click', async () => { await addComposerTurn(); await persistSession(); renderSetup(); });
+ui.homeBtn.addEventListener('click', async () => { flushSessionClock(); await addComposerTurn(); await persistSession(); renderSetup(); });
 ui.recordBtn.addEventListener('click', startRecording);
 ui.stopBtn.addEventListener('click', stopRecording);
 ui.addTurnBtn.addEventListener('click', async () => {
@@ -1328,8 +1327,10 @@ ui.addAdHocFollowUpBtn.addEventListener('click', async () => {
 ui.adHocFollowUpText.addEventListener('keydown', event => {
   if (event.key === 'Enter') { event.preventDefault(); ui.addAdHocFollowUpBtn.click(); }
 });
-ui.validateBtn.addEventListener('click', validateCurrent);
+ui.validateBtn.addEventListener('click', goNextQuestion);
 ui.prevBtn.addEventListener('click', goPrevious);
+ui.pauseBtn?.addEventListener('click', togglePause);
+ui.sidebarFinishBtn?.addEventListener('click', completeInterview);
 ui.reviewBtn.addEventListener('click', async () => {
   session.completed = false;
   session.completedAt = null;
