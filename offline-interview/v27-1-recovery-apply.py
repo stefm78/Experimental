@@ -98,47 +98,6 @@ if n != 1:
 
 app = app.replace('    recordingUsesBoundedAudio = false;\n', '')
 
-old_logic = '''    const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
-    let text = '';
-    let source = '';
-    let rawTranscript = '';
-
-    if (recordingUsesBoundedAudio) {
-      // Preserve turn order: earlier click-bounded segments are canonicalized first.
-      await boundedTranscriptionQueue;
-      show(ui.transcribing, true);
-      ui.recordState.textContent = 'Finalisation de la frontière audio…';
-      try {
-        text = await transcribeBoundedAudio(blob);
-        source = 'whisper-local-boundary';
-        rawTranscript = text;
-      } catch (error) {
-        diagnosticError = `Whisper frontière finale: ${error?.message || error}`;
-        text = cleanText(systemSnapshot.text);
-        source = systemSnapshot.mode === 'local'
-          ? 'system-local-boundary-fallback'
-          : 'system-boundary-fallback';
-        rawTranscript = systemSnapshot.finalText || text;
-      }
-    } else {
-      text = cleanText(systemSnapshot.text);
-      source = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
-      rawTranscript = systemSnapshot.finalText || text;
-
-      if (!text) {
-        show(ui.transcribing, true);
-        ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
-          ? 'Transcription Whisper locale…'
-          : 'Aucun texte système · secours Whisper…';
-        if (!transcriber) await prepareModel();
-        const samples = await blobTo16kMono(blob);
-        const result = await transcriber(samples, { language: 'french', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
-        text = cleanText(result?.text);
-        source = 'whisper-local';
-        rawTranscript = text;
-      }
-    }
-'''
 new_logic = '''    const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
     let text = cleanText(systemSnapshot.text);
     let source = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
@@ -156,8 +115,17 @@ new_logic = '''    const systemSnapshot = systemSpeechSession?.snapshot() || { t
       source = 'whisper-local';
       rawTranscript = text;
     }
+
 '''
-app = replace_once(app, old_logic, new_logic, 'handleRecordingStopped V27 logic')
+pattern = re.compile(
+    r"    const systemSnapshot = systemSpeechSession\?\.snapshot\(\) \|\| \{ text: '', finalText: '', mode: systemSpeechCapability\.mode \};\n"
+    r".*?"
+    r"(?=    if \(text\) \{)",
+    re.S,
+)
+app, n = pattern.subn(new_logic, app, count=1)
+if n != 1:
+    raise RuntimeError(f'handleRecordingStopped structural replacement count={n}')
 
 app = replace_once(app, "register('./sw.js?v=27'", "register('./sw.js?v=27-1'", 'sw registration query')
 app = replace_once(app, "'actif · v27'", "'actif · v27.1'", 'active sw label')
