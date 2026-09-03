@@ -32,9 +32,9 @@ jobs:
       - name: Parse JavaScript
         run: node --check offline-interview/app.js && node --check offline-interview/device-stt-capability.js && node --check offline-interview/stt-benchmark.js && node --check offline-interview/stt-deep-benchmark.js && node --check offline-interview/stt-lab-audio.js && node --check offline-interview/stt-lab-engines.js && node --check offline-interview/stt-lab-fixtures.js && node --check offline-interview/sw.js
       - name: Parse JSON assets
-        run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/interview.json')); JSON.parse(require('fs').readFileSync('offline-interview/manifest.webmanifest'))"
+        run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/interview.json')); JSON.parse(require('fs').readFileSync('offline-interview/interview-spec.schema.json')); JSON.parse(require('fs').readFileSync('offline-interview/manifest.webmanifest'))"
       - name: Verify required files
-        run: test -f offline-interview/index.html && test -f offline-interview/device-stt-capability.html && test -f offline-interview/stt-benchmark.html && test -f offline-interview/stt-deep-benchmark.html && test -f offline-interview/styles.css && test -f offline-interview/icon.svg
+        run: test -f offline-interview/index.html && test -f offline-interview/INTERVIEW_AUTHORING_KIT.md && test -f offline-interview/interview-spec.schema.json && test -f offline-interview/device-stt-capability.html && test -f offline-interview/stt-benchmark.html && test -f offline-interview/stt-deep-benchmark.html && test -f offline-interview/styles.css && test -f offline-interview/icon.svg
 
   deploy:
     if: github.event_name != 'pull_request'
