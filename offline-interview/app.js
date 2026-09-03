@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v23';
+const BUILD_ID = '2026-09-03.interview-runtime-v24';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -248,6 +248,7 @@ function newSession() {
     activeSeconds: 0,
     questionSeconds: {},
     paused: false,
+    participantHistory: Object.fromEntries(interview.participants.map(p => [p.id, { ...clone(p), removedAt: null }])),
     responses: {}
   };
 }
@@ -274,7 +275,11 @@ async function addParticipant() {
   const participant = { id: nextParticipantId(), name: 'Nouveau participant', role: 'interviewee' };
   target.push(participant);
   if (!session) interview.participants = target;
-  if (session && !session.activeSpeakerId) session.activeSpeakerId = participant.id;
+  if (session) {
+    if (!session.participantHistory || typeof session.participantHistory !== 'object') session.participantHistory = {};
+    session.participantHistory[participant.id] = { ...clone(participant), removedAt: null };
+    if (!session.activeSpeakerId) session.activeSpeakerId = participant.id;
+  }
   await persistRuntimeMetadata();
   renderParticipantsEverywhere();
   if (session) renderSpeakerButtons();
@@ -294,6 +299,9 @@ function renderParticipantEditor(container) {
     name.addEventListener('change', async () => {
       participant.name = cleanText(name.value) || participant.id;
       name.value = participant.name;
+      if (session?.participantHistory?.[participant.id]) {
+        session.participantHistory[participant.id].name = participant.name;
+      }
       await persistRuntimeMetadata();
       renderParticipantsEverywhere(container);
       if (session) { renderSpeakerButtons(); renderTurns(); }
@@ -310,6 +318,9 @@ function renderParticipantEditor(container) {
     }
     role.addEventListener('change', async () => {
       participant.role = normalizeRole(role.value);
+      if (session?.participantHistory?.[participant.id]) {
+        session.participantHistory[participant.id].role = participant.role;
+      }
       await persistRuntimeMetadata();
       renderParticipantsEverywhere(container);
       if (session) renderSpeakerButtons();
@@ -322,11 +333,18 @@ function renderParticipantEditor(container) {
     remove.title = 'Supprimer le participant';
     remove.disabled = participantsSource().length <= 1;
     remove.addEventListener('click', async () => {
+      if (session && (recordingSpeakerId === participant.id || queuedSpeakerId === participant.id)) {
+        alert(`Terminez d’abord la prise de parole de ${participant.name} avant de supprimer ce participant.`);
+        return;
+      }
       const used = session ? Object.values(session.responses || {}).some(r => (r.turns || []).some(t => t.speakerId === participant.id)) : false;
-      if (used && !confirm(`${participant.name} est déjà associé à des prises de parole. Supprimer quand même ce participant ?`)) return;
+      if (used && !confirm(`${participant.name} est déjà associé à des prises de parole. Son nom restera conservé dans l’historique. Supprimer ce participant de la liste active ?`)) return;
       const arr = participantsSource();
       const index = arr.findIndex(p => p.id === participant.id);
       if (index >= 0) arr.splice(index, 1);
+      if (session?.participantHistory?.[participant.id]) {
+        session.participantHistory[participant.id].removedAt = nowIso();
+      }
       if (session?.activeSpeakerId === participant.id) session.activeSpeakerId = defaultActiveSpeakerId();
       await persistRuntimeMetadata();
       renderParticipantsEverywhere();
@@ -749,10 +767,13 @@ function renderQuestion() {
 }
 
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
+  const speaker = participantById(speakerId) || session?.participantHistory?.[speakerId] || null;
   return {
     id: uuid('turn'),
     type,
     speakerId: speakerId || null,
+    speakerNameSnapshot: speaker?.name || null,
+    speakerRoleSnapshot: speaker?.role || null,
     text: cleanText(text),
     source,
     rawTranscript: rawTranscript == null ? null : String(rawTranscript),
@@ -842,19 +863,22 @@ function renderTurns() {
     for (const p of participantsSource()) {
       const option = document.createElement('option');
       option.value = p.id;
-      option.textContent = `${p.name} · ${roleLabel(p.role)}`;
+      option.textContent = p.name;
       option.selected = p.id === turn.speakerId;
       select.append(option);
     }
     if (!participantById(turn.speakerId) && turn.speakerId) {
       const option = document.createElement('option');
       option.value = turn.speakerId;
-      option.textContent = `${turn.speakerId} · participant supprimé`;
+      option.textContent = turn.speakerNameSnapshot || session?.participantHistory?.[turn.speakerId]?.name || 'Participant supprimé';
       option.selected = true;
       select.append(option);
     }
     select.addEventListener('change', async () => {
       turn.speakerId = select.value;
+      const speaker = participantById(turn.speakerId) || session?.participantHistory?.[turn.speakerId] || null;
+      turn.speakerNameSnapshot = speaker?.name || turn.speakerNameSnapshot || null;
+      turn.speakerRoleSnapshot = speaker?.role || turn.speakerRoleSnapshot || null;
       turn.updatedAt = nowIso();
       await persistSession();
     });
