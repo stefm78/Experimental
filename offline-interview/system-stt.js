@@ -65,51 +65,97 @@ export function createSystemSpeechSession({
   }
 
   let shouldRun = false;
-  let finalText = '';
-  let interimText = '';
   let resultSeen = false;
   let lastError = null;
   let restartTimer = null;
-  let boundaryText = '';
-  let boundaryUntil = 0;
+  let carryText = '';
+  const latestResults = new Map();
+  let boundaryResults = new Map();
+
+  const normalize = value => String(value || '')
+    .toLocaleLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+
+  const cleanJoin = (...parts) => parts
+    .map(value => String(value || '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const suffixAfterBoundary = (currentText, baseText) => {
+    const current = String(currentText || '').trim();
+    const base = String(baseText || '').trim();
+    if (!current) return '';
+    if (!base) return current;
+
+    const currentNorm = normalize(current);
+    const baseNorm = normalize(base);
+    if (!currentNorm || currentNorm === baseNorm) return '';
+
+    if (current.startsWith(base)) {
+      return current.slice(base.length).trim();
+    }
+
+    const currentWords = current.split(/\s+/);
+    const baseWords = base.split(/\s+/);
+    let prefixWords = 0;
+    while (
+      prefixWords < currentWords.length &&
+      prefixWords < baseWords.length &&
+      normalize(currentWords[prefixWords]) === normalize(baseWords[prefixWords])
+    ) {
+      prefixWords += 1;
+    }
+    if (prefixWords === baseWords.length && currentWords.length > prefixWords) {
+      return currentWords.slice(prefixWords).join(' ').trim();
+    }
+
+    const maxOverlap = Math.min(baseWords.length, currentWords.length);
+    for (let overlap = maxOverlap; overlap >= 2; overlap -= 1) {
+      const baseTail = normalize(baseWords.slice(-overlap).join(' '));
+      const currentHead = normalize(currentWords.slice(0, overlap).join(' '));
+      if (baseTail && baseTail === currentHead) {
+        return currentWords.slice(overlap).join(' ').trim();
+      }
+    }
+
+    // Existing result indexes are allowed to append, but not to rewrite their old history.
+    return '';
+  };
+
+  const segmentText = () => {
+    const parts = [];
+    for (const index of [...latestResults.keys()].sort((a, b) => a - b)) {
+      const current = latestResults.get(index);
+      const base = boundaryResults.get(index);
+      const delta = suffixAfterBoundary(current?.text, base?.text);
+      if (delta) parts.push(delta);
+    }
+    return cleanJoin(carryText, ...parts);
+  };
 
   const publish = () => {
-    const text = [finalText, interimText].filter(Boolean).join(' ').trim();
-    if (text) onText({ text, finalText: finalText || text, mode });
+    const text = segmentText();
+    if (text) onText({ text, finalText: text, mode });
   };
 
   recognition.onstart = () => onState(mode === 'local' ? 'listening-local' : 'listening');
   recognition.onspeechstart = () => onState(mode === 'local' ? 'speech-local' : 'speech');
   recognition.onresult = event => {
-    let interim = '';
     for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      let transcript = String(event.results[i]?.[0]?.transcript || '').trim();
+      const transcript = String(event.results[i]?.[0]?.transcript || '').trim();
       if (!transcript) continue;
-
-      if (boundaryText && Date.now() < boundaryUntil) {
-        const normalize = value => String(value || '')
-          .toLocaleLowerCase()
-          .normalize('NFKD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/[^\p{L}\p{N}]+/gu, ' ')
-          .trim();
-        const previous = normalize(boundaryText);
-        const candidate = normalize(transcript);
-        if (candidate && previous && (previous.endsWith(candidate) || previous === candidate)) {
-          continue;
-        }
-      } else if (Date.now() >= boundaryUntil) {
-        boundaryText = '';
-      }
-
-      resultSeen = true;
-      if (event.results[i].isFinal) {
-        finalText = [finalText, transcript].filter(Boolean).join(' ').trim();
-      } else {
-        interim = [interim, transcript].filter(Boolean).join(' ').trim();
-      }
+      latestResults.set(i, {
+        text: transcript,
+        isFinal: Boolean(event.results[i].isFinal)
+      });
     }
-    interimText = interim;
+    const text = segmentText();
+    resultSeen = Boolean(text);
     publish();
   };
   recognition.onerror = event => {
@@ -118,6 +164,14 @@ export function createSystemSpeechSession({
   };
   recognition.onend = () => {
     if (!shouldRun) return;
+
+    // Chromium restarts can reset result indexes to zero. Preserve the current semantic
+    // segment as carry text before clearing index state, then resume recognition.
+    const current = segmentText();
+    if (current) carryText = current;
+    latestResults.clear();
+    boundaryResults = new Map();
+
     restartTimer = setTimeout(() => {
       if (!shouldRun) return;
       try {
@@ -156,31 +210,35 @@ export function createSystemSpeechSession({
       } catch {}
     },
     snapshot() {
-      const text = [finalText, interimText].filter(Boolean).join(' ').trim();
+      const text = segmentText();
       return {
         text,
-        finalText: finalText || text,
+        finalText: text,
         mode,
-        resultSeen,
+        resultSeen: Boolean(text) || resultSeen,
         lastError
       };
     },
     takeSegment() {
-      const text = [finalText, interimText].filter(Boolean).join(' ').trim();
+      const text = segmentText();
       const segment = {
         text,
-        finalText: finalText || text,
+        finalText: text,
         mode,
-        resultSeen,
+        resultSeen: Boolean(text) || resultSeen,
         lastError
       };
-      boundaryText = text;
-      boundaryUntil = Date.now() + 2200;
-      finalText = '';
-      interimText = '';
+
+      // Snapshot every current recognition result. Subsequent events at the same index
+      // contribute only text appended after this semantic boundary.
+      boundaryResults = new Map(
+        [...latestResults.entries()].map(([index, value]) => [index, { ...value }])
+      );
+      carryText = '';
       resultSeen = false;
       lastError = null;
       return segment;
     }
   };
 }
+

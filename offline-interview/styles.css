@@ -676,3 +676,30 @@
     max-height:min(28vh,220px)!important;
   }
 }
+
+
+/* Observed UX v26 — mic emphasis without oversized breathing circle */
+.recording-mic{
+  width:auto!important;
+  height:auto!important;
+  min-width:0!important;
+  min-height:0!important;
+  padding:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  font-size:1.7rem!important;
+  line-height:1!important;
+}
+.capture-dock.is-recording .recording-mic,
+.capture-dock.is-finalizing .recording-mic{
+  background:transparent!important;
+  box-shadow:none!important;
+  animation:none!important;
+}
+.capture-dock.is-recording #captureModeLabel{
+  animation:onAirGlow 1.2s ease-in-out infinite;
+}
+@media(max-width:759px){
+  .recording-mic{font-size:1.55rem!important}
+}
