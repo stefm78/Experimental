@@ -44,3 +44,4 @@ jobs:
             git commit -m 'Recover V27 runtime from blocking boundary Whisper'
             git push origin HEAD:offline-interview-v27-1-runtime-recovery
           fi
+# retrigger after structural patch fix
