@@ -1,0 +1,40 @@
+name: Apply Offline Interview V27 patch
+
+on:
+  push:
+    branches:
+      - offline-interview-v27-audio-boundaries
+    paths:
+      - 'offline-interview/v27-apply.py'
+      - '.github/workflows/v27-apply.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: offline-interview-v27-audio-boundaries
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply bounded V27 patch
+        run: python offline-interview/v27-apply.py
+      - name: Validate generated sources
+        run: |
+          node --check offline-interview/app.js
+          node --check offline-interview/system-stt.js
+          node --check offline-interview/sw.js
+          python -m json.tool offline-interview/test-interviews/interview-test-ux-v27.json >/dev/null
+      - name: Commit V27 implementation
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add offline-interview/app.js offline-interview/styles.css offline-interview/sw.js offline-interview/UX_DREAM_TEAM_OBSERVED_V27.md offline-interview/test-interviews/interview-test-ux-v27.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Implement V27 audio-bounded speaker transitions"
+            git push origin HEAD:offline-interview-v27-audio-boundaries
+          fi
