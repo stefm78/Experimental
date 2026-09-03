@@ -76,6 +76,8 @@ function setView(name) {
   show(ui.sttLabCard, name === 'setup');
   show(ui.authoringKitCard, name === 'setup');
   document.body.classList.toggle('interview-mode', name === 'interview');
+  document.body.classList.toggle('setup-mode', name === 'setup');
+  document.body.classList.toggle('done-mode', name === 'done');
   if (name === 'interview') startSessionClock();
   else stopSessionClock();
 }
