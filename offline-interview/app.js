@@ -19,7 +19,7 @@ const ui = {
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
-  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), moveCaptureBtn: $('moveCaptureBtn'),
+  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
   captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'),
@@ -608,16 +608,34 @@ async function goToQuestion(index) {
   renderQuestion();
 }
 
+async function finishActiveCaptureBeforeLeaving(message) {
+  if (isRecording()) {
+    if (!confirm(message)) return false;
+    queuedSpeakerId = null;
+    queuedRecordingQuestionId = null;
+    stopRecording();
+  }
+  if (captureFinalizing || recordingCompletionPromise) {
+    if (recordingCompletionPromise) await recordingCompletionPromise;
+  }
+  return true;
+}
+
+async function returnToSetup() {
+  const ok = await finishActiveCaptureBeforeLeaving('Un enregistrement est en cours. L’arrêter, conserver sa transcription puis revenir à l’accueil ?');
+  if (!ok) return;
+  flushSessionClock();
+  await addComposerTurn();
+  await persistSession();
+  renderSetup();
+}
+
 async function completeInterview() {
   if (!session) return;
+  const ok = await finishActiveCaptureBeforeLeaving('Un enregistrement est en cours. L’arrêter, conserver sa transcription puis terminer l’entretien ?');
+  if (!ok) return;
   flushSessionClock();
-  if (isRecording()) {
-    queuedSpeakerId = null;
-    stopRecording();
-    if (recordingCompletionPromise) await recordingCompletionPromise;
-  } else {
-    await addComposerTurn();
-  }
+  await addComposerTurn();
   session.completed = true;
   session.completedAt = nowIso();
   session.updatedAt = nowIso();
@@ -1180,7 +1198,7 @@ function exportJson() {
 function exportTxt() {
   const payload = exportPayload();
   const lines = [payload.interview.title, '', payload.interview.context || '', payload.interview.objective ? `Objectif : ${payload.interview.objective}` : '', '', 'Participants :'];
-  for (const p of payload.participants) lines.push(`- ${p.name} (${roleLabel(p.role)})`);
+  for (const p of payload.participants) lines.push(`- ${p.name}${p.active === false ? ' [ancien participant]' : ''}`);
   lines.push('');
   for (const section of payload.sections) {
     lines.push(`# ${section.title}`, '');
@@ -1637,7 +1655,7 @@ ui.interviewAddParticipantBtn.addEventListener('click', addParticipant);
 ui.prepareBtn.addEventListener('click', () => prepareModel().catch(() => {}));
 ui.startBtn.addEventListener('click', startInterview);
 ui.resumeBtn.addEventListener('click', resumeInterview);
-ui.homeBtn.addEventListener('click', async () => { flushSessionClock(); await addComposerTurn(); await persistSession(); renderSetup(); });
+ui.homeBtn.addEventListener('click', returnToSetup);
 ui.addTurnBtn.addEventListener('click', async () => {
   const added = await addComposerTurn();
   if (!added) showError(ui.interviewError, 'La prise de parole est vide.');
