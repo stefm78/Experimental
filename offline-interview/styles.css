@@ -108,3 +108,21 @@
 .turn-meta{margin:3px 0 0;font-size:.7rem;color:#a0aabc}
 .conversation-section h3{display:none}
 .manual-entry summary,.question-intent-details summary,.followups-panel summary{user-select:none}
+
+
+/* Dream Team UX · iteration 3 — navigation at a glance */
+.sidebar-progress-row{display:flex;justify-content:space-between;gap:10px;margin-top:8px;color:#64748b;font-size:.76rem}
+.sidebar-progress-row span:first-child{font-weight:750;color:#475569}
+.sidebar-time-progress{height:5px;margin:8px 0 4px;accent-color:#64748b}
+.sidebar-pause{font-size:.76rem;margin-top:2px}
+.question-nav{gap:14px}
+.question-nav-section-title{padding-bottom:4px}
+.question-nav-item{padding:8px 8px}
+.question-nav-label{font-size:.84rem;font-weight:650}
+.question-nav-duration{font-size:.68rem}
+.question-nav-item.current .question-nav-label{font-weight:800}
+@media(min-width:760px){
+  .question-nav-label{-webkit-line-clamp:3}
+  .home-button{opacity:.55}
+  .home-button:hover{opacity:1}
+}
