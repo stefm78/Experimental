@@ -529,25 +529,46 @@ function renderQuestionNav() {
 }
 
 
-function renderCaptureTransfer() {
-  if (!ui.moveCaptureBtn || !session) return;
-  const viewedQuestionId = currentEntry()?.question?.id || null;
-  const canMove = Boolean(isRecording() && recordingQuestionId && viewedQuestionId && recordingQuestionId !== viewedQuestionId);
-  show(ui.moveCaptureBtn, canMove);
-  if (canMove) {
-    const label = currentEntry()?.question?.label || 'cette question';
-    ui.moveCaptureBtn.textContent = 'Basculer ici · ' + label;
-  }
-}
+async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
+  if (!isRecording() || !recordingSpeakerId || !recordingQuestionId) return false;
+  if (!nextSpeakerId || !nextQuestionId) return false;
+  if (nextSpeakerId === recordingSpeakerId && nextQuestionId === recordingQuestionId) return true;
+  if (!systemSpeechSession?.takeSegment) return false;
 
-async function moveRecordingToViewedQuestion() {
-  if (!isRecording() || !recordingSpeakerId) return;
-  const targetQuestionId = currentEntry()?.question?.id || null;
-  if (!targetQuestionId || targetQuestionId === recordingQuestionId) return;
-  queuedSpeakerId = recordingSpeakerId;
-  queuedRecordingQuestionId = targetQuestionId;
-  ui.recordState.textContent = 'Bascule vers la question affichée…';
-  stopRecording();
+  const snapshot = systemSpeechSession.takeSegment();
+  const text = cleanText(snapshot?.text);
+  if (!meaningfulTranscript(text)) return false;
+
+  const previousSpeakerId = recordingSpeakerId;
+  const previousQuestionId = recordingQuestionId;
+  const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
+  const source = snapshot.mode === 'local' ? 'system-local' : 'system';
+  const rawTranscript = snapshot.finalText || text;
+
+  recordingSpeakerId = nextSpeakerId;
+  recordingQuestionId = nextQuestionId;
+  session.activeSpeakerId = nextSpeakerId;
+  session.updatedAt = nowIso();
+  startedRecordingAt = performance.now();
+  composerDurationSeconds = 0;
+  chunks = [];
+  ui.timer.textContent = '00:00';
+  if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
+
+  renderSpeakerButtons();
+  renderQuestionNav();
+  updateCaptureUi();
+
+  await appendAnswerTurn({
+    questionId: previousQuestionId,
+    speakerId: previousSpeakerId,
+    text,
+    source,
+    rawTranscript,
+    durationSeconds
+  });
+  await persistSession();
+  return true;
 }
 
 async function togglePause() {
@@ -564,7 +585,20 @@ async function goToQuestion(index) {
   const all = flattenedQuestions();
   if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;
   flushSessionClock();
-  if (!isRecording() && !captureFinalizing) await addComposerTurn();
+  const targetQuestionId = all[index]?.question?.id || null;
+
+  if (isRecording() && targetQuestionId && targetQuestionId !== recordingQuestionId) {
+    const rotated = await rotateLiveSegment(recordingSpeakerId, targetQuestionId);
+    if (!rotated) {
+      queuedSpeakerId = recordingSpeakerId;
+      queuedRecordingQuestionId = targetQuestionId;
+      ui.recordState.textContent = 'Changement de question…';
+      stopRecording();
+    }
+  } else if (!isRecording() && !captureFinalizing) {
+    await addComposerTurn();
+  }
+
   session.currentIndex = index;
   session.completed = false;
   session.completedAt = null;
@@ -653,11 +687,14 @@ async function handleSpeakerButtonClick(participantId) {
       stopRecording();
       return;
     }
-    queuedSpeakerId = participantId;
-    queuedRecordingQuestionId = recordingQuestionId;
-    await selectSpeaker(participantId);
-    ui.recordState.textContent = 'Changement de locuteur…';
-    stopRecording();
+    const rotated = await rotateLiveSegment(participantId, recordingQuestionId);
+    if (!rotated) {
+      queuedSpeakerId = participantId;
+      queuedRecordingQuestionId = recordingQuestionId;
+      await selectSpeaker(participantId);
+      ui.recordState.textContent = 'Changement de locuteur…';
+      stopRecording();
+    }
     return;
   }
 
@@ -673,7 +710,7 @@ function updateCaptureUi() {
   ui.captureDock?.classList.toggle('is-finalizing', captureFinalizing && !recording);
 
   if (recording) {
-    if (ui.captureModeLabel) ui.captureModeLabel.textContent = '● ON AIR';
+    if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'ON AIR';
     ui.recordState.textContent = active ? `${active.name} · en cours` : 'Enregistrement en cours';
   } else if (captureFinalizing) {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'FINALISATION';
@@ -682,7 +719,6 @@ function updateCaptureUi() {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'PRÊT';
     ui.recordState.textContent = 'Cliquez sur la personne qui parle';
   }
-  renderCaptureTransfer();
 }
 
 function renderSpeakerButtons() {
@@ -697,7 +733,7 @@ function renderSpeakerButtons() {
     const queued = (isRecording() || captureFinalizing) && participant.id === queuedSpeakerId;
     const active = participant.id === session.activeSpeakerId;
     button.className = `speaker-button${active ? ' active' : ''}${recording ? ' recording' : ''}${queued ? ' queued' : ''}`;
-    button.textContent = recording ? `● ${participant.name}` : participant.name;
+    button.textContent = participant.name;
     button.dataset.captureState = recording ? 'recording' : queued ? 'queued' : 'idle';
     button.title = recording
       ? `Arrêter la prise de parole de ${participant.name}`
@@ -716,7 +752,6 @@ function renderSpeakerButtons() {
     ui.speakerHelp.classList.toggle('hidden', hasTurns || isRecording() || captureFinalizing);
   }
   updateCaptureUi();
-  renderCaptureTransfer();
   updateComposerSpeaker();
 }
 function updateComposerSpeaker() {
@@ -763,7 +798,6 @@ function renderQuestion() {
   renderFollowUps();
   renderQuestionNav();
   renderInterviewMetrics();
-  renderCaptureTransfer();
 }
 
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
@@ -1364,7 +1398,7 @@ function stopRecording() {
   updateCaptureUi();
   setTimeout(() => {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
-  }, 120);
+  }, 280);
 }
 async function blobTo16kMono(blob) {
   const arrayBuffer = await blob.arrayBuffer();
@@ -1622,7 +1656,6 @@ ui.adHocFollowUpText.addEventListener('keydown', event => {
 ui.validateBtn.addEventListener('click', goNextQuestion);
 ui.prevBtn.addEventListener('click', goPrevious);
 ui.pauseBtn?.addEventListener('click', togglePause);
-ui.moveCaptureBtn?.addEventListener('click', moveRecordingToViewedQuestion);
 ui.sidebarFinishBtn?.addEventListener('click', completeInterview);
 ui.reviewBtn.addEventListener('click', async () => {
   session.completed = false;
