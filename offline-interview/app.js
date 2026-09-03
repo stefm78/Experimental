@@ -335,11 +335,198 @@ function renderParticipantsEverywhere(skip = null) {
   if (session && ui.interviewParticipants !== skip) renderParticipantEditor(ui.interviewParticipants);
 }
 
+function estimatedTotalMinutes() {
+  const explicit = Number(interview?.estimatedDurationMinutes);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const all = flattenedQuestions();
+  const sum = all.reduce((total, entry) => total + (Number(entry.question.estimatedMinutes) > 0 ? Number(entry.question.estimatedMinutes) : 0), 0);
+  return sum > 0 ? sum : Math.max(10, all.length * 3);
+}
+
+function estimatedQuestionMinutes(question) {
+  const explicit = Number(question?.estimatedMinutes);
+  if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  const total = estimatedTotalMinutes();
+  const count = Math.max(1, flattenedQuestions().length);
+  return Math.max(1, Math.round((total / count) * 2) / 2);
+}
+
+function questionHasAnswer(questionId) {
+  return (session?.responses?.[questionId]?.turns || []).some(turn => turn.type === 'answer' && cleanText(turn.text));
+}
+
+function activeQuestionSeconds(questionId) {
+  return Math.max(0, Number(session?.questionSeconds?.[questionId]) || 0);
+}
+
+function elapsedMinutesLabel(seconds) {
+  const mins = Math.max(0, seconds) / 60;
+  if (mins < 1) return '<1 min';
+  return Math.round(mins) + ' min';
+}
+
+function remainingEstimatedMinutes() {
+  if (!session) return estimatedTotalMinutes();
+  return flattenedQuestions().reduce((total, entry) => {
+    const question = entry.question;
+    if (questionHasAnswer(question.id)) return total;
+    const estimate = estimatedQuestionMinutes(question);
+    const spent = activeQuestionSeconds(question.id) / 60;
+    return total + Math.max(0, estimate - spent);
+  }, 0);
+}
+
+function flushSessionClock() {
+  if (!session || session.paused || !sessionClockLastMs || ui.interviewView?.classList.contains('hidden')) {
+    sessionClockLastMs = Date.now();
+    return;
+  }
+  const now = Date.now();
+  const delta = Math.max(0, Math.min(5, (now - sessionClockLastMs) / 1000));
+  sessionClockLastMs = now;
+  if (!delta) return;
+  session.activeSeconds = Math.max(0, Number(session.activeSeconds) || 0) + delta;
+  if (!session.questionSeconds || typeof session.questionSeconds !== 'object') session.questionSeconds = {};
+  const entry = currentEntry();
+  if (entry) session.questionSeconds[entry.question.id] = activeQuestionSeconds(entry.question.id) + delta;
+  session.updatedAt = nowIso();
+}
+
+function startSessionClock() {
+  if (!session || session.completed) return;
+  sessionClockLastMs = Date.now();
+  if (sessionClockTimer) return;
+  sessionClockTimer = setInterval(() => {
+    if (!session || session.paused || document.visibilityState !== 'visible') {
+      sessionClockLastMs = Date.now();
+      renderInterviewMetrics();
+      return;
+    }
+    flushSessionClock();
+    renderInterviewMetrics();
+    sessionClockPersistTicks += 1;
+    if (sessionClockPersistTicks >= 10) {
+      sessionClockPersistTicks = 0;
+      persistSession().catch(() => {});
+    }
+  }, 1000);
+}
+
+function stopSessionClock() {
+  if (sessionClockTimer) {
+    flushSessionClock();
+    clearInterval(sessionClockTimer);
+    sessionClockTimer = null;
+  }
+  sessionClockLastMs = null;
+  sessionClockPersistTicks = 0;
+  if (session) persistSession().catch(() => {});
+}
+
+function renderInterviewMetrics() {
+  if (!session || !interview) return;
+  const all = flattenedQuestions();
+  const answered = all.filter(entry => questionHasAnswer(entry.question.id)).length;
+  const elapsedSeconds = Math.max(0, Number(session.activeSeconds) || 0);
+  const elapsedMinutes = elapsedSeconds / 60;
+  const totalEstimate = estimatedTotalMinutes();
+  const remaining = remainingEstimatedMinutes();
+  if (ui.interviewProgressSummary) ui.interviewProgressSummary.textContent = answered + ' / ' + all.length + ' abordées';
+  if (ui.timeProgressLabel) ui.timeProgressLabel.textContent = elapsedMinutesLabel(elapsedSeconds) + ' écoulées · ~' + Math.max(0, Math.round(remaining)) + ' min prévues restantes';
+  if (ui.sidebarTimeSummary) ui.sidebarTimeSummary.textContent = elapsedMinutesLabel(elapsedSeconds) + ' / ~' + Math.round(totalEstimate) + ' min';
+  if (ui.timeProgress) {
+    ui.timeProgress.max = Math.max(1, totalEstimate);
+    ui.timeProgress.value = Math.min(totalEstimate, elapsedMinutes);
+  }
+  if (ui.pauseBtn) {
+    ui.pauseBtn.textContent = session.paused ? '▶ Reprendre' : 'Ⅱ Pause';
+    ui.pauseBtn.setAttribute('aria-pressed', session.paused ? 'true' : 'false');
+  }
+}
+
+function questionNavLabel(question) {
+  const explicit = cleanText(question.label);
+  if (explicit) return explicit;
+  const text = cleanText(question.text);
+  return text.length > 46 ? text.slice(0, 43) + '…' : text;
+}
+
+function renderQuestionNav() {
+  if (!ui.questionNav || !session) return;
+  ui.questionNav.innerHTML = '';
+  let flatIndex = 0;
+  for (const section of interview.sections) {
+    const group = document.createElement('section');
+    group.className = 'question-nav-section';
+    const title = document.createElement('div');
+    title.className = 'question-nav-section-title';
+    title.textContent = section.title;
+    group.append(title);
+    for (const question of section.questions) {
+      const index = flatIndex++;
+      const answered = questionHasAnswer(question.id);
+      const current = index === session.currentIndex;
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'question-nav-item' + (answered ? ' answered' : '') + (current ? ' current' : '');
+      if (current) row.setAttribute('aria-current', 'step');
+      const state = document.createElement('span');
+      state.className = 'question-nav-state';
+      state.textContent = current ? '●' : answered ? '✓' : '';
+      const label = document.createElement('span');
+      label.className = 'question-nav-label';
+      label.textContent = (index + 1) + '. ' + questionNavLabel(question);
+      const duration = document.createElement('span');
+      duration.className = 'question-nav-duration';
+      const spent = activeQuestionSeconds(question.id);
+      duration.textContent = spent >= 30 ? elapsedMinutesLabel(spent) : '~' + estimatedQuestionMinutes(question) + ' min';
+      row.append(state, label, duration);
+      row.addEventListener('click', () => goToQuestion(index));
+      group.append(row);
+    }
+    ui.questionNav.append(group);
+  }
+}
+
+async function togglePause() {
+  if (!session) return;
+  if (!session.paused) flushSessionClock();
+  session.paused = !session.paused;
+  session.updatedAt = nowIso();
+  sessionClockLastMs = Date.now();
+  await persistSession();
+  renderInterviewMetrics();
+}
+
+async function goToQuestion(index) {
+  const all = flattenedQuestions();
+  if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;
+  flushSessionClock();
+  await addComposerTurn();
+  session.currentIndex = index;
+  session.completed = false;
+  session.completedAt = null;
+  session.updatedAt = nowIso();
+  sessionClockLastMs = Date.now();
+  await persistSession();
+  renderQuestion();
+}
+
+async function completeInterview() {
+  if (!session) return;
+  flushSessionClock();
+  await addComposerTurn();
+  session.completed = true;
+  session.completedAt = nowIso();
+  session.updatedAt = nowIso();
+  await persistSession();
+  finishInterview();
+}
 function renderSetup() {
   setView('setup');
   ui.setupTitle.textContent = interview.title;
   ui.setupContext.textContent = interview.context || 'Aucun contexte renseigné.';
-  ui.setupObjective.textContent = interview.objective ? `Objectif : ${interview.objective}` : 'Objectif non renseigné.';
+  ui.setupObjective.textContent = interview.objective ? `Objectif : ${interview.objective} · ~${Math.round(estimatedTotalMinutes())} min` : `Durée prévue : ~${Math.round(estimatedTotalMinutes())} min`;
   renderParticipantsEverywhere();
   refreshResumeButton();
 }
