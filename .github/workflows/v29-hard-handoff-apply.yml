@@ -1,0 +1,50 @@
+name: Apply Offline Interview V29 hard STT handoff
+
+on:
+  push:
+    branches:
+      - offline-interview-v29-hard-stt-handoff
+    paths:
+      - offline-interview/v29-hard-handoff-apply.py
+      - .github/workflows/v29-hard-handoff-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: offline-interview-v29-hard-stt-handoff
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply V29 runtime patch
+        run: python offline-interview/v29-hard-handoff-apply.py
+      - name: Validate JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/sw.js
+      - name: Run hard-cut regression
+        run: node offline-interview/test-system-stt-hard-cut.mjs
+      - name: Verify V29 invariants
+        run: |
+          grep -q "2026-09-04.interview-runtime-v29" offline-interview/app.js
+          grep -q "cutSegment" offline-interview/system-stt.js
+          grep -q "captureHandoffPending" offline-interview/app.js
+          grep -q "speechHandoffCalibration" offline-interview/app.js
+          grep -q "question-very-long" offline-interview/styles.css
+          grep -q 'app.js?v=29' offline-interview/index.html
+          grep -q "offline-interview-v29" offline-interview/sw.js
+      - name: Commit V29 runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add offline-interview/app.js offline-interview/system-stt.js offline-interview/index.html offline-interview/styles.css offline-interview/sw.js
+          if git diff --cached --quiet; then
+            echo 'No runtime changes to commit'
+          else
+            git commit -m 'Apply hard SpeechRecognition handoff and long-question viewport'
+            git push origin HEAD:offline-interview-v29-hard-stt-handoff
+          fi
