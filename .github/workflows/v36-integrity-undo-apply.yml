@@ -20,16 +20,21 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Repair one-shot patch anchor
+      - name: Repair one-shot patch anchors
         run: |
           python - <<'PY'
           from pathlib import Path
           p = Path('offline-interview/v36-integrity-undo-apply.py')
           s = p.read_text(encoding='utf-8')
           block = '''app = replace_once(app,\n    "  renderCaptureQuestionContext();\\n}",\n    "  renderCaptureQuestionContext();\\n  renderCaptureIntegrityAlert();\\n}",\n    'capture alert render')\n\n'''
-          if block not in s:
-              raise SystemExit('repair block not found')
-          p.write_text(s.replace(block, '', 1), encoding='utf-8')
+          if block in s:
+              s = s.replace(block, '', 1)
+          old = '''app = replace_once(app,\n    "    remove.className = 'ghost small icon-button';\\n    remove.textContent = '×';",\n    "    remove.className = 'ghost small icon-button turn-delete-button';\\n    remove.textContent = '×';",\n    'delete button class')'''
+          new = '''app = replace_once(app,\n    "    remove.className = 'ghost small icon-button';\\n    remove.textContent = '×';\\n    remove.title = 'Supprimer cette prise de parole';",\n    "    remove.className = 'ghost small icon-button turn-delete-button';\\n    remove.textContent = '×';\\n    remove.title = 'Supprimer cette prise de parole';",\n    'delete button class')'''
+          if old not in s:
+              raise SystemExit('delete repair anchor not found')
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding='utf-8')
           PY
       - name: Apply V36 patch
         run: python offline-interview/v36-integrity-undo-apply.py
