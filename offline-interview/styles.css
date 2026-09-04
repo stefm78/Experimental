@@ -809,3 +809,45 @@
   .capture-state-row{gap:8px!important}
   .timer{font-size:1.15rem!important}
 }
+
+
+/* V31 — one scroll owner + structural capture footer. */
+.interview-mode{height:100dvh;overflow:hidden}
+.interview-mode .shell{height:100dvh!important;min-height:0!important;overflow:hidden!important}
+.interview-layout{height:calc(100dvh - 24px);min-height:0;overflow:hidden;align-items:stretch!important}
+.interview-main{height:100%;min-height:0!important;display:grid!important;grid-template-rows:minmax(0,1fr) auto!important;overflow:hidden!important}
+.interview-workspace-scroll{min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:4px}
+.question-sticky{position:static!important;top:auto!important;z-index:auto!important;max-height:none!important;overflow:visible!important;background:#fff!important}
+.question.question-long,.question.question-very-long{max-height:none!important;overflow:visible!important;padding-right:0!important}
+.conversation-scroll{min-height:0!important;max-height:none!important;overflow:visible!important}
+.capture-dock{position:static!important;left:auto!important;right:auto!important;bottom:auto!important;z-index:auto!important;margin:10px 0 0!important;max-height:none!important;overflow:visible!important;box-shadow:0 -8px 20px rgba(15,23,42,.06)!important}
+.capture-dock .speaker-help{display:none!important}
+.live-transcript{max-height:72px!important;min-height:48px!important;overflow-y:auto!important}
+.question-sidebar{max-height:none!important;height:100%;overflow-y:auto;position:static!important;top:auto!important}
+
+@media(max-width:979px){
+  .interview-mode .shell{padding:8px!important}
+  .interview-layout{height:calc(100dvh - 16px)!important;display:block!important}
+  .question-sidebar{display:none!important}
+  .interview-main{height:100%!important;padding:14px 14px 10px!important}
+  .compact-interview-nav{display:grid!important;position:sticky;top:0;z-index:6;background:rgba(255,255,255,.98);padding:6px 0 8px;margin:4px 0 6px;border-bottom:1px solid #edf1f5}
+  .question{font-size:clamp(1.28rem,3.8vw,1.72rem)!important;line-height:1.3!important;margin:16px 0 9px!important}
+  .live-transcript{max-height:54px!important;min-height:42px!important}
+  .conversation-section{margin:12px 0!important}
+  .manual-entry{margin:12px 0!important}
+  .interview-nav-actions{position:static!important;margin-top:12px!important}
+}
+
+@media(max-width:640px){
+  .interview-main{padding:10px 10px 8px!important}
+  .question-header{display:grid!important;grid-template-columns:1fr!important;gap:6px!important}
+  .interview-clock{justify-content:space-between;flex-wrap:wrap}
+  .compact-interview-nav{grid-template-columns:1fr!important}
+  .question{font-size:1.22rem!important;line-height:1.28!important}
+  .capture-dock{padding:9px!important;margin-top:6px!important}
+  .live-transcript{max-height:2.9em!important;min-height:2.9em!important;line-height:1.45!important}
+  .speaker-buttons{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important}
+  .speaker-button{min-width:0!important;padding:9px 6px!important;white-space:normal!important;line-height:1.12!important}
+  .capture-state-row{gap:6px!important}
+  .timer{font-size:1.1rem!important}
+}
