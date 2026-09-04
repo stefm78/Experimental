@@ -1,0 +1,104 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v36-integrity-undo",
+  "version": "1.0",
+  "title": "Test UX V36 — intégrité, annulation et espace adaptatif",
+  "context": "V35 valide ON AIR continu, la densité des réponses et la petite fenêtre. Deux points matériels restent : la suppression d'une prise est trop proche du chevron de locuteur en petite largeur, et la télémétrie V35 a détecté un passage non transcrit alors que le verdict humain final n'avait pas remarqué l'erreur. Une amélioration souhaitée consiste aussi à donner plus d'espace à une question longue tant qu'aucune réponse n'existe, puis à réduire progressivement cet espace.",
+  "objective": "Vérifier une édition plus sûre avec annulation, une alerte d'intégrité impossible à ignorer si une transcription se perd, et une répartition verticale qui s'adapte au nombre de réponses sans réouvrir les décisions V35 déjà acquises.",
+  "language": "fr-FR",
+  "tags": [
+    "ux",
+    "v36",
+    "integrity",
+    "undo",
+    "responsive",
+    "stt-gap"
+  ],
+  "estimatedDurationMinutes": 5,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    },
+    {
+      "id": "P3",
+      "name": "Second participant",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Édition sûre",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Supprimer puis annuler",
+          "text": "En fenêtre très étroite, créez trois réponses très courtes. Sur l'une d'elles, utilisez le menu de locuteur puis supprimez volontairement cette même réponse. Vérifiez deux choses : le bouton de suppression est assez séparé du chevron pour réduire le risque de mauvais clic, et une barre « Prise de parole supprimée — Annuler » apparaît. Cliquez sur Annuler et vérifiez que la réponse revient à sa place. Dites si cette interaction vous paraît maintenant sûre.",
+          "intent": "Éliminer le risque de perte irréversible signalé en V35.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Espace adaptatif",
+      "questions": [
+        {
+          "id": "Q2",
+          "label": "Question qui cède la place",
+          "text": "Gardez la fenêtre très étroite. Cette question est volontairement longue : avant toute réponse, elle doit pouvoir utiliser une grande partie de l'espace disponible afin d'être facile à lire. Ajoutez ensuite une première petite réponse, puis une deuxième, puis plusieurs réponses courtes. À mesure que la conversation se remplit, la zone de question doit céder progressivement de la hauteur à la conversation tout en restant défilable et sans faire disparaître les boutons de personne en bas. Dites si ce comportement correspond à ce que vous aviez demandé.",
+          "intent": "Valider l'allocation verticale adaptative suggérée après V35.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Intégrité transcription",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Handoffs rapides",
+          "text": "Faites dix changements rapides entre Testeur et Second participant avec des phrases très courtes. Si tout est transcrit, dites simplement qu'aucune alerte d'intégrité n'est apparue. Si une transcription se perd, une alerte jaune doit rester visible dans la zone de capture et la question doit être marquée « À reprendre » dans la navigation. Répétez alors le passage pour la même personne et vérifiez que l'alerte disparaît seulement après récupération.",
+          "intent": "Vérifier que la perte de transcription ne peut plus être silencieuse.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2",
+            "P3"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Verdict V36",
+          "text": "Donnez un verdict bref : 1) suppression/annulation sûre ? 2) espace de question adaptatif satisfaisant ? 3) changement de personne toujours fluide ? 4) avez-vous vu une alerte d'intégrité ou un message de transcription ? Ne réouvrez pas l'ordre des réponses, ON AIR ou la densité générale sauf régression nette.",
+          "intent": "Décider si les derniers défauts matériels sont fermés.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

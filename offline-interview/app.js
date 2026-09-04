@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v35';
+const BUILD_ID = '2026-09-04.interview-runtime-v36';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -22,7 +22,7 @@ const ui = {
   questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), mobileQuestionSelect: $('mobileQuestionSelect'), mobileInterviewParticipants: $('mobileInterviewParticipants'), mobileAddParticipantBtn: $('mobileAddParticipantBtn'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), topOnAir: $('topOnAir'), topOnAirSpeaker: $('topOnAirSpeaker'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
-  captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'), captureQuestionContext: $('captureQuestionContext'), captureQuestionStatus: $('captureQuestionStatus'), captureQuestionLabel: $('captureQuestionLabel'), moveCaptureBtn: $('moveCaptureBtn'),
+  captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'), captureQuestionContext: $('captureQuestionContext'), captureQuestionStatus: $('captureQuestionStatus'), captureQuestionLabel: $('captureQuestionLabel'), moveCaptureBtn: $('moveCaptureBtn'), captureIntegrityAlert: $('captureIntegrityAlert'),
   answerText: $('answerText'), answerMeta: $('answerMeta'), composerSpeaker: $('composerSpeaker'), addTurnBtn: $('addTurnBtn'), clearComposerBtn: $('clearComposerBtn'),
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
   interviewError: $('interviewError'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
@@ -61,6 +61,7 @@ let semanticBoundaryCommitQueue = Promise.resolve();
 let captureHandoffPending = false;
 let latestHandoffCalibration = null;
 let recordingHadCuts = false;
+let lastDeletedTurn = null;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -254,7 +255,8 @@ function newSession() {
     paused: false,
     participantHistory: Object.fromEntries(interview.participants.map(p => [p.id, { ...clone(p), removedAt: null }])),
     responses: {},
-    runtimeEvents: []
+    runtimeEvents: [],
+    captureGaps: []
   };
 }
 
@@ -270,6 +272,70 @@ function logRuntimeEvent(type, details = {}) {
   if (session.runtimeEvents.length > 100) session.runtimeEvents = session.runtimeEvents.slice(-100);
   session.updatedAt = nowIso();
   persistSession().catch(() => {});
+}
+
+function unresolvedCaptureGaps() {
+  if (!Array.isArray(session?.captureGaps)) return [];
+  return session.captureGaps.filter(gap => !gap.resolvedAt);
+}
+
+function registerCaptureGap(questionId, speakerId, error) {
+  if (!session || !questionId || !speakerId) return;
+  if (!Array.isArray(session.captureGaps)) session.captureGaps = [];
+  const duplicate = session.captureGaps.find(gap => !gap.resolvedAt && gap.questionId === questionId && gap.speakerId === speakerId);
+  if (!duplicate) {
+    session.captureGaps.push({
+      id: uuid('gap'),
+      questionId,
+      speakerId,
+      createdAt: nowIso(),
+      resolvedAt: null,
+      error: cleanText(error)
+    });
+  }
+  logRuntimeEvent('transcription_gap', {
+    questionId,
+    speakerId,
+    stage: 'system-empty-after-handoff',
+    error: cleanText(error)
+  });
+  renderCaptureIntegrityAlert();
+  renderQuestionNav();
+}
+
+function resolveCaptureGap(questionId, speakerId) {
+  if (!session || !questionId || !speakerId || !Array.isArray(session.captureGaps)) return false;
+  let resolved = false;
+  const resolvedAt = nowIso();
+  for (const gap of session.captureGaps) {
+    if (!gap.resolvedAt && gap.questionId === questionId && gap.speakerId === speakerId) {
+      gap.resolvedAt = resolvedAt;
+      resolved = true;
+    }
+  }
+  if (resolved) {
+    logRuntimeEvent('transcription_gap_resolved', { questionId, speakerId });
+    renderCaptureIntegrityAlert();
+    renderQuestionNav();
+  }
+  return resolved;
+}
+
+function renderCaptureIntegrityAlert() {
+  if (!ui.captureIntegrityAlert) return;
+  const gaps = unresolvedCaptureGaps();
+  const gap = gaps[gaps.length - 1];
+  if (!gap) {
+    ui.captureIntegrityAlert.textContent = '';
+    show(ui.captureIntegrityAlert, false);
+    return;
+  }
+  const speaker = participantById(gap.speakerId) || session?.participantHistory?.[gap.speakerId];
+  const question = flattenedQuestions().find(entry => entry.question.id === gap.questionId)?.question;
+  const who = speaker?.name || gap.speakerId || 'ce locuteur';
+  const where = question?.label ? ` sur « ${question.label} »` : '';
+  ui.captureIntegrityAlert.textContent = `⚠ Propos non transcrit pour ${who}${where}. Répétez ce passage : l’alerte restera affichée jusqu’à sa récupération.`;
+  show(ui.captureIntegrityAlert, true);
 }
 
 function roleLabel(role) {
@@ -541,24 +607,25 @@ function renderQuestionNav() {
     for (const question of section.questions) {
       const index = flatIndex++;
       const answered = questionHasAnswer(question.id);
+      const hasGap = unresolvedCaptureGaps().some(gap => gap.questionId === question.id);
       const current = index === session.currentIndex;
       const recordingTarget = Boolean(isRecording() && recordingQuestionId === question.id);
       const finalizingTarget = Boolean(captureFinalizing && recordingQuestionId === question.id);
       const row = document.createElement('button');
       row.type = 'button';
-      row.className = 'question-nav-item' + (answered ? ' answered' : '') + (current ? ' current' : '') + (recordingTarget ? ' on-air' : '') + (finalizingTarget ? ' finalizing' : '');
+      row.className = 'question-nav-item' + (answered ? ' answered' : '') + (hasGap ? ' integrity-gap' : '') + (current ? ' current' : '') + (recordingTarget ? ' on-air' : '') + (finalizingTarget ? ' finalizing' : '');
       row.title = question.text;
       if (current) row.setAttribute('aria-current', 'step');
       const state = document.createElement('span');
       state.className = 'question-nav-state';
-      state.textContent = recordingTarget ? '🎙' : finalizingTarget ? '…' : current ? '›' : answered ? '✓' : '';
+      state.textContent = recordingTarget ? '🎙' : hasGap ? '⚠' : finalizingTarget ? '…' : current ? '›' : answered ? '✓' : '';
       const label = document.createElement('span');
       label.className = 'question-nav-label';
       label.textContent = (index + 1) + '. ' + questionNavLabel(question);
       const duration = document.createElement('span');
       duration.className = 'question-nav-duration';
       const spent = activeQuestionSeconds(question.id);
-      duration.textContent = recordingTarget ? 'ON AIR' : finalizingTarget ? 'TRAITEMENT' : (spent >= 30 ? elapsedMinutesLabel(spent) : '~' + estimatedQuestionMinutes(question) + ' min');
+      duration.textContent = recordingTarget ? 'ON AIR' : hasGap ? 'À REPRENDRE' : finalizingTarget ? 'TRAITEMENT' : (spent >= 30 ? elapsedMinutesLabel(spent) : '~' + estimatedQuestionMinutes(question) + ' min');
       row.append(state, label, duration);
       row.addEventListener('click', () => goToQuestion(index));
       group.append(row);
@@ -571,9 +638,10 @@ function renderQuestionNav() {
       const option = document.createElement('option');
       option.value = String(index);
       const answered = questionHasAnswer(entry.question.id);
+      const hasGap = unresolvedCaptureGaps().some(gap => gap.questionId === entry.question.id);
       const recordingTarget = Boolean(isRecording() && recordingQuestionId === entry.question.id);
       const finalizingTarget = Boolean(captureFinalizing && recordingQuestionId === entry.question.id);
-      const stateSuffix = recordingTarget ? ' · ON AIR' : finalizingTarget ? ' · TRAITEMENT' : answered ? ' ✓' : '';
+      const stateSuffix = recordingTarget ? ' · ON AIR' : hasGap ? ' · ⚠ À reprendre' : finalizingTarget ? ' · TRAITEMENT' : answered ? ' ✓' : '';
       option.textContent = `${index + 1}. ${questionNavLabel(entry.question)}${stateSuffix}`;
       option.selected = index === session.currentIndex;
       ui.mobileQuestionSelect.append(option);
@@ -617,7 +685,14 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
     let settled = null;
     try { settled = await cut.settled; } catch {}
     const text = cleanText(settled?.text || cut.text);
-    if (!meaningfulTranscript(text)) return;
+    if (!meaningfulTranscript(text)) {
+      registerCaptureGap(
+        previousQuestionId,
+        previousSpeakerId,
+        'Aucun texte reconnu pour ce passage au changement de personne. Répétez ce passage.'
+      );
+      return;
+    }
     await appendAnswerTurn({
       questionId: previousQuestionId,
       speakerId: previousSpeakerId,
@@ -763,6 +838,8 @@ async function completeInterview() {
   if (!session) return;
   const ok = await finishActiveCaptureBeforeLeaving('Un enregistrement est en cours. L’arrêter, conserver sa transcription puis terminer l’entretien ?');
   if (!ok) return;
+  const gaps = unresolvedCaptureGaps();
+  if (gaps.length && !confirm(`${gaps.length} passage${gaps.length > 1 ? 's' : ''} reste${gaps.length > 1 ? 'nt' : ''} à reprendre après un échec de transcription. Terminer quand même ?`)) return;
   flushSessionClock();
   await addComposerTurn();
   session.completed = true;
@@ -955,6 +1032,7 @@ function renderQuestion() {
   renderQuestionNav();
   renderInterviewMetrics();
   renderCaptureQuestionContext();
+  renderCaptureIntegrityAlert();
 }
 
 function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
@@ -1012,6 +1090,7 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
         const speaker = participantById(speakerId) || session?.participantHistory?.[speakerId] || null;
         last.speakerNameSnapshot = last.speakerNameSnapshot || speaker?.name || null;
         last.speakerRoleSnapshot = last.speakerRoleSnapshot || speaker?.role || null;
+        resolveCaptureGap(questionId, speakerId);
         await persistSession();
         renderTurns();
       }
@@ -1026,6 +1105,7 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
     rawTranscript,
     durationSeconds
   }));
+  resolveCaptureGap(questionId, speakerId);
   response.status = 'answered';
   session.updatedAt = nowIso();
   await persistSession();
@@ -1061,7 +1141,40 @@ function renderTurns() {
   const response = responseFor(entry.question.id);
   const turns = response.turns || [];
   ui.turnsList.innerHTML = '';
-  show(ui.turnsSection, turns.length > 0);
+  const questionFrame = ui.questionText?.closest('.question-sticky');
+  if (questionFrame) {
+    questionFrame.classList.toggle('question-space-empty', turns.length === 0);
+    questionFrame.classList.toggle('question-space-few', turns.length > 0 && turns.length < 3);
+    questionFrame.classList.toggle('question-space-busy', turns.length >= 3);
+  }
+  const canUndo = Boolean(lastDeletedTurn && lastDeletedTurn.questionId === entry.question.id);
+  show(ui.turnsSection, turns.length > 0 || canUndo);
+  if (canUndo) {
+    const undoRow = document.createElement('div');
+    undoRow.className = 'undo-turn-row';
+    const label = document.createElement('span');
+    label.textContent = 'Prise de parole supprimée';
+    const undoButton = document.createElement('button');
+    undoButton.type = 'button';
+    undoButton.className = 'ghost small';
+    undoButton.textContent = 'Annuler';
+    undoButton.addEventListener('click', async () => {
+      const deleted = lastDeletedTurn;
+      if (!deleted || deleted.questionId !== entry.question.id) return;
+      const target = responseFor(deleted.questionId);
+      target.turns.splice(Math.min(deleted.index, target.turns.length), 0, clone(deleted.turn));
+      target.status = target.turns.some(t => t.type === 'answer' && cleanText(t.text)) ? 'answered' : 'draft';
+      lastDeletedTurn = null;
+      session.updatedAt = nowIso();
+      await persistSession();
+      renderTurns();
+      renderFollowUps();
+      renderQuestionNav();
+      renderInterviewMetrics();
+    });
+    undoRow.append(label, undoButton);
+    ui.turnsList.append(undoRow);
+  }
 
   for (const turn of turns) {
     const card = document.createElement('article');
@@ -1108,11 +1221,14 @@ function renderTurns() {
 
     const remove = document.createElement('button');
     remove.type = 'button';
-    remove.className = 'ghost small icon-button';
+    remove.className = 'ghost small icon-button turn-delete-button';
     remove.textContent = '×';
     remove.title = 'Supprimer cette prise de parole';
     remove.addEventListener('click', async () => {
-      response.turns = response.turns.filter(t => t.id !== turn.id);
+      const deletedIndex = response.turns.findIndex(t => t.id === turn.id);
+      if (deletedIndex < 0) return;
+      lastDeletedTurn = { questionId: entry.question.id, turn: clone(turn), index: deletedIndex };
+      response.turns.splice(deletedIndex, 1);
       session.updatedAt = nowIso();
       await persistSession();
       renderTurns();
@@ -1316,7 +1432,8 @@ function exportPayload() {
         unansweredQuestions: totalQuestions - answeredQuestions,
         followUpsUsed
       },
-      runtimeEvents: clone(session.runtimeEvents || [])
+      runtimeEvents: clone(session.runtimeEvents || []),
+      captureGaps: clone(session.captureGaps || [])
     },
     sections
   };
@@ -1372,10 +1489,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=32', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=36', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v32' : 'installé · v32';
+    ui.diagSw.textContent = reg.active ? 'actif · v36' : 'installé · v36';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1610,10 +1727,7 @@ async function handleRecordingStopped() {
       show(ui.transcribing, true);
       if (recordingHadCuts) {
         const message = 'Aucun texte système pour cette prise après un changement de personne. Répétez ce passage.';
-        logRuntimeEvent('transcription_gap', {
-          questionId, speakerId, stage: 'system-empty-after-handoff',
-          error: message
-        });
+        registerCaptureGap(questionId, speakerId, message);
         throw new Error(message);
       }
       ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
@@ -1709,6 +1823,8 @@ async function resumeInterview() {
     }
   }
   if (!session.responses || typeof session.responses !== 'object') session.responses = {};
+  if (!Array.isArray(session.runtimeEvents)) session.runtimeEvents = [];
+  if (!Array.isArray(session.captureGaps)) session.captureGaps = [];
   if (!session.questionSeconds || typeof session.questionSeconds !== 'object') session.questionSeconds = {};
   if (!Number.isFinite(Number(session.activeSeconds))) session.activeSeconds = 0;
   if (typeof session.paused !== 'boolean') session.paused = false;
