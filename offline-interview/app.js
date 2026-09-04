@@ -685,7 +685,14 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
     let settled = null;
     try { settled = await cut.settled; } catch {}
     const text = cleanText(settled?.text || cut.text);
-    if (!meaningfulTranscript(text)) return;
+    if (!meaningfulTranscript(text)) {
+      registerCaptureGap(
+        previousQuestionId,
+        previousSpeakerId,
+        'Aucun texte reconnu pour ce passage au changement de personne. Répétez ce passage.'
+      );
+      return;
+    }
     await appendAnswerTurn({
       questionId: previousQuestionId,
       speakerId: previousSpeakerId,
