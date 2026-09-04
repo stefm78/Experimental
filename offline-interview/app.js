@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v37';
+const BUILD_ID = '2026-09-04.interview-runtime-v38';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -1327,6 +1327,10 @@ async function goPrevious() {
 
 function finishInterview() {
   setView('done');
+  requestAnimationFrame(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    try { ui.doneView?.focus({ preventScroll: true }); } catch {}
+  });
   const all = flattenedQuestions();
   const answered = all.filter(({ question }) => (session.responses[question.id]?.turns || []).some(t => t.type === 'answer' && cleanText(t.text))).length;
   const turns = Object.values(session.responses || {}).reduce((sum, r) => sum + (r.turns?.length || 0), 0);
