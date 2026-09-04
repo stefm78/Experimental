@@ -31,7 +31,7 @@ jobs:
           grep -q "2026-09-04.interview-runtime-v28" offline-interview/app.js
           grep -q "semanticBoundaryCommitQueue" offline-interview/app.js
           grep -q "heldIndexOwners" offline-interview/system-stt.js
-          grep -q "system-local-settled" offline-interview/app.js
+          grep -q 'pendingCount > 0' offline-interview/app.js
           ! grep -q 'class="recording-mic"' offline-interview/index.html
           ! grep -q 'class="top-on-air-mic"' offline-interview/index.html
           grep -q 'app.js?v=28' offline-interview/index.html
