@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v33';
+const BUILD_ID = '2026-09-04.interview-runtime-v34';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -299,6 +299,11 @@ function renderParticipantEditor(container) {
     name.type = 'text';
     name.value = participant.name;
     name.setAttribute('aria-label', `Nom de ${participant.id}`);
+    const selectDefaultParticipantName = () => {
+      if (name.value === 'Nouveau participant') requestAnimationFrame(() => name.select());
+    };
+    name.addEventListener('focus', selectDefaultParticipantName);
+    name.addEventListener('click', selectDefaultParticipantName);
     name.addEventListener('change', async () => {
       participant.name = cleanText(name.value) || participant.id;
       name.value = participant.name;
@@ -655,10 +660,9 @@ function renderCaptureQuestionContext() {
   }
   if (ui.captureQuestionLabel) ui.captureQuestionLabel.textContent = ownerLabel;
 
-  if (ui.topOnAirSpeaker && recording) {
-    const speaker = participantById(recordingSpeakerId);
-    ui.topOnAirSpeaker.textContent = speaker ? '· ' + speaker.name : '';
-  }
+  // Speaker identity already lives in the capture dock and active speaker button.
+  // Keep the global ON AIR pill intentionally static to avoid visual flicker.
+  if (ui.topOnAirSpeaker) ui.topOnAirSpeaker.textContent = '';
 
   show(ui.moveCaptureBtn, differs);
   if (differs && ui.moveCaptureBtn) {
