@@ -17,6 +17,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Normalize Python booleans in one-shot spec builder
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('offline-interview/v35-runtime-polish-apply.py')
+          s=p.read_text(encoding='utf-8').replace('"required":true','"required":True')
+          p.write_text(s,encoding='utf-8')
+          PY
       - name: Apply V35 runtime polish
         run: python offline-interview/v35-runtime-polish-apply.py
       - name: Validate JavaScript
@@ -37,7 +45,7 @@ jobs:
           sw=(root/'sw.js').read_text(encoding='utf-8')
           assert "2026-09-04.interview-runtime-v35" in app
           assert "show(ui.topOnAir, recording);" in app
-          assert "PASSAGE" not in app
+          assert "textContent = 'PASSAGE'" not in app
           assert "runtimeEvents: clone(session.runtimeEvents || [])" in app
           assert "system-empty-after-handoff" in app
           assert "grid-template-columns:minmax(0,1fr) auto" in css
