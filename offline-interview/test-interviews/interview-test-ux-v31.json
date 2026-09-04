@@ -1,0 +1,122 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v31-single-scroll-shell",
+  "version": "1.0",
+  "title": "Test UX V31 — scroll unique et footer de capture",
+  "context": "Ce test valide la V31 après l'échec responsive de la V30. La V31 ne change pas la mécanique STT V29/V30 : elle remplace les comportements fixed/sticky concurrents par un seul espace de contenu défilant et un footer de capture structurel toujours visible. L'URL canonique de l'application est https://stefm78.github.io/Experimental/.",
+  "objective": "Vérifier que le redimensionnement ne mélange plus les zones, que la capture ne migre jamais dans l'historique, que la navigation compacte reste disponible et que le footer de capture reste visible sans recouvrir le contenu.",
+  "language": "fr-FR",
+  "tags": ["ux", "v31", "single-scroll", "responsive", "capture-footer", "resize-stress", "stt-observation"],
+  "estimatedDurationMinutes": 8,
+  "participants": [
+    { "id": "P1", "name": "Interviewer", "role": "interviewer" },
+    { "id": "P2", "name": "Testeur", "role": "interviewee" },
+    { "id": "P3", "name": "Second participant", "role": "interviewee" }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Runtime et structure",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Version et mode large",
+          "text": "Vérifiez dans « Transcription et confidentialité » que Runtime affiche exactement 2026-09-04.interview-runtime-v31. Avec une fenêtre large, vérifiez que le panneau de questions est à gauche et que la zone de capture reste un footer distinct sous la zone de contenu, sans recouvrir ni la question ni l'historique. Décrivez brièvement ce que vous voyez.",
+          "intent": "Valider l'identité V31 et le shell desktop.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Stress de redimensionnement",
+          "text": "Sans arrêter l'enregistrement, resserrez puis réélargissez la fenêtre au moins cinq fois, en passant par le mode intermédiaire où la sidebar disparaît. Vérifiez qu'aucune zone ne se superpose, que le footer de capture reste à sa place et que le sélecteur compact apparaît puis disparaît proprement. En mode compact, vérifiez aussi que la question enregistrée porte la mention ON AIR dans le sélecteur.",
+          "intent": "Reproduire directement le défaut V30 où l'interface se mélangeait après plusieurs changements de largeur.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Scroll unique",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Question longue et capture visible",
+          "text": "Resserrez la fenêtre. Cette question est volontairement assez longue pour dépasser une hauteur confortable. Faites défiler uniquement la zone de contenu de l'entretien : la question, les relances et l'historique doivent défiler ensemble, tandis que le footer de capture avec ON AIR, la transcription live et les boutons de locuteur doit rester visible sans masquer le contenu. Vérifiez qu'il n'existe pas plusieurs grandes zones verticales concurrentes à faire défiler.",
+          "intent": "Valider le principe central V31 : un seul propriétaire du scroll pour le contenu.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Accumulation de tours en mode étroit",
+          "text": "Restez en mode étroit et alternez huit fois entre Testeur et Second participant avec des phrases courtes. L'historique doit s'accumuler uniquement dans la zone de contenu. À chaque bascule, vérifiez que le footer de capture ne monte pas dans l'historique, ne disparaît pas et ne recouvre aucune carte de réponse. La transcription live doit rester très compacte.",
+          "intent": "Attaquer le défaut V30 observé après accumulation de plusieurs tours.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Navigation",
+      "questions": [
+        {
+          "id": "Q5",
+          "label": "Questions et participants toujours accessibles",
+          "text": "Toujours en mode compact, utilisez le sélecteur pour aller à une autre question puis revenez ici. Ouvrez Participants, vérifiez que les participants restent éditables, puis refermez le panneau. Faites ensuite défiler beaucoup l'historique : le sélecteur compact doit rester accessible en haut de la zone de contenu et le footer de capture doit rester accessible en bas.",
+          "intent": "Vérifier que la navigation ne disparaît plus sous contrainte.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q6",
+          "label": "Retour au mode large",
+          "text": "Réélargissez maintenant complètement la fenêtre. Vérifiez que la sidebar revient proprement, que le footer de capture reste séparé du contenu, que l'historique n'est pas superposé à la capture et qu'aucun artefact du mode compact ne subsiste. Dites si le passage petit → grand est désormais stable.",
+          "intent": "Valider la réversibilité responsive, défaut majeur de la V30.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Capture et verdict",
+      "questions": [
+        {
+          "id": "Q7",
+          "label": "Observation frontière STT",
+          "text": "Observation seulement, sans conditionner le verdict responsive : Testeur dit « fin volcan » puis bascule immédiatement. Second participant dit « début bonjour fin rivière ». Testeur dit « début salut fin satellite ». Second participant dit « début coucou fin chocolat ». Signalez si un mot de fin disparaît ou arrive chez le locuteur suivant. Ne ralentissez pas volontairement.",
+          "intent": "Mesurer le défaut STT résiduel séparément de la V31 responsive.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q8",
+          "label": "Verdict V31",
+          "text": "Donnez deux verdicts séparés. Premièrement RESPONSIVE : après plusieurs redimensionnements et plusieurs tours, l'interface reste-t-elle compréhensible et utilisable sans superposition ni disparition des contrôles ? Deuxièmement STT : avez-vous observé un mot de fin perdu ou attribué au mauvais locuteur ? Signalez tout défaut restant avec le contexte de largeur où il apparaît.",
+          "intent": "Décider séparément la promotion responsive et le prochain travail STT.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    }
+  ]
+}
