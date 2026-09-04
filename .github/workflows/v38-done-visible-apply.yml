@@ -21,16 +21,17 @@ jobs:
       - name: Apply V38 patch
         run: python offline-interview/v38-done-visible-apply.py
       - name: Parse JavaScript
-        run: node --check offline-interview/app.js
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/sw.js
       - name: Preserve STT regressions
         run: |
-          node offline-interview/test-semantic-boundary-v28.mjs
-          node offline-interview/test-hard-stt-handoff-v29.mjs
+          node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs
+          node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
       - name: Verify V38 invariants
         run: |
           grep -q "interview-runtime-v38" offline-interview/app.js
           grep -q "window.scrollTo({ top: 0, left: 0, behavior: 'auto' })" offline-interview/app.js
           grep -q 'doneView.*tabindex="-1"' offline-interview/index.html
+          grep -q 'overflow-y:auto!important' offline-interview/styles.css
           grep -q 'offline-interview-v38' offline-interview/sw.js
       - name: Commit V38 runtime
         run: |
