@@ -67,6 +67,13 @@ export function createSystemSpeechSession({
   let lastError = null;
   let restartTimer = null;
   let carryText = '';
+  let hardCut = null;
+  const hardCutKey = `offline-interview.stt-hard-cut.v1:${mode}:${lang}`;
+  let hardCutSamples = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(hardCutKey) || 'null');
+    if (Array.isArray(saved?.samples)) hardCutSamples = saved.samples.map(Number).filter(Number.isFinite).filter(v => v >= 0 && v <= 5000).slice(-24);
+  } catch {}
   const latestResults = new Map();
   let boundaryResults = new Map();
 
@@ -163,6 +170,19 @@ export function createSystemSpeechSession({
     return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))];
   };
 
+  const rememberHardCut = ms => {
+    if (!Number.isFinite(ms) || ms < 0 || ms > 5000) return;
+    hardCutSamples.push(Math.round(ms));
+    hardCutSamples = hardCutSamples.slice(-24);
+    try { localStorage.setItem(hardCutKey, JSON.stringify({ samples: hardCutSamples })); } catch {}
+  };
+
+  const hardCutCalibration = () => ({
+    sampleCount: hardCutSamples.length,
+    p50Ms: percentile(hardCutSamples, 0.50),
+    p95Ms: percentile(hardCutSamples, 0.95)
+  });
+
   const recommendedSettleTimeoutMs = () => {
     const p95 = percentile(settleSamples, 0.95);
     if (p95 == null) return 1200;
@@ -211,7 +231,16 @@ export function createSystemSpeechSession({
     if (text) onText({ text, finalText: text, mode });
   };
 
-  recognition.onstart = () => onState(mode === 'local' ? 'listening-local' : 'listening');
+  recognition.onstart = () => {
+    if (hardCut?.waitingForRestart) {
+      const handoffMs = Math.max(0, performance.now() - hardCut.startedAt);
+      rememberHardCut(handoffMs);
+      hardCut.readyResolve({ ready: true, handoffMs: Math.round(handoffMs), calibration: hardCutCalibration() });
+      clearTimeout(hardCut.timer);
+      hardCut = null;
+    }
+    onState(mode === 'local' ? 'listening-local' : 'listening');
+  };
   recognition.onspeechstart = () => onState(mode === 'local' ? 'speech-local' : 'speech');
   recognition.onresult = event => {
     for (let i = event.resultIndex; i < event.results.length; i += 1) {
@@ -245,16 +274,51 @@ export function createSystemSpeechSession({
     if (!['aborted', 'no-speech'].includes(lastError)) onError(lastError);
   };
   recognition.onend = () => {
-    // Chromium restarts reset result indexes. Resolve any outstanding semantic boundary
-    // before dropping the index namespace, then carry only the current segment forward.
+    // A semantic hard cut deliberately ends this SpeechRecognition session. All results
+    // delivered before onend — even a brand-new result index arriving after the click —
+    // still belong to the previous speaker. The next speaker starts with a fresh result
+    // namespace after restart.
+    if (hardCut) {
+      resolveAllBoundaries('hard-cut');
+      const text = segmentText();
+      hardCut.settledResolve({
+        text, finalText: text, mode, resultSeen: Boolean(text) || resultSeen, lastError
+      });
+      latestResults.clear();
+      boundaryResults = new Map();
+      carryText = '';
+      resultSeen = false;
+      lastError = null;
+      hardCut.waitingForRestart = true;
+
+      if (!shouldRun) {
+        hardCut.readyResolve({ ready: false, handoffMs: null, reason: 'stopped', calibration: hardCutCalibration() });
+        clearTimeout(hardCut.timer);
+        hardCut = null;
+        return;
+      }
+
+      restartTimer = setTimeout(() => {
+        if (!shouldRun || !hardCut) return;
+        try {
+          recognition.start();
+        } catch (error) {
+          hardCut.readyResolve({ ready: false, handoffMs: null, reason: String(error?.message || error), calibration: hardCutCalibration() });
+          clearTimeout(hardCut.timer);
+          hardCut = null;
+        }
+      }, 0);
+      return;
+    }
+
+    // Unplanned Chromium restarts keep the same semantic speaker and may therefore carry
+    // the current text into the next recognition namespace.
     resolveAllBoundaries('recognition-end');
     if (!shouldRun) return;
-
     const current = segmentText();
     if (current) carryText = current;
     latestResults.clear();
     boundaryResults = new Map();
-
     restartTimer = setTimeout(() => {
       if (!shouldRun) return;
       try { recognition.start(); } catch {}
@@ -297,6 +361,34 @@ export function createSystemSpeechSession({
         resultSeen: Boolean(text) || resultSeen,
         lastError
       };
+    },
+    cutSegment({ timeoutMs = 1800 } = {}) {
+      if (hardCut) return null;
+      const initialText = segmentText();
+      let settledResolve;
+      let readyResolve;
+      const settled = new Promise(resolve => { settledResolve = resolve; });
+      const ready = new Promise(resolve => { readyResolve = resolve; });
+      hardCut = {
+        startedAt: performance.now(),
+        settledResolve,
+        readyResolve,
+        waitingForRestart: false,
+        timer: null
+      };
+      hardCut.timer = setTimeout(() => {
+        if (!hardCut) return;
+        try { recognition.abort(); } catch {}
+      }, Math.max(700, Math.min(3000, Number(timeoutMs) || 1800)));
+      try {
+        recognition.stop();
+      } catch (error) {
+        settledResolve({ text: initialText, finalText: initialText, mode, resultSeen: Boolean(initialText) || resultSeen, lastError: String(error?.message || error) });
+        readyResolve({ ready: false, handoffMs: null, reason: String(error?.message || error), calibration: hardCutCalibration() });
+        clearTimeout(hardCut.timer);
+        hardCut = null;
+      }
+      return { text: initialText, finalText: initialText, mode, settled, ready };
     },
     takeSegment({ settleTimeoutMs = null } = {}) {
       const text = segmentText();
@@ -366,7 +458,8 @@ export function createSystemSpeechSession({
         sampleCount: settleSamples.length,
         p50Ms: percentile(settleSamples, 0.50),
         p95Ms: percentile(settleSamples, 0.95),
-        timeoutMs: recommendedSettleTimeoutMs()
+        timeoutMs: recommendedSettleTimeoutMs(),
+        hardCut: hardCutCalibration()
       };
     }
   };

@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v28';
+const BUILD_ID = '2026-09-04.interview-runtime-v29';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -58,6 +58,8 @@ let captureFinalizing = false;
 let queuedRecordingQuestionId = null;
 let recordingCaptureId = null;
 let semanticBoundaryCommitQueue = Promise.resolve();
+let captureHandoffPending = false;
+let latestHandoffCalibration = null;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -548,20 +550,17 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   if (!isRecording() || !recordingSpeakerId || !recordingQuestionId) return false;
   if (!nextSpeakerId || !nextQuestionId) return false;
   if (nextSpeakerId === recordingSpeakerId && nextQuestionId === recordingQuestionId) return true;
-  if (!systemSpeechSession?.takeSegment) return false;
-
-  const snapshot = systemSpeechSession.takeSegment();
-  const initialText = cleanText(snapshot?.text);
-  if (!meaningfulTranscript(initialText)) return false;
+  if (!systemSpeechSession?.cutSegment) return false;
 
   const previousSpeakerId = recordingSpeakerId;
   const previousQuestionId = recordingQuestionId;
   const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
-  const baseSource = snapshot.mode === 'local' ? 'system-local' : 'system';
+  const cut = systemSpeechSession.cutSegment();
+  if (!cut) return false;
 
-  // Ownership switches immediately in the UI. Only persistence of the previous semantic
-  // segment waits for Chromium to finalise result indexes that were still interim at the
-  // click. This keeps the interface responsive while preventing late-tail leakage.
+  // UI ownership changes immediately, but ON AIR is briefly replaced by PASSAGE until
+  // the fresh SpeechRecognition session is listening. This makes the semantic boundary
+  // real instead of guessing from late result indexes.
   recordingSpeakerId = nextSpeakerId;
   recordingQuestionId = nextQuestionId;
   session.activeSpeakerId = nextSpeakerId;
@@ -569,30 +568,41 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   startedRecordingAt = performance.now();
   composerDurationSeconds = 0;
   chunks = [];
+  captureHandoffPending = true;
   ui.timer.textContent = '00:00';
   if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
-
   renderSpeakerButtons();
   renderQuestionNav();
   updateCaptureUi();
 
+  const baseSource = systemSpeechCapability.mode === 'local' ? 'system-local-cut' : 'system-cut';
   const commit = async () => {
     let settled = null;
-    try { settled = snapshot.settled ? await snapshot.settled : null; } catch {}
-    const text = cleanText(settled?.text || snapshot.finalText || snapshot.text);
+    try { settled = await cut.settled; } catch {}
+    const text = cleanText(settled?.text || cut.text);
     if (!meaningfulTranscript(text)) return;
-    const source = snapshot.pendingCount > 0 ? `${baseSource}-settled` : baseSource;
     await appendAnswerTurn({
       questionId: previousQuestionId,
       speakerId: previousSpeakerId,
       text,
-      source,
-      rawTranscript: text,
+      source: baseSource,
+      rawTranscript: settled?.finalText || text,
       durationSeconds
     });
     await persistSession();
   };
   semanticBoundaryCommitQueue = semanticBoundaryCommitQueue.then(commit, commit);
+
+  Promise.resolve(cut.ready).then(info => {
+    latestHandoffCalibration = info?.calibration || latestHandoffCalibration;
+    captureHandoffPending = false;
+    renderSpeakerButtons();
+    renderQuestionNav();
+    updateCaptureUi();
+  }).catch(() => {
+    captureHandoffPending = false;
+    updateCaptureUi();
+  });
   return true;
 }
 
@@ -607,7 +617,7 @@ function renderCaptureQuestionContext() {
   const finalizing = captureFinalizing && Boolean(recordingQuestionId);
   const active = recording || finalizing;
   show(ui.captureQuestionContext, active);
-  show(ui.topOnAir, recording);
+  show(ui.topOnAir, recording && !captureHandoffPending);
 
   if (!active) {
     show(ui.moveCaptureBtn, false);
@@ -805,7 +815,10 @@ function updateCaptureUi() {
   ui.captureDock?.classList.toggle('is-recording', recording);
   ui.captureDock?.classList.toggle('is-finalizing', captureFinalizing && !recording);
 
-  if (recording) {
+  if (recording && captureHandoffPending) {
+    if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'PASSAGE';
+    ui.recordState.textContent = active ? `${active.name} · préparation…` : 'Passage de parole…';
+  } else if (recording) {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'ON AIR';
     ui.recordState.textContent = active ? `${active.name} · en cours` : 'Enregistrement en cours';
   } else if (captureFinalizing) {
@@ -832,6 +845,7 @@ function renderSpeakerButtons() {
     button.className = `speaker-button${active ? ' active' : ''}${recording ? ' recording' : ''}${queued ? ' queued' : ''}`;
     button.textContent = participant.name;
     button.dataset.captureState = recording ? 'recording' : queued ? 'queued' : 'idle';
+    button.disabled = Boolean(captureHandoffPending);
     button.title = recording
       ? `Arrêter la prise de parole de ${participant.name}`
       : `Enregistrer une prise de parole de ${participant.name}`;
@@ -885,6 +899,10 @@ function renderQuestion() {
   ui.questionProgress.max = all.length;
   ui.questionProgress.value = session.currentIndex + 1;
   ui.questionText.textContent = question.text;
+  const questionLength = cleanText(question.text).length;
+  ui.questionText.classList.toggle('question-long', questionLength > 220);
+  ui.questionText.classList.toggle('question-very-long', questionLength > 420);
+  ui.questionText.scrollTop = 0;
   ui.questionIntent.textContent = question.intent || '';
   show(ui.questionIntentDetails, Boolean(question.intent));
   if (ui.questionIntentDetails) ui.questionIntentDetails.open = false;
@@ -1231,6 +1249,7 @@ function exportPayload() {
       inputSchema: interview.schema,
       transcriptionDefault: 'system',
       transcriptionFallback: 'whisper-local',
+      speechHandoffCalibration: latestHandoffCalibration,
       privacy: 'The app does not persist or export audio. System speech recognition may be processed locally or remotely depending on the browser/OS.'
     },
     interview: {
@@ -1312,10 +1331,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=28', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=29', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v28' : 'installé · v28';
+    ui.diagSw.textContent = reg.active ? 'actif · v29' : 'installé · v29';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
