@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v31';
+const BUILD_ID = '2026-09-04.interview-runtime-v32';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -1346,10 +1346,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=31', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=32', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v31' : 'installé · v31';
+    ui.diagSw.textContent = reg.active ? 'actif · v32' : 'installé · v32';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
