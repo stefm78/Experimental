@@ -926,3 +926,103 @@
   .speaker-buttons{gap:5px!important}
   .speaker-button{min-height:44px!important;padding:7px 5px!important}
 }
+
+
+/* V33 — stable question frame + conversation-only scroll. */
+/*
+   Field rule: a new speaker turn may move the conversation, never the question.
+   The footer remains a natural-height sibling. The conversation is the only
+   region that follows newly appended turns automatically.
+*/
+.interview-main{
+  display:flex!important;
+  flex-direction:column!important;
+  min-height:0!important;
+  overflow:hidden!important;
+}
+.interview-workspace-scroll{
+  flex:1 1 auto!important;
+  min-height:0!important;
+  display:flex!important;
+  flex-direction:column!important;
+  overflow:hidden!important;
+  padding-right:0!important;
+}
+.question-sticky{
+  flex:0 0 auto!important;
+  position:relative!important;
+  top:auto!important;
+  max-height:min(46dvh,440px)!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  border-bottom:1px solid #edf1f5!important;
+}
+.conversation-scroll{
+  flex:1 1 0!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow-y:auto!important;
+  overflow-x:hidden!important;
+  overscroll-behavior:contain;
+  scroll-behavior:smooth;
+}
+.capture-dock{
+  flex:0 0 auto!important;
+  align-self:stretch!important;
+  min-height:0!important;
+}
+
+/* Three complete lines are easier to read than the 1.5–2.5 line V32 window. */
+.live-transcript{
+  height:calc(4.35em + 20px)!important;
+  min-height:calc(4.35em + 20px)!important;
+  max-height:calc(4.35em + 20px)!important;
+  overflow-y:auto!important;
+}
+
+/* Participant roles are authoring metadata, not an in-interview narrow-screen control. */
+.mobile-participants-panel .participant-id,
+.mobile-participants-panel .participant-row select{
+  display:none!important;
+}
+.mobile-participants-panel .participant-row{
+  grid-template-columns:minmax(0,1fr) 38px!important;
+}
+.mobile-participants-panel .participant-row input{
+  grid-column:1/2!important;
+  grid-row:1!important;
+}
+.mobile-participants-panel .participant-row .icon-button{
+  grid-column:2/3!important;
+  grid-row:1!important;
+}
+
+/* The compact question selector already replaces Previous / Next. */
+@media(max-width:979px){
+  .interview-nav-actions{display:none!important}
+  .compact-interview-nav{
+    position:sticky!important;
+    top:0!important;
+    z-index:8!important;
+    background:#fff!important;
+  }
+  .question-sticky{max-height:min(48dvh,400px)!important}
+}
+
+/* On very narrow screens keep only the controls needed during the interview. */
+@media(max-width:640px){
+  .question-header>div:first-child{display:none!important}
+  .mobile-only-metrics,
+  .question-progress-mobile{display:none!important}
+  .question-header{padding-bottom:2px!important}
+  .interview-clock{width:100%!important;justify-content:space-between!important;gap:5px!important}
+  .question-sticky{max-height:min(47dvh,360px)!important}
+  .question{margin-top:12px!important}
+  .live-transcript{
+    height:calc(4.35em + 16px)!important;
+    min-height:calc(4.35em + 16px)!important;
+    max-height:calc(4.35em + 16px)!important;
+  }
+}

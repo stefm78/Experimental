@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v32';
+const BUILD_ID = '2026-09-04.interview-runtime-v33';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -631,7 +631,7 @@ function renderCaptureQuestionContext() {
   const recording = isRecording();
   const finalizing = captureFinalizing && Boolean(recordingQuestionId);
   const active = recording || finalizing;
-  show(ui.captureQuestionContext, active);
+  show(ui.captureQuestionContext, false);
   show(ui.topOnAir, recording && !captureHandoffPending);
 
   if (!active) {
@@ -646,6 +646,9 @@ function renderCaptureQuestionContext() {
   const viewedIndex = session.currentIndex;
   const ownerLabel = owner ? ((ownerIndex + 1) + '. ' + (owner.question.label || questionNavLabel(owner.question))) : 'Question en cours';
   const differs = Boolean(recording && viewed?.question?.id && viewed.question.id !== recordingQuestionId);
+
+  // The context row is useful only when the interviewer can transfer capture.
+  show(ui.captureQuestionContext, differs);
 
   if (ui.captureQuestionStatus) {
     ui.captureQuestionStatus.textContent = differs ? 'L’enregistrement reste sur' : 'Enregistrement sur';
