@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-03.interview-runtime-v27-1';
+const BUILD_ID = '2026-09-04.interview-runtime-v27-2';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -16,7 +16,7 @@ const ui = {
   setupView: $('setupView'), interviewView: $('interviewView'), doneView: $('doneView'), sttLabCard: $('sttLabCard'), authoringKitCard: $('authoringKitCard'), setupMeta: $('setupMeta'),
   networkBadge: $('networkBadge'), setupTitle: $('setupTitle'), setupContext: $('setupContext'), setupObjective: $('setupObjective'),
   interviewFile: $('interviewFile'), loadError: $('loadError'), setupParticipants: $('setupParticipants'), setupAddParticipantBtn: $('setupAddParticipantBtn'),
-  swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
+  swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), runtimeVersion: $('runtimeVersion'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
   questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), topOnAir: $('topOnAir'), topOnAirSpeaker: $('topOnAirSpeaker'),
@@ -1300,10 +1300,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=27-1', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=27-2', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v27.1' : 'installé · v27.1';
+    ui.diagSw.textContent = reg.active ? 'actif · v27.2' : 'installé · v27.2';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1692,6 +1692,7 @@ async function copyDiagnosticReport() {
 
 async function init() {
   ui.diagBuild.textContent = BUILD_ID;
+  if (ui.runtimeVersion) ui.runtimeVersion.textContent = BUILD_ID;
   updateNetwork();
   window.addEventListener('online', updateNetwork);
   window.addEventListener('offline', updateNetwork);
