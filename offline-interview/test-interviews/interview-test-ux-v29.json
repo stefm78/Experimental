@@ -1,0 +1,102 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v29-hard-stt-handoff",
+  "version": "1.0",
+  "title": "Test UX V29 — coupure STT réelle et questions longues",
+  "context": "Ce test valide la V29 après l'échec terrain de la frontière continue V28. La V29 crée une vraie frontière SpeechRecognition à chaque changement de locuteur ou de question, sans fermer le microphone ni lancer Whisper. Elle mesure automatiquement le temps de reprise du transcripteur. Elle réduit aussi la taille des questions longues et leur donne un défilement interne afin que la capture reste visible.",
+  "objective": "Vérifier que les fins de phrases ne migrent plus vers le locuteur suivant, mesurer si le bref état PASSAGE reste acceptable, détecter d'éventuels premiers mots perdus après reprise et valider le traitement des questions longues.",
+  "language": "fr-FR",
+  "tags": ["ux", "v29", "hard-stt-cut", "speaker-boundary", "restart-latency", "long-question"],
+  "estimatedDurationMinutes": 7,
+  "participants": [
+    { "id": "P1", "name": "Interviewer", "role": "interviewer" },
+    { "id": "P2", "name": "Testeur", "role": "interviewee" },
+    { "id": "P3", "name": "Second participant", "role": "interviewee" }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Runtime et lisibilité",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Version et question longue",
+          "text": "Vérifiez d'abord dans « Transcription et confidentialité » que Runtime affiche exactement 2026-09-04.interview-runtime-v29. Observez ensuite cette question volontairement longue : elle doit rester parfaitement lisible sans occuper presque toute la hauteur utile de l'entretien. Lorsque le texte dépasse la hauteur raisonnable, il doit pouvoir défiler à l'intérieur de sa propre zone, tandis que la transcription live, le statut de capture et les boutons de locuteur restent accessibles. Dites si le compromis entre taille de police, espace occupé et défilement vous paraît naturel, et signalez si vous devez encore parcourir excessivement la page pour atteindre les commandes essentielles.",
+          "intent": "Valider l'identité V29 et le correctif hybride de lisibilité des questions longues.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Frontières STT réelles",
+      "questions": [
+        {
+          "id": "Q2",
+          "label": "Sentinelles — bascules immédiates",
+          "text": "Testeur dit « Ma phrase se termine par volcan » puis clique immédiatement sur Second participant. Second participant dit immédiatement « Ma phrase commence par bonjour et se termine par rivière » puis clique sur Testeur. Testeur dit immédiatement « Ma phrase commence par salut et se termine par satellite » puis clique sur Second participant. Second participant dit « Ma phrase commence par coucou et se termine par chocolat ». Ne ralentissez pas volontairement votre rythme. Observez à la fois si volcan, rivière ou satellite fuit vers le suivant et si bonjour, salut ou coucou disparaît au début du nouveau tour.",
+          "intent": "Tester simultanément les deux risques de la coupure réelle : ancienne fin qui fuit et nouveau début perdu pendant la reprise SpeechRecognition.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Dix bascules naturelles",
+          "text": "Alternez au moins dix fois entre Testeur et Second participant. Chaque personne prononce une phrase naturelle de cinq à douze mots puis clique immédiatement sur l'autre. Parlez au rythme qui vous semblerait normal dans une vraie interview. Signalez si l'état PASSAGE est perceptible ou gênant, si un début de phrase est mangé, si une fin de phrase passe chez le suivant, ou si l'interface cesse d'être réactive.",
+          "intent": "Mesurer le coût UX réel de la frontière dure et sa robustesse en usage normal.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Conversation et question",
+      "questions": [
+        {
+          "id": "Q4",
+          "label": "Conversation continue",
+          "text": "Échangez naturellement à deux pendant environ une minute. Changez de locuteur avec les boutons comme vous le feriez réellement, y compris avec quelques enchaînements rapides. À la fin, décrivez si les tours sont mieux séparés qu'en V28 et si le système vous impose un rythme artificiel.",
+          "intent": "Vérifier la généralisation hors protocole sentinelle.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "followUps": []
+        },
+        {
+          "id": "Q5",
+          "label": "Transfert de question sous capture",
+          "text": "Pendant que cette question est enregistrée, affichez la question suivante puis utilisez « Basculer sur la question N → ». Continuez à parler normalement. Vérifiez que le transfert conserve la fin de cette question ici, que le début suivant n'est pas perdu et que l'ordre des prises reste correct.",
+          "intent": "Valider la même coupure STT sur une frontière de question.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Verdict",
+      "questions": [
+        {
+          "id": "Q6",
+          "label": "Verdict V29",
+          "text": "Donnez votre verdict : avez-vous vu une fin de phrase chez le mauvais locuteur, un début de phrase perdu, un état PASSAGE trop lent, un gel, une hallucination, un problème de transfert de question ou une question longue encore envahissante ? Si le comportement est acceptable, dites ce qui vous paraît désormais fiable et ce qui reste à améliorer.",
+          "intent": "Décider si la frontière dure peut devenir la nouvelle base de capture et si le correctif de question longue est validé.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}
