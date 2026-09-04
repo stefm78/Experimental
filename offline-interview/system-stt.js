@@ -60,9 +60,7 @@ export function createSystemSpeechSession({
   recognition.continuous = true;
   recognition.interimResults = true;
   recognition.maxAlternatives = 1;
-  if ('processLocally' in recognition) {
-    recognition.processLocally = mode === 'local';
-  }
+  if ('processLocally' in recognition) recognition.processLocally = mode === 'local';
 
   let shouldRun = false;
   let resultSeen = false;
@@ -71,6 +69,23 @@ export function createSystemSpeechSession({
   let carryText = '';
   const latestResults = new Map();
   let boundaryResults = new Map();
+
+  // V28: a result index that was still interim when the interviewer changed speaker
+  // remains owned by the previous semantic segment until Chromium marks it final.
+  // Late finalisation therefore cannot leak into the next speaker merely because the
+  // onresult event arrived after the click.
+  const heldIndexOwners = new Map();
+  const activeBoundaries = new Set();
+  let boundarySequence = 0;
+
+  const calibrationKey = `offline-interview.stt-boundary-settle.v1:${mode}:${lang}`;
+  let settleSamples = [];
+  try {
+    const saved = JSON.parse(localStorage.getItem(calibrationKey) || 'null');
+    if (Array.isArray(saved?.samples)) {
+      settleSamples = saved.samples.map(Number).filter(Number.isFinite).filter(v => v >= 0 && v <= 5000).slice(-24);
+    }
+  } catch {}
 
   const normalize = value => String(value || '')
     .toLocaleLowerCase()
@@ -86,6 +101,10 @@ export function createSystemSpeechSession({
     .replace(/\s+/g, ' ')
     .trim();
 
+  const cloneResults = source => new Map(
+    [...source.entries()].map(([index, value]) => [index, { ...value }])
+  );
+
   const suffixAfterBoundary = (currentText, baseText) => {
     const current = String(currentText || '').trim();
     const base = String(baseText || '').trim();
@@ -96,9 +115,7 @@ export function createSystemSpeechSession({
     const baseNorm = normalize(base);
     if (!currentNorm || currentNorm === baseNorm) return '';
 
-    if (current.startsWith(base)) {
-      return current.slice(base.length).trim();
-    }
+    if (current.startsWith(base)) return current.slice(base.length).trim();
 
     const currentWords = current.split(/\s+/);
     const baseWords = base.split(/\s+/);
@@ -123,19 +140,70 @@ export function createSystemSpeechSession({
       }
     }
 
-    // Existing result indexes are allowed to append, but not to rewrite their old history.
+    // Existing result indexes may append text, but never rewrite their old history.
     return '';
   };
 
-  const segmentText = () => {
+  const segmentTextFrom = (baseResults, currentResults, carry = '') => {
     const parts = [];
-    for (const index of [...latestResults.keys()].sort((a, b) => a - b)) {
-      const current = latestResults.get(index);
-      const base = boundaryResults.get(index);
+    for (const index of [...currentResults.keys()].sort((a, b) => a - b)) {
+      const current = currentResults.get(index);
+      const base = baseResults.get(index);
       const delta = suffixAfterBoundary(current?.text, base?.text);
       if (delta) parts.push(delta);
     }
-    return cleanJoin(carryText, ...parts);
+    return cleanJoin(carry, ...parts);
+  };
+
+  const segmentText = () => segmentTextFrom(boundaryResults, latestResults, carryText);
+
+  const percentile = (values, p) => {
+    if (!values.length) return null;
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.min(sorted.length - 1, Math.max(0, Math.ceil(sorted.length * p) - 1))];
+  };
+
+  const recommendedSettleTimeoutMs = () => {
+    const p95 = percentile(settleSamples, 0.95);
+    if (p95 == null) return 1200;
+    return Math.round(Math.min(2200, Math.max(650, (p95 * 1.6) + 180)));
+  };
+
+  const rememberSettle = ms => {
+    if (!Number.isFinite(ms) || ms < 0 || ms > 5000) return;
+    settleSamples.push(Math.round(ms));
+    settleSamples = settleSamples.slice(-24);
+    try { localStorage.setItem(calibrationKey, JSON.stringify({ samples: settleSamples })); } catch {}
+  };
+
+  const boundaryText = boundary => segmentTextFrom(
+    boundary.baseResults,
+    boundary.capturedResults,
+    boundary.carryText
+  );
+
+  const resolveBoundary = (boundary, timedOut = false, reason = null) => {
+    if (!boundary || boundary.resolved) return;
+    boundary.resolved = true;
+    boundary.timedOut = Boolean(timedOut);
+    clearTimeout(boundary.timer);
+    activeBoundaries.delete(boundary);
+    const settleMs = Math.max(0, performance.now() - boundary.startedAt);
+    if (!timedOut && boundary.initialPendingCount > 0) rememberSettle(settleMs);
+    boundary.resolve({
+      text: boundaryText(boundary),
+      finalText: boundaryText(boundary),
+      mode,
+      pendingCount: boundary.initialPendingCount,
+      settleMs: Math.round(settleMs),
+      timedOut: Boolean(timedOut),
+      reason
+    });
+  };
+
+  const resolveAllBoundaries = reason => {
+    for (const boundary of [...activeBoundaries]) resolveBoundary(boundary, true, reason);
+    heldIndexOwners.clear();
   };
 
   const publish = () => {
@@ -149,10 +217,24 @@ export function createSystemSpeechSession({
     for (let i = event.resultIndex; i < event.results.length; i += 1) {
       const transcript = String(event.results[i]?.[0]?.transcript || '').trim();
       if (!transcript) continue;
-      latestResults.set(i, {
+      const value = {
         text: transcript,
         isFinal: Boolean(event.results[i].isFinal)
-      });
+      };
+      latestResults.set(i, value);
+
+      const owner = heldIndexOwners.get(i);
+      if (owner) {
+        owner.capturedResults.set(i, { ...value });
+        // Absorb every late update into the semantic boundary so the new segment never
+        // sees it as a suffix. This is the core V28 ownership rule.
+        boundaryResults.set(i, { ...value });
+        if (value.isFinal) {
+          owner.pendingIndexes.delete(i);
+          heldIndexOwners.delete(i);
+          if (owner.pendingIndexes.size === 0) resolveBoundary(owner, false, 'final');
+        }
+      }
     }
     const text = segmentText();
     resultSeen = Boolean(text);
@@ -163,10 +245,11 @@ export function createSystemSpeechSession({
     if (!['aborted', 'no-speech'].includes(lastError)) onError(lastError);
   };
   recognition.onend = () => {
+    // Chromium restarts reset result indexes. Resolve any outstanding semantic boundary
+    // before dropping the index namespace, then carry only the current segment forward.
+    resolveAllBoundaries('recognition-end');
     if (!shouldRun) return;
 
-    // Chromium restarts can reset result indexes to zero. Preserve the current semantic
-    // segment as carry text before clearing index state, then resume recognition.
     const current = segmentText();
     if (current) carryText = current;
     latestResults.clear();
@@ -174,9 +257,7 @@ export function createSystemSpeechSession({
 
     restartTimer = setTimeout(() => {
       if (!shouldRun) return;
-      try {
-        recognition.start();
-      } catch {}
+      try { recognition.start(); } catch {}
     }, 120);
   };
 
@@ -197,17 +278,15 @@ export function createSystemSpeechSession({
       shouldRun = false;
       clearTimeout(restartTimer);
       restartTimer = null;
-      try {
-        recognition.stop();
-      } catch {}
+      resolveAllBoundaries('stop');
+      try { recognition.stop(); } catch {}
     },
     abort() {
       shouldRun = false;
       clearTimeout(restartTimer);
       restartTimer = null;
-      try {
-        recognition.abort();
-      } catch {}
+      resolveAllBoundaries('abort');
+      try { recognition.abort(); } catch {}
     },
     snapshot() {
       const text = segmentText();
@@ -219,26 +298,76 @@ export function createSystemSpeechSession({
         lastError
       };
     },
-    takeSegment() {
+    takeSegment({ settleTimeoutMs = null } = {}) {
       const text = segmentText();
-      const segment = {
+      const baseForSegment = cloneResults(boundaryResults);
+      const capturedResults = cloneResults(latestResults);
+      const carryAtBoundary = carryText;
+      const pendingIndexes = new Set(
+        [...latestResults.entries()]
+          .filter(([index, value]) => !value.isFinal && !heldIndexOwners.has(index))
+          .map(([index]) => index)
+      );
+
+      // From this instant, the current recognition state is the baseline of the new
+      // semantic segment. Held interim indexes are kept synchronized with this baseline
+      // until they become final, preventing late-tail leakage.
+      boundaryResults = cloneResults(latestResults);
+      carryText = '';
+      resultSeen = false;
+      lastError = null;
+
+      let settleResolve;
+      const settled = new Promise(resolve => { settleResolve = resolve; });
+      const boundary = {
+        id: ++boundarySequence,
+        baseResults: baseForSegment,
+        capturedResults,
+        carryText: carryAtBoundary,
+        pendingIndexes,
+        initialPendingCount: pendingIndexes.size,
+        startedAt: performance.now(),
+        timer: null,
+        resolved: false,
+        resolve: settleResolve
+      };
+
+      if (pendingIndexes.size === 0) {
+        settleResolve({
+          text,
+          finalText: text,
+          mode,
+          pendingCount: 0,
+          settleMs: 0,
+          timedOut: false,
+          reason: 'already-final'
+        });
+      } else {
+        activeBoundaries.add(boundary);
+        for (const index of pendingIndexes) heldIndexOwners.set(index, boundary);
+        const timeoutMs = Number.isFinite(Number(settleTimeoutMs))
+          ? Math.max(300, Math.min(3000, Number(settleTimeoutMs)))
+          : recommendedSettleTimeoutMs();
+        boundary.timer = setTimeout(() => resolveBoundary(boundary, true, 'timeout'), timeoutMs);
+      }
+
+      return {
         text,
         finalText: text,
         mode,
         resultSeen: Boolean(text) || resultSeen,
-        lastError
+        lastError,
+        pendingCount: boundary.initialPendingCount,
+        settled
       };
-
-      // Snapshot every current recognition result. Subsequent events at the same index
-      // contribute only text appended after this semantic boundary.
-      boundaryResults = new Map(
-        [...latestResults.entries()].map(([index, value]) => [index, { ...value }])
-      );
-      carryText = '';
-      resultSeen = false;
-      lastError = null;
-      return segment;
+    },
+    calibration() {
+      return {
+        sampleCount: settleSamples.length,
+        p50Ms: percentile(settleSamples, 0.50),
+        p95Ms: percentile(settleSamples, 0.95),
+        timeoutMs: recommendedSettleTimeoutMs()
+      };
     }
   };
 }
-

@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v27-2';
+const BUILD_ID = '2026-09-04.interview-runtime-v28';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -57,6 +57,7 @@ let resolveRecordingCompletion = null;
 let captureFinalizing = false;
 let queuedRecordingQuestionId = null;
 let recordingCaptureId = null;
+let semanticBoundaryCommitQueue = Promise.resolve();
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -550,15 +551,17 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   if (!systemSpeechSession?.takeSegment) return false;
 
   const snapshot = systemSpeechSession.takeSegment();
-  const text = cleanText(snapshot?.text);
-  if (!meaningfulTranscript(text)) return false;
+  const initialText = cleanText(snapshot?.text);
+  if (!meaningfulTranscript(initialText)) return false;
 
   const previousSpeakerId = recordingSpeakerId;
   const previousQuestionId = recordingQuestionId;
   const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
-  const source = snapshot.mode === 'local' ? 'system-local' : 'system';
-  const rawTranscript = snapshot.finalText || text;
+  const baseSource = snapshot.mode === 'local' ? 'system-local' : 'system';
 
+  // Ownership switches immediately in the UI. Only persistence of the previous semantic
+  // segment waits for Chromium to finalise result indexes that were still interim at the
+  // click. This keeps the interface responsive while preventing late-tail leakage.
   recordingSpeakerId = nextSpeakerId;
   recordingQuestionId = nextQuestionId;
   session.activeSpeakerId = nextSpeakerId;
@@ -573,15 +576,23 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   renderQuestionNav();
   updateCaptureUi();
 
-  await appendAnswerTurn({
-    questionId: previousQuestionId,
-    speakerId: previousSpeakerId,
-    text,
-    source,
-    rawTranscript,
-    durationSeconds
-  });
-  await persistSession();
+  const commit = async () => {
+    let settled = null;
+    try { settled = snapshot.settled ? await snapshot.settled : null; } catch {}
+    const text = cleanText(settled?.text || snapshot.finalText || snapshot.text);
+    if (!meaningfulTranscript(text)) return;
+    const source = snapshot.pendingCount > 0 ? `${baseSource}-settled` : baseSource;
+    await appendAnswerTurn({
+      questionId: previousQuestionId,
+      speakerId: previousSpeakerId,
+      text,
+      source,
+      rawTranscript: text,
+      durationSeconds
+    });
+    await persistSession();
+  };
+  semanticBoundaryCommitQueue = semanticBoundaryCommitQueue.then(commit, commit);
   return true;
 }
 
@@ -684,6 +695,7 @@ async function finishActiveCaptureBeforeLeaving(message) {
   if (captureFinalizing || recordingCompletionPromise) {
     if (recordingCompletionPromise) await recordingCompletionPromise;
   }
+  await semanticBoundaryCommitQueue;
   return true;
 }
 
@@ -1300,10 +1312,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=27-2', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=28', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v27.2' : 'installé · v27.2';
+    ui.diagSw.textContent = reg.active ? 'actif · v28' : 'installé · v28';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1541,6 +1553,8 @@ async function handleRecordingStopped() {
       source = 'whisper-local';
       rawTranscript = text;
     }
+
+    await semanticBoundaryCommitQueue;
 
     if (text) {
       await appendAnswerTurn({
