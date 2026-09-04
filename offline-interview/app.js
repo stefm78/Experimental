@@ -1331,6 +1331,10 @@ function finishInterview() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     try { ui.doneView?.focus({ preventScroll: true }); } catch {}
   });
+  requestAnimationFrame(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    try { ui.doneView?.focus({ preventScroll: true }); } catch {}
+  });
   const all = flattenedQuestions();
   const answered = all.filter(({ question }) => (session.responses[question.id]?.turns || []).some(t => t.type === 'answer' && cleanText(t.text))).length;
   const turns = Object.values(session.responses || {}).reduce((sum, r) => sum + (r.turns?.length || 0), 0);
