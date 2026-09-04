@@ -216,10 +216,10 @@
 
 
 /* Dream Team UX v21 · iteration 3 — completion */
-.done-mode{background:#f4f6f9}
+.done-mode{background:#f4f6f9;min-height:100dvh;height:auto!important;overflow-x:hidden;overflow-y:auto!important}
 .done-mode .topbar,.done-mode .diagnostics,.done-mode .setup-tools{display:none}
-.done-mode .shell{width:min(760px,100%);min-height:100vh;display:grid;align-content:center;padding:24px}
-.done-panel{background:#fff;border:1px solid #dfe5ee;border-radius:22px;padding:clamp(28px,5vw,46px);box-shadow:0 18px 44px rgba(30,52,84,.08);text-align:center}
+.done-mode .shell{width:min(760px,100%);min-height:100dvh;height:auto!important;overflow:visible!important;display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;padding:24px}
+.done-panel{width:100%;margin-block:auto;flex:0 0 auto;background:#fff;border:1px solid #dfe5ee;border-radius:22px;padding:clamp(28px,5vw,46px);box-shadow:0 18px 44px rgba(30,52,84,.08);text-align:center}
 .done-icon{display:grid;place-items:center;width:48px;height:48px;margin:0 auto 16px;border-radius:999px;background:#eaf7ef;color:#18794e;font-size:1.4rem;font-weight:900}
 .done-panel h2{margin:.4rem 0 .5rem;font-size:clamp(1.7rem,3vw,2.2rem)}
 .done-summary{margin:0;color:#64748b}
