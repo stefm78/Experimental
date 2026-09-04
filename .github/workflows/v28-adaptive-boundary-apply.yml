@@ -1,0 +1,49 @@
+name: Apply Offline Interview V28 adaptive boundary
+
+on:
+  push:
+    branches:
+      - offline-interview-v28-adaptive-boundary
+    paths:
+      - offline-interview/v28-adaptive-boundary-apply.py
+      - .github/workflows/v28-adaptive-boundary-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: offline-interview-v28-adaptive-boundary
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply V28 app patch
+        run: python offline-interview/v28-adaptive-boundary-apply.py
+      - name: Validate JavaScript syntax
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/sw.js
+      - name: Verify V28 invariants
+        run: |
+          grep -q "2026-09-04.interview-runtime-v28" offline-interview/app.js
+          grep -q "semanticBoundaryCommitQueue" offline-interview/app.js
+          grep -q "heldIndexOwners" offline-interview/system-stt.js
+          grep -q "system-local-settled" offline-interview/app.js
+          ! grep -q 'class="recording-mic"' offline-interview/index.html
+          ! grep -q 'class="top-on-air-mic"' offline-interview/index.html
+          grep -q 'app.js?v=28' offline-interview/index.html
+          grep -q "offline-interview-v28" offline-interview/sw.js
+      - name: Commit V28 runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add offline-interview/app.js offline-interview/index.html offline-interview/sw.js
+          if git diff --cached --quiet; then
+            echo 'No runtime changes to commit'
+          else
+            git commit -m 'Apply adaptive STT boundary ownership and simplify ON AIR'
+            git push origin HEAD:offline-interview-v28-adaptive-boundary
+          fi
