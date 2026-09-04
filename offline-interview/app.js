@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v30';
+const BUILD_ID = '2026-09-04.interview-runtime-v31';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -550,7 +550,10 @@ function renderQuestionNav() {
       const option = document.createElement('option');
       option.value = String(index);
       const answered = questionHasAnswer(entry.question.id);
-      option.textContent = `${index + 1}. ${questionNavLabel(entry.question)}${answered ? ' ✓' : ''}`;
+      const recordingTarget = Boolean(isRecording() && recordingQuestionId === entry.question.id);
+      const finalizingTarget = Boolean(captureFinalizing && recordingQuestionId === entry.question.id);
+      const stateSuffix = recordingTarget ? ' · ON AIR' : finalizingTarget ? ' · TRAITEMENT' : answered ? ' ✓' : '';
+      option.textContent = `${index + 1}. ${questionNavLabel(entry.question)}${stateSuffix}`;
       option.selected = index === session.currentIndex;
       ui.mobileQuestionSelect.append(option);
     });
@@ -1343,10 +1346,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=30', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=31', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v30' : 'installé · v30';
+    ui.diagSw.textContent = reg.active ? 'actif · v31' : 'installé · v31';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
