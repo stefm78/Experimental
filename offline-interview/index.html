@@ -137,6 +137,16 @@
           <progress id="timeProgress" class="time-progress mobile-only-metrics" max="1" value="0"></progress>
           <progress id="questionProgress" class="question-progress-mobile" max="5" value="1"></progress>
 
+          <div class="compact-interview-nav" aria-label="Navigation compacte dans l’entretien">
+            <label class="sr-only" for="mobileQuestionSelect">Aller à une question</label>
+            <select id="mobileQuestionSelect" class="mobile-question-select" aria-label="Aller directement à une question"></select>
+            <details class="mobile-participants-panel">
+              <summary>Participants</summary>
+              <div id="mobileInterviewParticipants" class="participant-list"></div>
+              <button id="mobileAddParticipantBtn" class="ghost small" type="button">+ Ajouter</button>
+            </details>
+          </div>
+
           <p id="questionText" class="question"></p>
 
           <div class="question-tools">
@@ -156,6 +166,33 @@
 
           </div>
         </div>
+
+
+        <section id="captureDock" class="capture-dock" aria-label="Capturer une prise de parole">
+          <div id="captureQuestionContext" class="capture-question-context hidden">
+            <span id="captureQuestionStatus">Enregistrement sur</span>
+            <strong id="captureQuestionLabel"></strong>
+            <button id="moveCaptureBtn" class="move-capture hidden" type="button">Basculer sur la question affichée →</button>
+          </div>
+
+          <div class="live-transcript-slot">
+            <div id="liveTranscriptPreview" class="live-transcript" aria-live="polite"></div>
+          </div>
+
+          <div class="capture-state-row">
+            <div class="capture-state-copy">
+              <strong id="captureModeLabel">PRÊT</strong>
+              <span id="recordState" class="record-state">Cliquez sur la personne qui parle</span>
+            </div>
+            <span id="timer" class="timer">00:00</span>
+          </div>
+
+          <div id="speakerButtons" class="speaker-buttons"></div>
+
+          <p id="speakerHelp" class="speaker-help">Cliquez sur un nom pour commencer. Pendant l’enregistrement, changez de nom en un clic.</p>
+          <span id="activeSpeakerLabel" class="sr-only"></span>
+          <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Finalisation…</span></div>
+        </section>
 
         <div class="conversation-scroll">
           <section id="turnsSection" class="conversation-section hidden">
@@ -185,31 +222,6 @@
           </div>
         </div>
 
-        <section id="captureDock" class="capture-dock" aria-label="Capturer une prise de parole">
-          <div id="captureQuestionContext" class="capture-question-context hidden">
-            <span id="captureQuestionStatus">Enregistrement sur</span>
-            <strong id="captureQuestionLabel"></strong>
-            <button id="moveCaptureBtn" class="move-capture hidden" type="button">Basculer sur la question affichée →</button>
-          </div>
-
-          <div class="live-transcript-slot">
-            <div id="liveTranscriptPreview" class="live-transcript" aria-live="polite"></div>
-          </div>
-
-          <div class="capture-state-row">
-            <div class="capture-state-copy">
-              <strong id="captureModeLabel">PRÊT</strong>
-              <span id="recordState" class="record-state">Cliquez sur la personne qui parle</span>
-            </div>
-            <span id="timer" class="timer">00:00</span>
-          </div>
-
-          <div id="speakerButtons" class="speaker-buttons"></div>
-
-          <p id="speakerHelp" class="speaker-help">Cliquez sur un nom pour commencer. Pendant l’enregistrement, changez de nom en un clic.</p>
-          <span id="activeSpeakerLabel" class="sr-only"></span>
-          <div id="transcribing" class="transcribing hidden" aria-live="polite"><span class="spinner" aria-hidden="true"></span><span>Finalisation…</span></div>
-        </section>
       </section>
     </section>
     <section id="doneView" class="done-panel hidden">
@@ -251,6 +263,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=29"></script>
+  <script type="module" src="./app.js?v=30"></script>
 </body>
 </html>

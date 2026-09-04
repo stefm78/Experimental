@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v29';
+const BUILD_ID = '2026-09-04.interview-runtime-v30';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -19,7 +19,7 @@ const ui = {
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), runtimeVersion: $('runtimeVersion'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
   prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
-  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), topOnAir: $('topOnAir'), topOnAirSpeaker: $('topOnAirSpeaker'),
+  questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), mobileQuestionSelect: $('mobileQuestionSelect'), mobileInterviewParticipants: $('mobileInterviewParticipants'), mobileAddParticipantBtn: $('mobileAddParticipantBtn'), pauseBtn: $('pauseBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), topOnAir: $('topOnAir'), topOnAirSpeaker: $('topOnAirSpeaker'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
   captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'), captureQuestionContext: $('captureQuestionContext'), captureQuestionStatus: $('captureQuestionStatus'), captureQuestionLabel: $('captureQuestionLabel'), moveCaptureBtn: $('moveCaptureBtn'),
@@ -379,6 +379,7 @@ function renderParticipantEditor(container) {
 function renderParticipantsEverywhere(skip = null) {
   if (ui.setupParticipants !== skip) renderParticipantEditor(ui.setupParticipants);
   if (session && ui.interviewParticipants !== skip) renderParticipantEditor(ui.interviewParticipants);
+  if (session && ui.mobileInterviewParticipants && ui.mobileInterviewParticipants !== skip) renderParticipantEditor(ui.mobileInterviewParticipants);
 }
 
 function estimatedTotalMinutes() {
@@ -542,6 +543,17 @@ function renderQuestionNav() {
       group.append(row);
     }
     ui.questionNav.append(group);
+  }
+  if (ui.mobileQuestionSelect) {
+    ui.mobileQuestionSelect.innerHTML = '';
+    flattenedQuestions().forEach((entry, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      const answered = questionHasAnswer(entry.question.id);
+      option.textContent = `${index + 1}. ${questionNavLabel(entry.question)}${answered ? ' ✓' : ''}`;
+      option.selected = index === session.currentIndex;
+      ui.mobileQuestionSelect.append(option);
+    });
   }
 }
 
@@ -1331,10 +1343,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=29', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js?v=30', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v29' : 'installé · v29';
+    ui.diagSw.textContent = reg.active ? 'actif · v30' : 'installé · v30';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1756,6 +1768,11 @@ ui.interviewFile.addEventListener('change', () => {
 });
 ui.setupAddParticipantBtn.addEventListener('click', addParticipant);
 ui.interviewAddParticipantBtn.addEventListener('click', addParticipant);
+ui.mobileAddParticipantBtn?.addEventListener('click', addParticipant);
+ui.mobileQuestionSelect?.addEventListener('change', event => {
+  const index = Number(event.target.value);
+  if (Number.isInteger(index)) goToQuestion(index);
+});
 ui.prepareBtn.addEventListener('click', () => prepareModel().catch(() => {}));
 ui.startBtn.addEventListener('click', startInterview);
 ui.resumeBtn.addEventListener('click', resumeInterview);
