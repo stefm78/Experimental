@@ -1108,3 +1108,54 @@
   .turn-card{padding:4px 6px!important}
   .turn-card .turn-text{min-height:27px!important;padding:4px 6px!important}
 }
+
+
+/* V36 — data-integrity affordances and safer compact editing. */
+.capture-integrity-alert{
+  margin:0 0 8px;
+  padding:8px 10px;
+  border:1px solid #f59e0b;
+  border-radius:10px;
+  background:#fffbeb;
+  color:#7c2d12;
+  font-size:.82rem;
+  font-weight:800;
+  line-height:1.35;
+}
+.question-nav-item.integrity-gap{background:#fff7ed!important;color:#9a3412!important}
+.question-nav-item.integrity-gap .question-nav-state{color:#c2410c!important}
+.undo-turn-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:7px 9px;
+  border:1px solid #bfdbfe;
+  border-radius:9px;
+  background:#eff6ff;
+  color:#334155;
+  font-size:.82rem;
+  font-weight:750;
+}
+.turn-delete-button{
+  margin-left:10px!important;
+  min-width:42px!important;
+  color:#991b1b!important;
+  border-color:#fecaca!important;
+  background:#fff7f7!important;
+}
+
+@media(max-width:640px){
+  .turn-head{column-gap:14px!important}
+  .turn-delete-button{min-width:44px!important;margin-left:8px!important}
+  /* Empty questions can use the available screen; conversation progressively takes it back. */
+  .question-sticky.question-space-empty{max-height:min(56dvh,440px)!important}
+  .question-sticky.question-space-few{max-height:min(44dvh,340px)!important}
+  .question-sticky.question-space-busy{max-height:min(35dvh,275px)!important}
+  .question-sticky.question-space-empty .question-long,
+  .question-sticky.question-space-empty .question-very-long{max-height:min(38dvh,300px)!important}
+  .question-sticky.question-space-few .question-long,
+  .question-sticky.question-space-few .question-very-long{max-height:min(25dvh,200px)!important}
+  .question-sticky.question-space-busy .question-long,
+  .question-sticky.question-space-busy .question-very-long{max-height:min(16dvh,138px)!important}
+}
