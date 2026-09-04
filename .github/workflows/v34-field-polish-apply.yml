@@ -1,0 +1,45 @@
+name: Apply Offline Interview V34 field polish
+
+on:
+  push:
+    branches: [offline-interview-v34-field-polish]
+    paths:
+      - 'offline-interview/v34-field-polish-apply.py'
+      - '.github/workflows/v34-field-polish-apply.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: offline-interview-v34-field-polish
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply V34 field patch
+        run: python offline-interview/v34-field-polish-apply.py
+      - name: Validate JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/sw.js
+      - name: Preserve STT boundary regressions
+        run: |
+          node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs
+          node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
+      - name: Verify V34 invariants
+        run: |
+          grep -q "2026-09-04.interview-runtime-v34" offline-interview/app.js
+          grep -q 'styles.css?v=34' offline-interview/index.html
+          grep -q 'app.js?v=34' offline-interview/index.html
+          grep -q "offline-interview-v34" offline-interview/sw.js
+          grep -q 'field polish after V33 qualification' offline-interview/styles.css
+          grep -q 'selectDefaultParticipantName' offline-interview/app.js
+      - name: Commit V34 runtime
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add offline-interview/app.js offline-interview/index.html offline-interview/styles.css offline-interview/sw.js
+          git commit -m 'Polish V34 interview density and stable recording chrome'
+          git push origin HEAD:offline-interview-v34-field-polish
