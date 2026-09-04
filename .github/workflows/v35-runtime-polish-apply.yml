@@ -1,0 +1,59 @@
+name: Apply Offline Interview V35 runtime polish
+
+on:
+  push:
+    branches: [offline-interview-v35-runtime-polish]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: offline-interview-v35-runtime-polish
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Apply V35 runtime polish
+        run: python offline-interview/v35-runtime-polish-apply.py
+      - name: Validate JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js
+      - name: Preserve STT boundary regressions
+        run: |
+          node offline-interview/tests/system-stt-semantic-boundary.test.mjs
+          node offline-interview/tests/system-stt-hard-handoff.test.mjs
+      - name: Verify V35 invariants
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('offline-interview')
+          app=(root/'app.js').read_text(encoding='utf-8')
+          css=(root/'styles.css').read_text(encoding='utf-8')
+          index=(root/'index.html').read_text(encoding='utf-8')
+          sw=(root/'sw.js').read_text(encoding='utf-8')
+          assert "2026-09-04.interview-runtime-v35" in app
+          assert "show(ui.topOnAir, recording);" in app
+          assert "PASSAGE" not in app
+          assert "runtimeEvents: clone(session.runtimeEvents || [])" in app
+          assert "system-empty-after-handoff" in app
+          assert "grid-template-columns:minmax(0,1fr) auto" in css
+          assert "styles.css?v=35" in index and "app.js?v=35" in index
+          assert "offline-interview-v35" in sw and "styles.css?v=35" in sw and "app.js?v=35" in sw
+          json.loads((root/'test-interviews'/'interview-test-ux-v35.json').read_text(encoding='utf-8'))
+          print('V35 invariants PASS')
+          PY
+      - name: Commit V35 runtime
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add offline-interview/app.js offline-interview/styles.css offline-interview/index.html offline-interview/sw.js offline-interview/test-interviews/interview-test-ux-v35.json
+          if git diff --cached --quiet; then
+            echo "No runtime changes to commit"
+          else
+            git commit -m "Harden V35 recording chrome and transcription telemetry"
+            git push origin HEAD:offline-interview-v35-runtime-polish
+          fi
