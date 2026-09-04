@@ -1159,3 +1159,9 @@
   .question-sticky.question-space-busy .question-long,
   .question-sticky.question-space-busy .question-very-long{max-height:min(16dvh,138px)!important}
 }
+
+
+/* V37 always-visible mobile completion */
+.mobile-finish-button{display:none}
+@media(max-width:759px){.mobile-finish-button{display:inline-flex;align-items:center;justify-content:center;padding:7px 10px;white-space:nowrap;border-color:#a9b8cc;background:#fff;color:#172554}.mobile-finish-button:focus-visible{outline:3px solid rgba(37,99,235,.24);outline-offset:2px}}
+@media(max-width:420px){.mobile-finish-button{padding:7px 8px}.interview-clock{row-gap:6px}}
