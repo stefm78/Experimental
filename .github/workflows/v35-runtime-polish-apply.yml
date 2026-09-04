@@ -31,8 +31,8 @@ jobs:
         run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js
       - name: Preserve STT boundary regressions
         run: |
-          node offline-interview/tests/system-stt-semantic-boundary.test.mjs
-          node offline-interview/tests/system-stt-hard-handoff.test.mjs
+          node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs
+          node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
       - name: Verify V35 invariants
         run: |
           python - <<'PY'
