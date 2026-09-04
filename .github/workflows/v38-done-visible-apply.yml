@@ -1,0 +1,45 @@
+name: Apply Offline Interview V38 result visibility
+
+on:
+  push:
+    branches: [offline-interview-v38-done-visible]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: offline-interview-v38-done-visible
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply V38 patch
+        run: python offline-interview/v38-done-visible-apply.py
+      - name: Parse JavaScript
+        run: node --check offline-interview/app.js
+      - name: Preserve STT regressions
+        run: |
+          node offline-interview/test-semantic-boundary-v28.mjs
+          node offline-interview/test-hard-stt-handoff-v29.mjs
+      - name: Verify V38 invariants
+        run: |
+          grep -q "interview-runtime-v38" offline-interview/app.js
+          grep -q "window.scrollTo({ top: 0, left: 0, behavior: 'auto' })" offline-interview/app.js
+          grep -q 'doneView.*tabindex="-1"' offline-interview/index.html
+          grep -q 'offline-interview-v38' offline-interview/sw.js
+      - name: Commit V38 runtime
+        run: |
+          git config user.name "Stef"
+          git config user.email "104558808+stefm78@users.noreply.github.com"
+          git add offline-interview/app.js offline-interview/index.html offline-interview/styles.css offline-interview/sw.js
+          if git diff --cached --quiet; then
+            echo "No runtime changes to commit"
+          else
+            git commit -m "Fix V38 result view across widths"
+            git push origin HEAD:offline-interview-v38-done-visible
+          fi
