@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v34';
+const BUILD_ID = '2026-09-04.interview-runtime-v35';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -60,6 +60,7 @@ let recordingCaptureId = null;
 let semanticBoundaryCommitQueue = Promise.resolve();
 let captureHandoffPending = false;
 let latestHandoffCalibration = null;
+let recordingHadCuts = false;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -252,8 +253,23 @@ function newSession() {
     questionSeconds: {},
     paused: false,
     participantHistory: Object.fromEntries(interview.participants.map(p => [p.id, { ...clone(p), removedAt: null }])),
-    responses: {}
+    responses: {},
+    runtimeEvents: []
   };
+}
+
+function logRuntimeEvent(type, details = {}) {
+  if (!session) return;
+  if (!Array.isArray(session.runtimeEvents)) session.runtimeEvents = [];
+  const event = { at: nowIso(), type: cleanText(type) || 'runtime_event' };
+  for (const [key, value] of Object.entries(details || {})) {
+    if (value == null) continue;
+    if (['string', 'number', 'boolean'].includes(typeof value)) event[key] = value;
+  }
+  session.runtimeEvents.push(event);
+  if (session.runtimeEvents.length > 100) session.runtimeEvents = session.runtimeEvents.slice(-100);
+  session.updatedAt = nowIso();
+  persistSession().catch(() => {});
 }
 
 function roleLabel(role) {
@@ -577,6 +593,7 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
   const cut = systemSpeechSession.cutSegment();
   if (!cut) return false;
+  recordingHadCuts = true;
 
   // UI ownership changes immediately, but ON AIR is briefly replaced by PASSAGE until
   // the fresh SpeechRecognition session is listening. This makes the semantic boundary
@@ -637,7 +654,9 @@ function renderCaptureQuestionContext() {
   const finalizing = captureFinalizing && Boolean(recordingQuestionId);
   const active = recording || finalizing;
   show(ui.captureQuestionContext, false);
-  show(ui.topOnAir, recording && !captureHandoffPending);
+  // Audio capture remains live during the short SpeechRecognition handoff.
+  // Keep the global ON AIR indicator continuous instead of blinking.
+  show(ui.topOnAir, recording);
 
   if (!active) {
     show(ui.moveCaptureBtn, false);
@@ -837,12 +856,11 @@ function updateCaptureUi() {
   ui.captureDock?.classList.toggle('is-recording', recording);
   ui.captureDock?.classList.toggle('is-finalizing', captureFinalizing && !recording);
 
-  if (recording && captureHandoffPending) {
-    if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'PASSAGE';
-    ui.recordState.textContent = active ? `${active.name} · préparation…` : 'Passage de parole…';
-  } else if (recording) {
+  if (recording) {
+    // The active red speaker button already identifies the person. Keep capture chrome stable
+    // across the sub-second recognition handoff: no PASSAGE flash and no duplicated name.
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'ON AIR';
-    ui.recordState.textContent = active ? `${active.name} · en cours` : 'Enregistrement en cours';
+    ui.recordState.textContent = '';
   } else if (captureFinalizing) {
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'FINALISATION';
     ui.recordState.textContent = 'Enregistrement terminé · préparation du texte…';
@@ -1110,7 +1128,7 @@ function renderTurns() {
     text.value = turn.text;
     const resizeTurnText = () => {
       text.style.height = 'auto';
-      text.style.height = Math.min(280, Math.max(34, text.scrollHeight)) + 'px';
+      text.style.height = Math.min(220, Math.max(28, text.scrollHeight)) + 'px';
     };
     text.addEventListener('input', resizeTurnText);
     text.addEventListener('change', async () => {
@@ -1297,7 +1315,8 @@ function exportPayload() {
         totalQuestions,
         unansweredQuestions: totalQuestions - answeredQuestions,
         followUpsUsed
-      }
+      },
+      runtimeEvents: clone(session.runtimeEvents || [])
     },
     sections
   };
@@ -1506,17 +1525,22 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
       lang: interview?.language || 'fr-FR',
       mode: systemSpeechCapability.mode,
       onText: applySystemText,
-      onState: () => {
-        const active = participantById(recordingSpeakerId);
-        ui.recordState.textContent = active ? `${active.name} · en cours` : 'Enregistrement en cours';
-      },
-      onError: error => { diagnosticError = `SpeechRecognition: ${error}`; }
+      onState: () => {},
+      onError: error => {
+        diagnosticError = `SpeechRecognition: ${error}`;
+        logRuntimeEvent('speech_recognition_error', {
+          questionId: recordingQuestionId,
+          speakerId: recordingSpeakerId,
+          error: String(error)
+        });
+      }
     });
     const usingSystem = Boolean(systemSpeechSession?.start());
 
+    recordingHadCuts = false;
     startedRecordingAt = performance.now();
     if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
-    if (!usingSystem) ui.recordState.textContent = `Enregistrement · ${participantById(recordingSpeakerId)?.name || 'locuteur'}`;
+    if (!usingSystem) ui.recordState.textContent = 'Transcription système indisponible';
     renderSpeakerButtons();
     timerHandle = setInterval(() => { ui.timer.textContent = formatTime((performance.now() - startedRecordingAt) / 1000); }, 250);
   } catch (error) {
@@ -1584,6 +1608,14 @@ async function handleRecordingStopped() {
 
     if (!text) {
       show(ui.transcribing, true);
+      if (recordingHadCuts) {
+        const message = 'Aucun texte système pour cette prise après un changement de personne. Répétez ce passage.';
+        logRuntimeEvent('transcription_gap', {
+          questionId, speakerId, stage: 'system-empty-after-handoff',
+          error: message
+        });
+        throw new Error(message);
+      }
       ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
         ? 'Transcription Whisper locale…'
         : 'Aucun texte système · secours Whisper…';
@@ -1618,6 +1650,10 @@ async function handleRecordingStopped() {
     }
   } catch (error) {
     diagnosticError = String(error?.message || error);
+    logRuntimeEvent('transcription_error', {
+      questionId, speakerId, stage: recordingHadCuts ? 'after-handoff' : 'finalize',
+      error: diagnosticError
+    });
     showError(ui.interviewError, `La transcription a échoué : ${error.message || error}`);
     ui.recordState.textContent = 'Transcription en échec';
   } finally {
@@ -1730,7 +1766,8 @@ async function copyDiagnosticReport() {
       modelReady: Boolean(transcriber),
       systemSpeech: systemSpeechCapability,
       systemSpeechLastError: systemSpeechSession?.snapshot?.().lastError || null,
-      lastError: diagnosticError
+      lastError: diagnosticError,
+      runtimeEvents: clone(session?.runtimeEvents || []).slice(-20)
     },
     storage: navigator.storage?.estimate ? await navigator.storage.estimate() : null
   };
