@@ -746,3 +746,26 @@
   display:block!important;
   fill:currentColor!important;
 }
+
+
+/* V29 — long questions stay central without consuming the whole interview viewport. */
+.question.question-long{
+  font-size:clamp(1.15rem,1.8vw,1.6rem)!important;
+  line-height:1.42!important;
+  max-height:38vh;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  scrollbar-gutter:stable;
+  padding-right:10px;
+}
+.question.question-very-long{
+  font-size:clamp(1.05rem,1.55vw,1.4rem)!important;
+  max-height:34vh;
+}
+@media(max-width:759px){
+  .question.question-long,.question.question-very-long{
+    font-size:clamp(1.05rem,5vw,1.3rem)!important;
+    max-height:42vh;
+  }
+}
+.capture-dock.is-recording #captureModeLabel{min-width:5.2rem;text-align:center}
