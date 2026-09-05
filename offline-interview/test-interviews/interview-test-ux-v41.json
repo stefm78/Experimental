@@ -34,7 +34,7 @@
         {
           "id": "Q1",
           "label": "Jauge réelle et replay",
-          "text": "Vérifiez que Runtime affiche 2026-09-06.interview-runtime-v41. Avant d’enregistrer, cliquez sur « Tester le micro » : restez silencieux, parlez doucement, normalement puis très fort près du micro. La jauge doit suivre immédiatement ces changements et indiquer Silence, Faible, Bon niveau ou Trop fort de façon cohérente. Lancez ensuite une prise de parole normale, arrêtez-la, puis utilisez le bouton ▶ de cette prise pour réécouter exactement ce segment. Coupez le réseau si vous voulez confirmer que la réécoute reste locale. Dites si la jauge et la réécoute fonctionnent correctement.",
+          "text": "Vérifiez que Runtime affiche 2026-09-06.interview-runtime-v41.2. Avant d’enregistrer, cliquez sur « Tester le micro » : restez silencieux, parlez doucement, normalement puis très fort près du micro. La jauge doit suivre immédiatement ces changements et indiquer Silence, Faible, Bon niveau ou Trop fort de façon cohérente. Lancez ensuite une prise de parole normale, arrêtez-la, puis utilisez le bouton ▶ de cette prise pour réécouter exactement ce segment. Coupez le réseau si vous voulez confirmer que la réécoute reste locale. Dites si la jauge et la réécoute fonctionnent correctement.",
           "intent": "Qualifier la nouvelle capture audio locale sans confondre transcription et signal microphone.",
           "estimatedMinutes": 4,
           "required": true,
