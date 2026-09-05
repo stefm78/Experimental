@@ -13,6 +13,7 @@ assert.match(app, /completion_requested/);
 assert.match(app, /completion_succeeded/);
 assert.match(app, /completion_error/);
 assert.match(app, /pendingInterviewCompletion && !nextSpeakerId/);
+assert.doesNotMatch(app, /if \(captureFinalizing \|\| recordingCompletionPromise\) \{\s+pendingInterviewCompletion = true;/);
 assert.match(app, /ui\.mobileFinishBtn\?\.addEventListener\('click', completeInterview\)/);
 assert.match(app, /ui\.sidebarFinishBtn\?\.addEventListener\('click', completeInterview\)/);
 assert.match(css, /@media\(max-width:979px\)\{\.mobile-finish-button\{display:inline-flex/);

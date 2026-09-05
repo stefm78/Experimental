@@ -910,7 +910,6 @@ async function completeInterview(event) {
   }
 
   if (captureFinalizing || recordingCompletionPromise) {
-    pendingInterviewCompletion = true;
     try {
       if (recordingCompletionPromise) await recordingCompletionPromise;
     } catch (error) {
