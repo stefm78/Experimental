@@ -3,6 +3,8 @@ name: Apply Offline Interview V39 completion state
 on:
   push:
     branches: [offline-interview-v39-completion-state]
+    paths:
+      - '.github/workflows/v39-completion-apply.yml'
 
 permissions:
   contents: write
@@ -40,7 +42,10 @@ jobs:
         run: |
           git config user.name "Stef"
           git config user.email "104558808+stefm78@users.noreply.github.com"
-          git add offline-interview/app.js offline-interview/index.html offline-interview/styles.css offline-interview/sw.js offline-interview/test-completion-path-v39.mjs offline-interview/test-interviews/interview-test-ux-v39.json .github/workflows/pages.yml
+          # pages.yml was validated above, but a workflow-scoped GITHUB_TOKEN cannot push workflow changes.
+          # The canonical pages workflow is updated separately through the authorized GitHub connector.
+          git checkout -- .github/workflows/pages.yml
+          git add offline-interview/app.js offline-interview/index.html offline-interview/styles.css offline-interview/sw.js offline-interview/test-completion-path-v39.mjs offline-interview/test-interviews/interview-test-ux-v39.json
           if git diff --cached --quiet; then
             echo "No runtime changes to commit"
           else
