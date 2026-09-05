@@ -6,6 +6,7 @@ on:
     branches: [offline-interview-v41-audio-replay-vumeter]
     paths:
       - 'offline-interview/_v41_patch.py'
+      - 'offline-interview/_v41_fix_helper.py'
       - '.github/workflows/v41-build.yml'
 
 permissions:
@@ -21,6 +22,8 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - name: Repair V41 helper
+        run: python offline-interview/_v41_fix_helper.py
       - name: Apply V41 patch
         run: python offline-interview/_v41_patch.py
       - name: Parse JavaScript
@@ -33,7 +36,7 @@ jobs:
         run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41.json'))"
       - name: Commit materialized runtime
         run: |
-          rm offline-interview/_v41_patch.py .github/workflows/v41-build.yml
+          rm offline-interview/_v41_patch.py offline-interview/_v41_fix_helper.py .github/workflows/v41-build.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add offline-interview .github/workflows
