@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-05.interview-runtime-v39';
+const BUILD_ID = '2026-09-06.interview-runtime-v40';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -65,7 +65,11 @@ let lastDeletedTurn = null;
 let completionInProgress = false;
 let pendingInterviewCompletion = false;
 
-function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
+function show(el, visible = true) {
+  if (!el) return;
+  el.hidden = !visible;
+  el.classList.toggle('hidden', !visible);
+}
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
 function nowIso() { return new Date().toISOString(); }
 function uuid(prefix = 'id') { return crypto.randomUUID ? crypto.randomUUID() : `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`; }
@@ -1406,10 +1410,6 @@ function finishInterview() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     try { ui.doneView?.focus({ preventScroll: true }); } catch {}
   });
-  requestAnimationFrame(() => {
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-    try { ui.doneView?.focus({ preventScroll: true }); } catch {}
-  });
   const all = flattenedQuestions();
   const answered = all.filter(({ question }) => (session.responses[question.id]?.turns || []).some(t => t.type === 'answer' && cleanText(t.text))).length;
   const turns = Object.values(session.responses || {}).reduce((sum, r) => sum + (r.turns?.length || 0), 0);
@@ -1572,10 +1572,10 @@ async function registerServiceWorker() {
     return false;
   }
   try {
-    const reg = await navigator.serviceWorker.register('./sw.js?v=36', { scope: './' });
+    const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
     await navigator.serviceWorker.ready;
     ui.swStatus.textContent = 'Mis en cache';
-    ui.diagSw.textContent = reg.active ? 'actif · v36' : 'installé · v36';
+    ui.diagSw.textContent = reg.active ? 'actif' : 'installé';
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);

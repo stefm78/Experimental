@@ -1,0 +1,29 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v40-result-replaces-capture",
+  "version": "1.0",
+  "title": "Test UX V40 — le résultat remplace réellement la captation",
+  "context": "Le terrain V39 a confirmé que Terminer finalise correctement la session à 490 px et 803 px, mais a aussi montré que l'écran de captation restait affiché au-dessus du résultat à ces largeurs. L'audit a relié ce symptôme à la cascade CSS responsive : interviewView recevait bien l'état hidden, mais un display:block!important plus tardif pouvait le réafficher sous 980 px.",
+  "objective": "Vérifier que la visibilité des vues est désormais indépendante du responsive : après Terminer, la captation disparaît immédiatement et l'écran Entretien terminé est visible en haut de la fenêtre, sans défilement manuel, à 490 px puis à environ 800–850 px.",
+  "language": "fr-FR",
+  "tags": ["ux", "v40", "visibility-state", "responsive", "completion", "code-hygiene"],
+  "estimatedDurationMinutes": 3,
+  "participants": [
+    {"id": "P1", "name": "Interviewer", "role": "interviewer"},
+    {"id": "P2", "name": "Testeur", "role": "interviewee"}
+  ],
+  "sections": [{
+    "id": "S1",
+    "title": "Remplacement de vue",
+    "questions": [{
+      "id": "Q1",
+      "label": "Résultat immédiat en étroit et intermédiaire",
+      "text": "Vérifiez que Runtime affiche 2026-09-06.interview-runtime-v40. Placez la fenêtre vers 490 px. Lancez une courte prise de parole puis cliquez sur Terminer pendant ON AIR et acceptez la confirmation. Sans toucher au défilement, dites si l'écran « Entretien terminé » remplace immédiatement la captation en haut de la fenêtre et si les boutons d'export sont visibles ou naturellement dans cette seule page de résultat. Cliquez sur « Relire / corriger », élargissez vers 800–850 px et recommencez exactement le même test. Dans les deux cas, signalez comme échec si la question, ON AIR, les boutons de locuteurs ou toute autre partie de la captation reste affichée au-dessus du résultat, ou s'il faut descendre dans la page pour découvrir que l'entretien est terminé.",
+      "intent": "Réattaquer le défaut V39 exact : une vue interview masquée par l'état applicatif mais réaffichée par une règle responsive CSS.",
+      "estimatedMinutes": 3,
+      "required": true,
+      "audience": ["P2"],
+      "followUps": []
+    }]
+  }]
+}
