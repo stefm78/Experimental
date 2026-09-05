@@ -8,7 +8,7 @@
   <title>Interview locale structurée</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=40">
+  <link rel="stylesheet" href="./styles.css?v=41">
 </head>
 <body>
   <main class="shell">
@@ -221,6 +221,15 @@
             <span id="timer" class="timer">00:00</span>
           </div>
 
+          <div class="mic-meter-row">
+            <button id="micPreviewBtn" class="ghost small mic-preview-button" type="button" aria-pressed="false">Tester le micro</button>
+            <div class="mic-meter" role="meter" aria-label="Niveau du microphone" aria-valuemin="0" aria-valuemax="100">
+              <span class="mic-meter-recommended" aria-hidden="true"></span>
+              <span id="micMeterFill" class="mic-meter-fill" style="--level:0" aria-hidden="true"></span>
+            </div>
+            <span id="micMeterState" class="mic-meter-state" data-level-state="silence">Silence</span>
+          </div>
+
           <div id="speakerButtons" class="speaker-buttons"></div>
 
           <p id="speakerHelp" class="speaker-help">Cliquez sur un nom pour commencer. Pendant l’enregistrement, changez de nom en un clic.</p>
@@ -249,6 +258,7 @@
 
       <div class="done-secondary">
         <button id="reviewBtn" class="link-button">Relire / corriger</button>
+        <button id="deleteAudioBtn" class="link-button">Supprimer l’audio local</button>
         <button id="newSessionBtn" class="link-button done-new-session">Nouvelle session</button>
       </div>
     </section>
@@ -269,6 +279,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=40"></script>
+  <script type="module" src="./app.js?v=41"></script>
 </body>
 </html>

@@ -1,0 +1,49 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v41-audio-replay-vumeter",
+  "version": "1.0",
+  "title": "Test V41 — niveau micro et réécoute locale",
+  "context": "V40 est validée. V41 ajoute un indicateur réel du niveau microphone et conserve localement l’audio pour permettre la réécoute par prise de parole.",
+  "objective": "Vérifier que la jauge suit réellement la voix avant et pendant la prise, puis qu’une prise enregistrée peut être réécoutée sans réseau.",
+  "language": "fr-FR",
+  "tags": [
+    "v41",
+    "audio",
+    "replay",
+    "vu-meter",
+    "offline"
+  ],
+  "estimatedDurationMinutes": 4,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Micro et réécoute",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Jauge réelle et replay",
+          "text": "Vérifiez que Runtime affiche 2026-09-06.interview-runtime-v41. Avant d’enregistrer, cliquez sur « Tester le micro » : restez silencieux, parlez doucement, normalement puis très fort près du micro. La jauge doit suivre immédiatement ces changements et indiquer Silence, Faible, Bon niveau ou Trop fort de façon cohérente. Lancez ensuite une prise de parole normale, arrêtez-la, puis utilisez le bouton ▶ de cette prise pour réécouter exactement ce segment. Coupez le réseau si vous voulez confirmer que la réécoute reste locale. Dites si la jauge et la réécoute fonctionnent correctement.",
+          "intent": "Qualifier la nouvelle capture audio locale sans confondre transcription et signal microphone.",
+          "estimatedMinutes": 4,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}
