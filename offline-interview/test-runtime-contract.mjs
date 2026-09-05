@@ -29,7 +29,7 @@ assert.match(app, /el\.hidden = !visible;/);
 assert.match(app, /el\.classList\.toggle\('hidden', !visible\)/);
 const interviewLayoutBlocks = [...css.matchAll(/\.interview-layout\s*\{([^{}]*)\}/gs)].map(match => match[1]);
 assert.ok(interviewLayoutBlocks.length > 0, 'interview-layout CSS contract missing');
-assert.equal(interviewLayoutBlocks.some(block => /display\s*:\s*block\s*!important/i.test(block)), false, 'responsive CSS must not override hidden state');
+assert.equal(interviewLayoutBlocks.some(block => /display\s*:[^;!}]+!important/i.test(block)), false, 'responsive CSS must not override hidden state');
 assert.match(css, /@media\(max-width:979px\)\{\.mobile-finish-button\{display:inline-flex/);
 assert.match(index, /id="interviewView" class="interview-layout hidden"/);
 assert.match(index, /id="doneView"/);
