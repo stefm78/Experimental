@@ -1,13 +1,9 @@
-const VERSION = 'offline-interview-v39';
+const VERSION = 'offline-interview-v40';
 const SHELL_CACHE = `${VERSION}-shell`;
 const SHELL = [
-  './', './index.html', './styles.css?v=39', './app.js?v=39', './system-stt.js',
+  './', './index.html', './styles.css?v=40', './app.js?v=40', './system-stt.js',
   './interview.json', './manifest.webmanifest', './icon.svg', './INTERVIEW_FORMAT.md',
-  './INTERVIEW_AUTHORING_KIT.md', './interview-spec.schema.json',
-  './stt-benchmark.html', './stt-benchmark.js?v=9',
-  './stt-deep-benchmark.html', './stt-deep-benchmark.js?v=9',
-  './device-stt-capability.html', './device-stt-capability.js?v=3',
-  './stt-lab-audio.js?v=4', './stt-lab-engines.js?v=4', './stt-lab-fixtures.js?v=3'
+  './INTERVIEW_AUTHORING_KIT.md', './interview-spec.schema.json'
 ];
 
 self.addEventListener('install', event => {

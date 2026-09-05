@@ -775,7 +775,7 @@
 .compact-interview-nav{display:none}
 @media(max-width:979px){
   .interview-mode .shell{width:min(860px,100%)!important;padding:8px!important;min-height:0!important}
-  .interview-layout{display:block!important}
+  .interview-layout{display:block}
   .question-sidebar{display:none!important}
   .interview-main{min-height:0!important;border-radius:14px!important;padding:16px 14px 22px!important;margin:0!important}
   .question-sticky{position:relative!important;top:auto!important;z-index:auto!important;background:#fff;padding-bottom:8px;border-bottom:1px solid #edf1f5}
@@ -827,7 +827,7 @@
 
 @media(max-width:979px){
   .interview-mode .shell{padding:8px!important}
-  .interview-layout{height:calc(100dvh - 16px)!important;display:block!important}
+  .interview-layout{height:calc(100dvh - 16px)!important;display:block}
   .question-sidebar{display:none!important}
   .interview-main{height:100%!important;padding:14px 14px 10px!important}
   .compact-interview-nav{display:grid!important;position:sticky;top:0;z-index:6;background:rgba(255,255,255,.98);padding:6px 0 8px;margin:4px 0 6px;border-bottom:1px solid #edf1f5}
