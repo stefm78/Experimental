@@ -69,5 +69,9 @@ test=once(test,
 "assert.match(app, /await dbAudioPut\\(\\{ id: captureId, sessionId: session\\.id, blob/);",
 "assert.match(app, /masterAudioChunks = \\[\\]/);\nassert.match(app, /masterAudioChunks\\.push\\(event\\.data\\)/);\nassert.match(app, /blob: masterBlob/);\nassert.match(app, /const recordingId = recordingCaptureId/);",
 'master audio contract')
+test=once(test,
+"assert.match(app, /audioRef: \\{ recordingId: recordingCaptureId, startMs: segmentStartMs, endMs: segmentEndMs \\}/);",
+"assert.match(app, /audioRef: \\{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \\}/);",
+'captured audio ref contract')
 p.write_text(s); t.write_text(test)
 print('V41 audio ownership repair applied')
