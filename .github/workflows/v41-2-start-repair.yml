@@ -1,0 +1,35 @@
+name: Repair V41.2 start regression
+on:
+  push:
+    branches: [offline-interview-v41-2-start-repair]
+    paths: ['.github/workflows/v41-2-start-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-2-start-repair
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Apply V41.2 patch
+        run: python offline-interview/_v41_2_start_repair.py
+      - name: Parse JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/sw.js
+      - name: Existing regressions
+        run: node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs && node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
+      - name: Runtime contract
+        run: node offline-interview/test-runtime-contract.mjs
+      - name: Parse field questionnaire
+        run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41.json','utf8'))"
+      - name: Commit repair
+        run: |
+          rm offline-interview/_v41_2_start_repair.py .github/workflows/v41-2-start-repair.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add offline-interview .github/workflows
+          git commit -m 'Repair V41.2 participants and interview start paths'
+          git push origin HEAD:offline-interview-v41-2-start-repair
