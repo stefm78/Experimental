@@ -38,6 +38,7 @@ let transcriber = null;
 let recorder = null;
 let stream = null;
 let chunks = [];
+let masterAudioChunks = [];
 let startedRecordingAt = 0;
 let timerHandle = null;
 let composerDurationSeconds = 0;
@@ -796,11 +797,12 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   const previousSpeakerId = recordingSpeakerId;
   const previousQuestionId = recordingQuestionId;
   const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
+  const recordingId = recordingCaptureId;
   const segmentStartMs = recordingAudioOffsetMs;
   const segmentEndMs = segmentStartMs + durationSeconds * 1000;
-  recordingAudioOffsetMs = segmentEndMs;
   const cut = systemSpeechSession.cutSegment();
   if (!cut) return false;
+  recordingAudioOffsetMs = segmentEndMs;
   recordingHadCuts = true;
 
   // UI ownership changes immediately, but ON AIR is briefly replaced by PASSAGE until
@@ -840,7 +842,7 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
       source: baseSource,
       rawTranscript: settled?.finalText || text,
       durationSeconds,
-      audioRef: { recordingId: recordingCaptureId, startMs: segmentStartMs, endMs: segmentEndMs }
+      audioRef: { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }
     });
     await persistSession();
   };
@@ -1712,6 +1714,7 @@ function exportTxt() {
 
 async function resetSession() {
   if (!confirm('Effacer la session courante ? Le questionnaire chargé reste disponible sur cet appareil.')) return;
+  if (session?.id) await dbAudioDeleteSession(session.id);
   await dbDelete(STATE_KEY);
   session = null;
   renderSetup();
@@ -1867,7 +1870,12 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     const mimeType = preferredMimeType();
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     chunks = [];
-    recorder.ondataavailable = event => { if (event.data?.size) chunks.push(event.data); };
+    masterAudioChunks = [];
+    recorder.ondataavailable = event => {
+      if (!event.data?.size) return;
+      chunks.push(event.data);
+      masterAudioChunks.push(event.data);
+    };
     recorder.onstop = handleRecordingStopped;
     recorder.start(500);
 
@@ -1951,7 +1959,8 @@ async function handleRecordingStopped() {
   try {
     if (!chunks.length) return;
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
-    await dbAudioPut({ id: captureId, sessionId: session.id, blob, mimeType: blob.type || 'audio/webm', createdAt: nowIso() });
+    const masterBlob = new Blob(masterAudioChunks, { type: recorder.mimeType || 'audio/webm' });
+    await dbAudioPut({ id: captureId, sessionId: session.id, blob: masterBlob, mimeType: masterBlob.type || 'audio/webm', createdAt: nowIso() });
     const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
     let text = cleanText(systemSnapshot.text);
     let source = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
@@ -2007,6 +2016,7 @@ async function handleRecordingStopped() {
     ui.recordState.textContent = 'Transcription en échec';
   } finally {
     chunks = [];
+    masterAudioChunks = [];
     show(ui.transcribing, false);
     ui.addTurnBtn.disabled = false;
     ui.validateBtn.disabled = false;

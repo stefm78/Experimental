@@ -56,8 +56,11 @@ for (const optional of [
 
 // V41: audio is retained locally as complete recording blobs; turns hold only time references.
 assert.match(app, /createObjectStore\('audio', \{ keyPath: 'id' \}\)/);
-assert.match(app, /await dbAudioPut\(\{ id: captureId, sessionId: session\.id, blob/);
-assert.match(app, /audioRef: \{ recordingId: recordingCaptureId, startMs: segmentStartMs, endMs: segmentEndMs \}/);
+assert.match(app, /masterAudioChunks = \[\]/);
+assert.match(app, /masterAudioChunks\.push\(event\.data\)/);
+assert.match(app, /blob: masterBlob/);
+assert.match(app, /const recordingId = recordingCaptureId/);
+assert.match(app, /audioRef: \{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \}/);
 assert.match(app, /replayTurnAudio\(turn\)/);
 assert.match(app, /AudioContext \|\| window\.webkitAudioContext/);
 assert.match(app, /getFloatTimeDomainData/);
