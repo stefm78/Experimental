@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-06.interview-runtime-v41.1';
+const BUILD_ID = '2026-09-06.interview-runtime-v41.2';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -17,7 +17,7 @@ const ui = {
   networkBadge: $('networkBadge'), setupTitle: $('setupTitle'), setupContext: $('setupContext'), setupObjective: $('setupObjective'),
   interviewFile: $('interviewFile'), loadError: $('loadError'), setupParticipants: $('setupParticipants'), setupAddParticipantBtn: $('setupAddParticipantBtn'),
   swStatus: $('swStatus'), storageStatus: $('storageStatus'), modelStatus: $('modelStatus'), runtimeVersion: $('runtimeVersion'), progressBlock: $('progressBlock'), progressLabel: $('progressLabel'), progressValue: $('progressValue'), modelProgress: $('modelProgress'), setupError: $('setupError'),
-  prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), resumeBtn: $('resumeBtn'),
+  prepareBtn: $('prepareBtn'), startBtn: $('startBtn'), freeStartBtn: $('freeStartBtn'), resumeBtn: $('resumeBtn'),
   sectionTitle: $('sectionTitle'), questionCounter: $('questionCounter'), questionProgress: $('questionProgress'), questionText: $('questionText'), questionIntent: $('questionIntent'), questionIntentDetails: $('questionIntentDetails'), speakerHelp: $('speakerHelp'),
   questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), mobileQuestionSelect: $('mobileQuestionSelect'), mobileInterviewParticipants: $('mobileInterviewParticipants'), mobileAddParticipantBtn: $('mobileAddParticipantBtn'), pauseBtn: $('pauseBtn'), mobileFinishBtn: $('mobileFinishBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), topOnAir: $('topOnAir'), topOnAirSpeaker: $('topOnAirSpeaker'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
@@ -296,6 +296,32 @@ function defaultParticipants() {
     { id: 'P1', name: 'Interviewer', role: 'interviewer' },
     { id: 'P2', name: 'Interviewé', role: 'interviewee' }
   ];
+}
+
+function ensureInterviewParticipants() {
+  if (!interview) return;
+  if (!Array.isArray(interview.participants) || !interview.participants.length) interview.participants = defaultParticipants();
+}
+
+function freeInterviewSpec() {
+  return normalizeSpec({
+    schema: SPEC_SCHEMA,
+    id: `free-interview-${Date.now()}`,
+    version: '1.0',
+    title: 'Entretien libre',
+    context: 'Entretien démarré sans questionnaire chargé.',
+    objective: 'Capturer librement la conversation, avec transcription et audio local.',
+    language: navigator.language || 'fr-FR',
+    estimatedDurationMinutes: 30,
+    participants: defaultParticipants(),
+    sections: [{
+      id: 'S1', title: 'Entretien libre', questions: [{
+        id: 'Q1', label: 'Conversation libre', text: 'Entretien libre',
+        intent: 'Capturer la conversation sans questionnaire préparé.',
+        estimatedMinutes: 30, required: false, audience: ['P2'], followUps: []
+      }]
+    }]
+  });
 }
 
 function normalizeRole(role) {
@@ -1089,6 +1115,7 @@ async function completeInterview(event) {
   await finalizeInterviewCompletion();
 }
 function renderSetup() {
+  ensureInterviewParticipants();
   setView('setup');
   ui.setupTitle.textContent = interview.title;
   if (ui.setupMeta) ui.setupMeta.textContent = `Interview · ~${Math.round(estimatedTotalMinutes())} min`;
@@ -1110,6 +1137,7 @@ async function loadInterviewFile(file) {
   try {
     const raw = JSON.parse(await file.text());
     interview = normalizeSpec(raw);
+    ensureInterviewParticipants();
     session = null;
     await persistSpec();
     await detectRuntimeSystemSpeech();
@@ -2068,9 +2096,33 @@ async function handleRecordingStopped() {
   }
 }
 async function startInterview() {
-  session = newSession();
-  await persistSession();
-  renderQuestion();
+  showError(ui.setupError);
+  try {
+    if (!interview) interview = freeInterviewSpec();
+    ensureInterviewParticipants();
+    session = newSession();
+    renderQuestion();
+    try { await persistSession(); }
+    catch (error) {
+      diagnosticError = `Session storage: ${error?.message || error}`;
+      showError(ui.interviewError, 'Entretien démarré, mais la sauvegarde locale est temporairement indisponible.');
+    }
+  } catch (error) {
+    session = null;
+    diagnosticError = `Start interview: ${error?.message || error}`;
+    showError(ui.setupError, `Impossible de démarrer l’entretien : ${error?.message || error}`);
+    renderSetup();
+  }
+}
+
+async function startFreeInterview() {
+  showError(ui.loadError);
+  showError(ui.setupError);
+  interview = freeInterviewSpec();
+  session = null;
+  renderSetup();
+  try { await persistSpec(); } catch (error) { diagnosticError = `Free interview storage: ${error?.message || error}`; }
+  await startInterview();
 }
 async function resumeInterview() {
   if (!session) return;
@@ -2218,6 +2270,7 @@ ui.mobileQuestionSelect?.addEventListener('change', event => {
 });
 ui.prepareBtn.addEventListener('click', () => prepareModel().catch(() => {}));
 ui.startBtn.addEventListener('click', startInterview);
+ui.freeStartBtn?.addEventListener('click', startFreeInterview);
 ui.resumeBtn.addEventListener('click', resumeInterview);
 ui.homeBtn.addEventListener('click', returnToSetup);
 ui.addTurnBtn.addEventListener('click', async () => {

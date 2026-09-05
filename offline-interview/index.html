@@ -8,7 +8,7 @@
   <title>Interview locale structurée</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=41.1">
+  <link rel="stylesheet" href="./styles.css?v=41.2">
 </head>
 <body>
   <main class="shell">
@@ -56,12 +56,13 @@
 
       <div class="setup-footer">
         <button id="resumeBtn" class="link-button hidden">Voir le dernier entretien</button>
+        <button id="freeStartBtn" class="ghost setup-start" type="button">Entretien libre</button>
         <button id="startBtn" class="primary setup-start">Commencer l’entretien →</button>
       </div>
 
       <details class="setup-settings">
         <summary>Transcription et confidentialité</summary>
-        <p>La voix est transcrite automatiquement. Le texte de l’entretien reste dans ce navigateur ; l’audio n’est pas conservé par l’application.</p>
+        <p>La voix est transcrite automatiquement. Le texte et l’audio de la session restent localement dans ce navigateur ; l’audio peut être supprimé depuis l’écran de fin.</p>
         <div class="setup-status" aria-live="polite">
           <span>Application <strong id="swStatus">Vérification…</strong></span>
           <span>Runtime <strong id="runtimeVersion">Vérification…</strong></span>
@@ -279,6 +280,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=41.1"></script>
+  <script type="module" src="./app.js?v=41.2"></script>
 </body>
 </html>
