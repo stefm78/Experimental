@@ -1,0 +1,34 @@
+name: Repair V41 audio ownership
+
+on:
+  push:
+    branches: [offline-interview-v41-audio-replay-vumeter]
+    paths:
+      - 'offline-interview/_v41_audio_repair.py'
+      - '.github/workflows/v41-audio-repair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-audio-replay-vumeter
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: python offline-interview/_v41_audio_repair.py
+      - run: node --check offline-interview/app.js && node --check offline-interview/sw.js
+      - run: node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs && node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
+      - run: node offline-interview/test-runtime-contract.mjs
+      - name: Commit repair
+        run: |
+          rm offline-interview/_v41_audio_repair.py .github/workflows/v41-audio-repair.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add offline-interview .github/workflows
+          git commit -m 'Repair V41 full-capture audio ownership after semantic cuts'
+          git push origin HEAD:offline-interview-v41-audio-replay-vumeter
