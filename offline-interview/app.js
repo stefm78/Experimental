@@ -1,13 +1,13 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-06.interview-runtime-v40';
+const BUILD_ID = '2026-09-06.interview-runtime-v41';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
 const TRANSFORMERS_URL = `https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_VERSION}`;
 const MODEL_ID = 'onnx-community/whisper-tiny';
 const DB_NAME = 'offline-interview';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STATE_KEY = 'current-session';
 const SPEC_KEY = 'last-interview-spec';
 
@@ -22,11 +22,11 @@ const ui = {
   questionSidebar: $('questionSidebar'), sidebarInterviewTitle: $('sidebarInterviewTitle'), sidebarProgressSummary: $('sidebarProgressSummary'), sidebarTimeSummary: $('sidebarTimeSummary'), sidebarTimeProgress: $('sidebarTimeProgress'), questionNav: $('questionNav'), mobileQuestionSelect: $('mobileQuestionSelect'), mobileInterviewParticipants: $('mobileInterviewParticipants'), mobileAddParticipantBtn: $('mobileAddParticipantBtn'), pauseBtn: $('pauseBtn'), mobileFinishBtn: $('mobileFinishBtn'), sidebarFinishBtn: $('sidebarFinishBtn'), interviewProgressSummary: $('interviewProgressSummary'), timeProgressLabel: $('timeProgressLabel'), timeProgress: $('timeProgress'), sessionClockText: $('sessionClockText'), sessionRemainingText: $('sessionRemainingText'), topOnAir: $('topOnAir'), topOnAirSpeaker: $('topOnAirSpeaker'),
   interviewParticipants: $('interviewParticipants'), interviewAddParticipantBtn: $('interviewAddParticipantBtn'), speakerButtons: $('speakerButtons'), activeSpeakerLabel: $('activeSpeakerLabel'),
   turnsSection: $('turnsSection'), turnsList: $('turnsList'),
-  captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'), captureQuestionContext: $('captureQuestionContext'), captureQuestionStatus: $('captureQuestionStatus'), captureQuestionLabel: $('captureQuestionLabel'), moveCaptureBtn: $('moveCaptureBtn'), captureIntegrityAlert: $('captureIntegrityAlert'),
+  captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'), micPreviewBtn: $('micPreviewBtn'), micMeterFill: $('micMeterFill'), micMeterState: $('micMeterState'), captureQuestionContext: $('captureQuestionContext'), captureQuestionStatus: $('captureQuestionStatus'), captureQuestionLabel: $('captureQuestionLabel'), moveCaptureBtn: $('moveCaptureBtn'), captureIntegrityAlert: $('captureIntegrityAlert'),
   answerText: $('answerText'), answerMeta: $('answerMeta'), composerSpeaker: $('composerSpeaker'), addTurnBtn: $('addTurnBtn'), clearComposerBtn: $('clearComposerBtn'),
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
   interviewError: $('interviewError'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
-  doneSummary: $('doneSummary'), doneQuestionStat: $('doneQuestionStat'), doneTurnStat: $('doneTurnStat'), doneTimeStat: $('doneTimeStat'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), newSessionBtn: $('newSessionBtn'),
+  doneSummary: $('doneSummary'), doneQuestionStat: $('doneQuestionStat'), doneTurnStat: $('doneTurnStat'), doneTimeStat: $('doneTimeStat'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), deleteAudioBtn: $('deleteAudioBtn'), newSessionBtn: $('newSessionBtn'),
   diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), diagStt: $('diagStt'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput'),
   copyAuthoringKitBtn: $('copyAuthoringKitBtn'), authoringKitStatus: $('authoringKitStatus')
 };
@@ -64,6 +64,13 @@ let recordingHadCuts = false;
 let lastDeletedTurn = null;
 let completionInProgress = false;
 let pendingInterviewCompletion = false;
+let recordingAudioOffsetMs = 0;
+let audioContext = null;
+let audioAnalyser = null;
+let audioSourceNode = null;
+let audioMeterFrame = 0;
+let activeReplayAudio = null;
+let activeReplayUrl = null;
 
 function show(el, visible = true) {
   if (!el) return;
@@ -81,6 +88,101 @@ function formatTime(seconds) {
   return `${m}:${s}`;
 }
 function safeFilePart(value) { return String(value || 'interview').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'interview'; }
+
+function updateMicMeter(level = 0, peak = 0) {
+  const rms = Math.max(0, Math.min(1, Number(level) || 0));
+  const pk = Math.max(0, Math.min(1, Number(peak) || 0));
+  const db = rms > 0 ? 20 * Math.log10(rms) : -96;
+  const visual = Math.max(0, Math.min(1, (db + 60) / 60));
+  let state = 'Silence';
+  let key = 'silence';
+  if (pk >= 0.95 || db > -4) { state = 'Trop fort'; key = 'hot'; }
+  else if (db >= -30) { state = 'Bon niveau'; key = 'good'; }
+  else if (db >= -50) { state = 'Faible'; key = 'low'; }
+  if (ui.micMeterFill) ui.micMeterFill.style.setProperty('--level', visual.toFixed(3));
+  if (ui.micMeterState) { ui.micMeterState.textContent = state; ui.micMeterState.dataset.levelState = key; }
+}
+
+async function startMicrophoneMeter(targetStream) {
+  if (!targetStream) return;
+  stopMicrophoneMeter(false);
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) return;
+  audioContext = new Context();
+  audioAnalyser = audioContext.createAnalyser();
+  audioAnalyser.fftSize = 1024;
+  audioAnalyser.smoothingTimeConstant = 0.65;
+  audioSourceNode = audioContext.createMediaStreamSource(targetStream);
+  audioSourceNode.connect(audioAnalyser);
+  const samples = new Float32Array(audioAnalyser.fftSize);
+  const tick = () => {
+    if (!audioAnalyser) return;
+    audioAnalyser.getFloatTimeDomainData(samples);
+    let sum = 0, peak = 0;
+    for (const sample of samples) { const a = Math.abs(sample); sum += sample * sample; if (a > peak) peak = a; }
+    updateMicMeter(Math.sqrt(sum / samples.length), peak);
+    audioMeterFrame = requestAnimationFrame(tick);
+  };
+  tick();
+}
+
+function stopMicrophoneMeter(reset = true) {
+  if (audioMeterFrame) cancelAnimationFrame(audioMeterFrame);
+  audioMeterFrame = 0;
+  try { audioSourceNode?.disconnect(); } catch {}
+  try { audioAnalyser?.disconnect(); } catch {}
+  const context = audioContext;
+  audioSourceNode = null; audioAnalyser = null; audioContext = null;
+  if (context && context.state !== 'closed') context.close().catch(() => {});
+  if (reset) updateMicMeter(0, 0);
+}
+
+async function ensureMicrophoneStream() {
+  const reusable = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
+  if (!reusable) stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
+  if (!audioAnalyser) await startMicrophoneMeter(stream);
+  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = isRecording() ? 'Micro actif' : 'Couper le test micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'true'); }
+  return stream;
+}
+
+function releaseMicrophone() {
+  stopMicrophoneMeter();
+  stream?.getTracks().forEach(track => track.stop());
+  stream = null;
+  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = 'Tester le micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'false'); }
+}
+
+async function toggleMicrophonePreview() {
+  if (isRecording() || captureFinalizing) return;
+  const live = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
+  if (live) releaseMicrophone();
+  else {
+    try { await ensureMicrophoneStream(); showError(ui.interviewError, ''); }
+    catch (error) { releaseMicrophone(); showError(ui.interviewError, `Microphone indisponible : ${error.message || error}`); }
+  }
+}
+
+function stopReplay() {
+  try { activeReplayAudio?.pause(); } catch {}
+  activeReplayAudio = null;
+  if (activeReplayUrl) URL.revokeObjectURL(activeReplayUrl);
+  activeReplayUrl = null;
+}
+
+async function replayTurnAudio(turn) {
+  const ref = turn?.audioRef;
+  if (!ref?.recordingId) return;
+  stopReplay();
+  const record = await dbAudioGet(ref.recordingId);
+  if (!record?.blob) { showError(ui.interviewError, 'Audio local introuvable pour cette prise de parole.'); return; }
+  const url = URL.createObjectURL(record.blob);
+  const audio = new Audio(url);
+  activeReplayAudio = audio; activeReplayUrl = url;
+  const end = Math.max(0, Number(ref.endMs) || 0) / 1000;
+  audio.addEventListener('loadedmetadata', () => { audio.currentTime = Math.max(0, Number(ref.startMs) || 0) / 1000; audio.play().catch(() => stopReplay()); }, { once: true });
+  audio.addEventListener('timeupdate', () => { if (end && audio.currentTime >= end) stopReplay(); });
+  audio.addEventListener('ended', stopReplay, { once: true });
+}
 
 function setView(name) {
   show(ui.setupView, name === 'setup');
@@ -107,6 +209,7 @@ function openDb() {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       if (!request.result.objectStoreNames.contains('kv')) request.result.createObjectStore('kv');
+      if (!request.result.objectStoreNames.contains('audio')) request.result.createObjectStore('audio', { keyPath: 'id' });
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -130,6 +233,34 @@ function dbDelete(key) {
   return new Promise((resolve, reject) => {
     const req = db.transaction('kv', 'readwrite').objectStore('kv').delete(key);
     req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+function audioStore(mode = 'readonly') { return db.transaction('audio', mode).objectStore('audio'); }
+function dbAudioPut(value) {
+  return new Promise((resolve, reject) => {
+    const req = audioStore('readwrite').put(value);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+function dbAudioGet(id) {
+  return new Promise((resolve, reject) => {
+    const req = audioStore().get(id);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+  });
+}
+function dbAudioDeleteSession(sessionId) {
+  return new Promise((resolve, reject) => {
+    const store = audioStore('readwrite');
+    const req = store.openCursor();
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) return resolve();
+      if (cursor.value?.sessionId === sessionId) cursor.delete();
+      cursor.continue();
+    };
     req.onerror = () => reject(req.error);
   });
 }
@@ -665,6 +796,9 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   const previousSpeakerId = recordingSpeakerId;
   const previousQuestionId = recordingQuestionId;
   const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
+  const segmentStartMs = recordingAudioOffsetMs;
+  const segmentEndMs = segmentStartMs + durationSeconds * 1000;
+  recordingAudioOffsetMs = segmentEndMs;
   const cut = systemSpeechSession.cutSegment();
   if (!cut) return false;
   recordingHadCuts = true;
@@ -705,7 +839,8 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
       text,
       source: baseSource,
       rawTranscript: settled?.finalText || text,
-      durationSeconds
+      durationSeconds,
+      audioRef: { recordingId: recordingCaptureId, startMs: segmentStartMs, endMs: segmentEndMs }
     });
     await persistSession();
   };
@@ -837,6 +972,7 @@ async function returnToSetup() {
   flushSessionClock();
   await addComposerTurn();
   await persistSession();
+  releaseMicrophone();
   renderSetup();
 }
 
@@ -1011,6 +1147,7 @@ function updateCaptureUi() {
   const active = participantById(recordingSpeakerId || session?.activeSpeakerId);
   ui.captureDock?.classList.toggle('is-recording', recording);
   ui.captureDock?.classList.toggle('is-finalizing', captureFinalizing && !recording);
+  if (ui.micPreviewBtn) { ui.micPreviewBtn.disabled = recording || captureFinalizing; if (recording) { ui.micPreviewBtn.textContent = 'Micro actif'; ui.micPreviewBtn.setAttribute('aria-pressed', 'true'); } }
 
   if (recording) {
     // The active red speaker button already identifies the person. Keep capture chrome stable
@@ -1114,7 +1251,7 @@ function renderQuestion() {
   renderCaptureIntegrityAlert();
 }
 
-function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, followUpId = null, followUpKind = null }) {
+function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', rawTranscript = null, durationSeconds = 0, audioRef = null, followUpId = null, followUpKind = null }) {
   const speaker = participantById(speakerId) || session?.participantHistory?.[speakerId] || null;
   return {
     id: uuid('turn'),
@@ -1126,6 +1263,7 @@ function createTurn({ type = 'answer', speakerId, text, source = 'keyboard', raw
     source,
     rawTranscript: rawTranscript == null ? null : String(rawTranscript),
     durationSeconds: Math.round((durationSeconds || 0) * 10) / 10,
+    audioRef: audioRef ? { recordingId: audioRef.recordingId, startMs: Math.max(0, Math.round(audioRef.startMs || 0)), endMs: Math.max(0, Math.round(audioRef.endMs || 0)) } : null,
     followUpId,
     followUpKind,
     createdAt: nowIso(),
@@ -1147,7 +1285,7 @@ function comparableTranscript(value) {
     .trim();
 }
 
-async function appendAnswerTurn({ questionId, speakerId, text, source, rawTranscript = null, durationSeconds = 0 }) {
+async function appendAnswerTurn({ questionId, speakerId, text, source, rawTranscript = null, durationSeconds = 0, audioRef = null }) {
   const clean = cleanText(text);
   if (!meaningfulTranscript(clean) || !questionId || !speakerId) return false;
   const response = responseFor(questionId);
@@ -1166,6 +1304,7 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
         last.rawTranscript = rawTranscript || clean;
         last.updatedAt = nowIso();
         last.durationSeconds = Math.max(Number(last.durationSeconds) || 0, Number(durationSeconds) || 0);
+        if (audioRef) last.audioRef = audioRef;
         const speaker = participantById(speakerId) || session?.participantHistory?.[speakerId] || null;
         last.speakerNameSnapshot = last.speakerNameSnapshot || speaker?.name || null;
         last.speakerRoleSnapshot = last.speakerRoleSnapshot || speaker?.role || null;
@@ -1182,7 +1321,8 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
     text: clean,
     source,
     rawTranscript,
-    durationSeconds
+    durationSeconds,
+    audioRef
   }));
   resolveCaptureGap(questionId, speakerId);
   response.status = 'answered';
@@ -1315,7 +1455,16 @@ function renderTurns() {
       renderQuestionNav();
       renderInterviewMetrics();
     });
-    head.append(select, type, meta, remove);
+    const replay = document.createElement('button');
+    replay.type = 'button';
+    replay.className = 'ghost small turn-replay-button';
+    replay.textContent = '▶';
+    replay.title = 'Réécouter cette prise de parole';
+    replay.setAttribute('aria-label', replay.title);
+    replay.disabled = !turn.audioRef?.recordingId;
+    replay.addEventListener('click', () => replayTurnAudio(turn));
+    if (turn.type === 'answer') head.append(select, type, meta, replay, remove);
+    else head.append(select, type, meta, remove);
 
     const text = document.createElement('textarea');
     text.className = 'turn-text';
@@ -1405,6 +1554,8 @@ async function goPrevious() {
 }
 
 function finishInterview() {
+  releaseMicrophone();
+  stopReplay();
   setView('done');
   requestAnimationFrame(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -1456,6 +1607,7 @@ function exportPayload() {
           source: turn.source,
           rawTranscript: turn.rawTranscript,
           durationSeconds: turn.durationSeconds || 0,
+          audioRef: turn.audioRef || null,
           followUpId: turn.followUpId,
           followUpKind: turn.followUpKind,
           createdAt: turn.createdAt,
@@ -1489,7 +1641,7 @@ function exportPayload() {
       transcriptionDefault: 'system',
       transcriptionFallback: 'whisper-local',
       speechHandoffCalibration: latestHandoffCalibration,
-      privacy: 'The app does not persist or export audio. System speech recognition may be processed locally or remotely depending on the browser/OS.'
+      privacy: 'Audio replay is stored locally in IndexedDB when captured and is never included in JSON/TXT exports or sent by this app. System speech recognition may be processed locally or remotely depending on the browser/OS.'
     },
     interview: {
       id: interview.id,
@@ -1709,11 +1861,9 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     recordingSpeakerId = speakerId;
     recordingQuestionId = questionId;
     recordingCaptureId = uuid('capture');
+    recordingAudioOffsetMs = 0;
     recordingCompletionPromise = new Promise(resolve => { resolveRecordingCompletion = resolve; });
-    const reusableStream = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
-    if (!reusableStream) {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
-    }
+    await ensureMicrophoneStream();
     const mimeType = preferredMimeType();
     recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
     chunks = [];
@@ -1801,6 +1951,7 @@ async function handleRecordingStopped() {
   try {
     if (!chunks.length) return;
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+    await dbAudioPut({ id: captureId, sessionId: session.id, blob, mimeType: blob.type || 'audio/webm', createdAt: nowIso() });
     const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
     let text = cleanText(systemSnapshot.text);
     let source = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
@@ -1833,7 +1984,8 @@ async function handleRecordingStopped() {
         text,
         source,
         rawTranscript,
-        durationSeconds
+        durationSeconds,
+        audioRef: { recordingId: captureId, startMs: recordingAudioOffsetMs, endMs: recordingAudioOffsetMs + Math.max(0, durationSeconds || 0) * 1000 }
       });
       ui.recordState.textContent = `Propos enregistré · ${participantById(speakerId)?.name || 'locuteur'}`;
       ui.answerText.value = '';
@@ -1863,10 +2015,7 @@ async function handleRecordingStopped() {
     recorder = null;
     captureFinalizing = false;
     const keepMicrophoneOpen = Boolean(nextSpeakerId && participantById(nextSpeakerId));
-    if (!keepMicrophoneOpen) {
-      stream?.getTracks().forEach(track => track.stop());
-      stream = null;
-    }
+    if (!keepMicrophoneOpen) releaseMicrophone();
     try { resolveRecordingCompletion?.(); } catch {}
     resolveRecordingCompletion = null;
     recordingCompletionPromise = null;
@@ -2019,6 +2168,17 @@ ui.interviewFile.addEventListener('change', () => {
 ui.setupAddParticipantBtn.addEventListener('click', addParticipant);
 ui.interviewAddParticipantBtn.addEventListener('click', addParticipant);
 ui.mobileAddParticipantBtn?.addEventListener('click', addParticipant);
+ui.micPreviewBtn?.addEventListener('click', toggleMicrophonePreview);
+ui.deleteAudioBtn?.addEventListener('click', async () => {
+  if (!session || !confirm('Supprimer définitivement les enregistrements audio locaux de cette session ?')) return;
+  stopReplay();
+  await dbAudioDeleteSession(session.id);
+  for (const response of Object.values(session.responses || {})) for (const turn of response.turns || []) turn.audioRef = null;
+  await persistSession();
+  ui.deleteAudioBtn.textContent = 'Audio local supprimé';
+  ui.deleteAudioBtn.disabled = true;
+});
+
 ui.mobileQuestionSelect?.addEventListener('change', event => {
   const index = Number(event.target.value);
   if (Number.isInteger(index)) goToQuestion(index);
