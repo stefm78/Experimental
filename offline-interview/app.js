@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-04.interview-runtime-v38';
+const BUILD_ID = '2026-09-05.interview-runtime-v39';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -62,6 +62,8 @@ let captureHandoffPending = false;
 let latestHandoffCalibration = null;
 let recordingHadCuts = false;
 let lastDeletedTurn = null;
+let completionInProgress = false;
+let pendingInterviewCompletion = false;
 
 function show(el, visible = true) { if (el) el.classList.toggle('hidden', !visible); }
 function showError(el, message = '') { if (!el) return; el.textContent = message; show(el, Boolean(message)); }
@@ -834,19 +836,93 @@ async function returnToSetup() {
   renderSetup();
 }
 
-async function completeInterview() {
-  if (!session) return;
-  const ok = await finishActiveCaptureBeforeLeaving('Un enregistrement est en cours. L’arrêter, conserver sa transcription puis terminer l’entretien ?');
-  if (!ok) return;
-  const gaps = unresolvedCaptureGaps();
-  if (gaps.length && !confirm(`${gaps.length} passage${gaps.length > 1 ? 's' : ''} reste${gaps.length > 1 ? 'nt' : ''} à reprendre après un échec de transcription. Terminer quand même ?`)) return;
-  flushSessionClock();
-  await addComposerTurn();
-  session.completed = true;
-  session.completedAt = nowIso();
-  session.updatedAt = nowIso();
-  await persistSession();
-  finishInterview();
+function setCompletionBusy(busy) {
+  for (const button of [ui.mobileFinishBtn, ui.sidebarFinishBtn]) {
+    if (button) button.disabled = busy;
+  }
+  if (ui.mobileFinishBtn) ui.mobileFinishBtn.textContent = busy ? 'Finalisation…' : 'Terminer';
+  if (ui.sidebarFinishBtn) ui.sidebarFinishBtn.textContent = busy ? 'Finalisation…' : 'Terminer l’entretien';
+}
+
+function resetCompletionState() {
+  pendingInterviewCompletion = false;
+  completionInProgress = false;
+  setCompletionBusy(false);
+}
+
+async function finalizeInterviewCompletion() {
+  if (!session) {
+    resetCompletionState();
+    return false;
+  }
+  try {
+    await semanticBoundaryCommitQueue;
+    const gaps = unresolvedCaptureGaps();
+    if (gaps.length && !confirm(`${gaps.length} passage${gaps.length > 1 ? 's' : ''} reste${gaps.length > 1 ? 'nt' : ''} à reprendre après un échec de transcription. Terminer quand même ?`)) {
+      logRuntimeEvent('completion_cancelled', { stage: 'capture_gaps', gapCount: gaps.length });
+      return false;
+    }
+    flushSessionClock();
+    await addComposerTurn();
+    session.completed = true;
+    session.completedAt = nowIso();
+    session.updatedAt = nowIso();
+    logRuntimeEvent('completion_succeeded', { viewportWidth: Math.round(window.innerWidth || 0) });
+    await persistSession();
+    finishInterview();
+    return true;
+  } catch (error) {
+    diagnosticError = String(error?.message || error);
+    logRuntimeEvent('completion_error', { stage: 'finalize', error: diagnosticError });
+    showError(ui.interviewError, `Impossible de terminer l’entretien : ${diagnosticError}. Réessayez sans quitter la page.`);
+    return false;
+  } finally {
+    resetCompletionState();
+  }
+}
+
+async function completeInterview(event) {
+  if (!session || completionInProgress) return;
+  completionInProgress = true;
+  setCompletionBusy(true);
+  showError(ui.interviewError, '');
+  const source = event?.currentTarget?.id || 'programmatic';
+  logRuntimeEvent('completion_requested', {
+    source,
+    recording: isRecording(),
+    captureFinalizing: Boolean(captureFinalizing),
+    viewportWidth: Math.round(window.innerWidth || 0)
+  });
+
+  if (isRecording()) {
+    if (!confirm('Un enregistrement est en cours. L’arrêter, conserver sa transcription puis terminer l’entretien ?')) {
+      logRuntimeEvent('completion_cancelled', { stage: 'active_capture', source });
+      resetCompletionState();
+      return;
+    }
+    pendingInterviewCompletion = true;
+    queuedSpeakerId = null;
+    queuedRecordingQuestionId = null;
+    ui.recordState.textContent = 'Finalisation de l’entretien…';
+    updateCaptureUi();
+    stopRecording();
+    return;
+  }
+
+  if (captureFinalizing || recordingCompletionPromise) {
+    pendingInterviewCompletion = true;
+    try {
+      if (recordingCompletionPromise) await recordingCompletionPromise;
+    } catch (error) {
+      diagnosticError = String(error?.message || error);
+      logRuntimeEvent('completion_error', { stage: 'capture_wait', error: diagnosticError });
+      showError(ui.interviewError, `Impossible de finaliser la prise de parole : ${diagnosticError}. Réessayez.`);
+      resetCompletionState();
+      return;
+    }
+  }
+
+  await finalizeInterviewCompletion();
 }
 function renderSetup() {
   setView('setup');
@@ -1799,6 +1875,10 @@ async function handleRecordingStopped() {
     ui.timer.textContent = '00:00';
     renderSpeakerButtons();
     renderQuestionNav();
+
+    if (pendingInterviewCompletion && !nextSpeakerId) {
+      queueMicrotask(() => { finalizeInterviewCompletion().catch(() => {}); });
+    }
 
     if (nextSpeakerId && participantById(nextSpeakerId)) {
       await selectSpeaker(nextSpeakerId);

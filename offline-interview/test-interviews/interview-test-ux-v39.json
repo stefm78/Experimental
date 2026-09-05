@@ -1,0 +1,29 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v39-completion-state",
+  "version": "1.0",
+  "title": "Test UX V39 — Terminer réellement à toutes les largeurs",
+  "context": "Le test V38 a prouvé deux défauts distincts : un intervalle de largeur où aucun bouton Terminer n'était disponible, et des clics sur le bouton Terminer de la barre haute qui pouvaient finaliser la prise de parole sans ouvrir l'écran de résultat.",
+  "objective": "Vérifier que Terminer est toujours accessible quand la barre latérale disparaît et que le même clic conduit réellement à Entretien terminé puis à l'export, y compris pendant une prise de parole active.",
+  "language": "fr-FR",
+  "tags": ["ux", "v39", "responsive", "completion", "active-capture", "export"],
+  "estimatedDurationMinutes": 3,
+  "participants": [
+    {"id": "P1", "name": "Interviewer", "role": "interviewer"},
+    {"id": "P2", "name": "Testeur", "role": "interviewee"}
+  ],
+  "sections": [{
+    "id": "S1",
+    "title": "Fin réelle",
+    "questions": [{
+      "id": "Q1",
+      "label": "Terminer en intermédiaire puis étroit",
+      "text": "Vérifiez que Runtime affiche 2026-09-05.interview-runtime-v39. Placez d'abord la fenêtre vers 850 px de large : la barre latérale doit être absente mais Terminer doit rester visible en haut. Lancez une prise de parole, puis cliquez sur Terminer pendant que ON AIR est encore affiché et acceptez la confirmation. Sans redimensionner, vous devez arriver sur « Entretien terminé » et pouvoir atteindre « Exporter pour une IA ». Cliquez ensuite sur « Relire / corriger », réduisez la fenêtre vers 480 px, recommencez une courte prise de parole et cliquez à nouveau sur Terminer pendant ON AIR. Le même écran de résultat et l'export doivent être accessibles. Si une erreur de finalisation apparaît, lisez-la à voix haute.",
+      "intent": "Réattaquer exactement le trou 760–979 px et le défaut de continuation Terminer pendant une capture active observés en V38.",
+      "estimatedMinutes": 3,
+      "required": true,
+      "audience": ["P2"],
+      "followUps": []
+    }]
+  }]
+}
