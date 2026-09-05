@@ -1,0 +1,41 @@
+name: Materialize V41 audio replay and VU meter
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [offline-interview-v41-audio-replay-vumeter]
+    paths:
+      - 'offline-interview/_v41_patch.py'
+      - '.github/workflows/v41-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-audio-replay-vumeter
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Apply V41 patch
+        run: python offline-interview/_v41_patch.py
+      - name: Parse JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/sw.js
+      - name: Existing STT regressions
+        run: node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs && node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
+      - name: Runtime contract
+        run: node offline-interview/test-runtime-contract.mjs
+      - name: Parse V41 JSON
+        run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41.json'))"
+      - name: Commit materialized runtime
+        run: |
+          rm offline-interview/_v41_patch.py .github/workflows/v41-build.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add offline-interview .github/workflows
+          git commit -m 'Materialize V41 local audio replay and real microphone meter'
+          git push origin HEAD:offline-interview-v41-audio-replay-vumeter
