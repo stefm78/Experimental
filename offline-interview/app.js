@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-06.interview-runtime-v41';
+const BUILD_ID = '2026-09-06.interview-runtime-v41.1';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -34,6 +34,7 @@ const ui = {
 let interview = null;
 let session = null;
 let db = null;
+let dbReadyPromise = null;
 let transcriber = null;
 let recorder = null;
 let stream = null;
@@ -216,45 +217,67 @@ function openDb() {
     request.onerror = () => reject(request.error);
   });
 }
-function dbGet(key) {
+function ensureDb() {
+  if (db) return Promise.resolve(db);
+  if (!dbReadyPromise) {
+    dbReadyPromise = openDb().then(connection => {
+      db = connection;
+      db.onversionchange = () => { try { db.close(); } catch {} db = null; dbReadyPromise = null; };
+      return db;
+    }).catch(error => {
+      dbReadyPromise = null;
+      throw error;
+    });
+  }
+  return dbReadyPromise;
+}
+async function dbGet(key) {
+  const connection = await ensureDb();
   return new Promise((resolve, reject) => {
-    const req = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+    const req = connection.transaction('kv', 'readonly').objectStore('kv').get(key);
     req.onsuccess = () => resolve(req.result ?? null);
     req.onerror = () => reject(req.error);
   });
 }
-function dbPut(key, value) {
+async function dbPut(key, value) {
+  const connection = await ensureDb();
   return new Promise((resolve, reject) => {
-    const req = db.transaction('kv', 'readwrite').objectStore('kv').put(value, key);
+    const req = connection.transaction('kv', 'readwrite').objectStore('kv').put(value, key);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
-function dbDelete(key) {
+async function dbDelete(key) {
+  const connection = await ensureDb();
   return new Promise((resolve, reject) => {
-    const req = db.transaction('kv', 'readwrite').objectStore('kv').delete(key);
+    const req = connection.transaction('kv', 'readwrite').objectStore('kv').delete(key);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
-function audioStore(mode = 'readonly') { return db.transaction('audio', mode).objectStore('audio'); }
-function dbAudioPut(value) {
+async function audioStore(mode = 'readonly') {
+  const connection = await ensureDb();
+  return connection.transaction('audio', mode).objectStore('audio');
+}
+async function dbAudioPut(value) {
+  const store = await audioStore('readwrite');
   return new Promise((resolve, reject) => {
-    const req = audioStore('readwrite').put(value);
+    const req = store.put(value);
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
-function dbAudioGet(id) {
+async function dbAudioGet(id) {
+  const store = await audioStore();
   return new Promise((resolve, reject) => {
-    const req = audioStore().get(id);
+    const req = store.get(id);
     req.onsuccess = () => resolve(req.result || null);
     req.onerror = () => reject(req.error);
   });
 }
-function dbAudioDeleteSession(sessionId) {
+async function dbAudioDeleteSession(sessionId) {
+  const store = await audioStore('readwrite');
   return new Promise((resolve, reject) => {
-    const store = audioStore('readwrite');
     const req = store.openCursor();
     req.onsuccess = () => {
       const cursor = req.result;
@@ -2150,7 +2173,7 @@ async function init() {
   updateNetwork();
   window.addEventListener('online', updateNetwork);
   window.addEventListener('offline', updateNetwork);
-  db = await openDb();
+  await ensureDb();
 
   const [savedSpec, savedSession] = await Promise.all([dbGet(SPEC_KEY), dbGet(STATE_KEY)]);
   if (savedSpec) {

@@ -56,6 +56,10 @@ for (const optional of [
 
 // V41: audio is retained locally as complete recording blobs; turns hold only time references.
 assert.match(app, /createObjectStore\('audio', \{ keyPath: 'id' \}\)/);
+assert.match(app, /let dbReadyPromise = null/);
+assert.match(app, /function ensureDb\(\)/);
+assert.match(app, /const connection = await ensureDb\(\)/);
+assert.doesNotMatch(app, /db\.transaction\(/);
 assert.match(app, /masterAudioChunks = \[\]/);
 assert.match(app, /masterAudioChunks\.push\(event\.data\)/);
 assert.match(app, /blob: masterBlob/);
@@ -79,7 +83,7 @@ assert.ok(coreBytes <= 196_000, `core source budget exceeded: ${coreBytes} bytes
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41',
+  contract: 'offline-interview.runtime-contract.v41.1',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes

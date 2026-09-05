@@ -1,4 +1,4 @@
-const VERSION = 'offline-interview-v41';
+const VERSION = 'offline-interview-v41.1';
 const SHELL_CACHE = `${VERSION}-shell`;
 const SHELL = [
   './', './index.html', './styles.css?v=41', './app.js?v=41', './system-stt.js',
