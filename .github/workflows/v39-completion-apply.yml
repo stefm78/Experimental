@@ -1,0 +1,49 @@
+name: Apply Offline Interview V39 completion state
+
+on:
+  push:
+    branches: [offline-interview-v39-completion-state]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: offline-interview-v39-completion-state
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply V39 patch
+        run: python offline-interview/v39-completion-apply.py
+      - name: Parse JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/sw.js && node --check offline-interview/test-completion-path-v39.mjs
+      - name: Preserve STT regressions
+        run: |
+          node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs
+          node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
+      - name: Verify completion regression
+        run: node offline-interview/test-completion-path-v39.mjs
+      - name: Verify V39 invariants
+        run: |
+          grep -q "2026-09-05.interview-runtime-v39" offline-interview/app.js
+          grep -q "pendingInterviewCompletion && !nextSpeakerId" offline-interview/app.js
+          grep -q "completion_error" offline-interview/app.js
+          grep -q '@media(max-width:979px){.mobile-finish-button{display:inline-flex' offline-interview/styles.css
+          grep -q 'offline-interview-v39' offline-interview/sw.js
+          grep -q 'Completion path regression' .github/workflows/pages.yml
+      - name: Commit V39 runtime
+        run: |
+          git config user.name "Stef"
+          git config user.email "104558808+stefm78@users.noreply.github.com"
+          git add offline-interview/app.js offline-interview/index.html offline-interview/styles.css offline-interview/sw.js offline-interview/test-completion-path-v39.mjs offline-interview/test-interviews/interview-test-ux-v39.json .github/workflows/pages.yml
+          if git diff --cached --quiet; then
+            echo "No runtime changes to commit"
+          else
+            git commit -m "Fix V39 completion across responsive widths"
+            git push origin HEAD:offline-interview-v39-completion-state
+          fi
