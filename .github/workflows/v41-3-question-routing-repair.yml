@@ -28,7 +28,7 @@ jobs:
           p.write_text(s.replace(old,new,1))
           p=Path('offline-interview/index.html'); s=p.read_text().replace('styles.css?v=41.2','styles.css?v=41.3').replace('app.js?v=41.2','app.js?v=41.3'); p.write_text(s)
           p=Path('offline-interview/sw.js'); s=p.read_text().replace('offline-interview-v41.2','offline-interview-v41.3').replace("'./styles.css?v=41'","'./styles.css?v=41.3'").replace("'./app.js?v=41'","'./app.js?v=41.3'"); p.write_text(s)
-          p=Path('offline-interview/test-runtime-contract.mjs'); s=p.read_text().replace('runtime-contract.v41.2','runtime-contract.v41.3')
+          p=Path('offline-interview/test-runtime-contract.mjs'); s=p.read_text().replace('interview-runtime-v41\\.2','interview-runtime-v41\\.3').replace('runtime-contract.v41.2','runtime-contract.v41.3')
           anchor="assert.match(app, /replayTurnAudio\\(turn\\)/);"
           checks="""assert.match(app, /const targetQuestionId = all\\[index\\]\\?\\.question\\?\\.id \\|\\| null;/);\nassert.match(app, /if \\(isRecording\\(\\) && targetQuestionId && recordingQuestionId !== targetQuestionId\\)/);\nassert.match(app, /await moveRecordingToViewedQuestion\\(\\);/);"""
           if anchor not in s: raise SystemExit('contract anchor missing')
