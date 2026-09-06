@@ -19,6 +19,7 @@ jobs:
       - run: python .github/v41_6_stabilize.py
       - run: python .github/v41_6_contract_fix.py
       - run: python .github/v41_6_contract_fix2.py
+      - run: python .github/v41_6_contract_fix3.py
       - name: Validate V41.6
         run: |
           node --check offline-interview/app.js
@@ -29,7 +30,7 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41-6.json','utf8'))"
       - name: Commit stabilization candidate
         run: |
-          rm .github/workflows/v41-6-field-stabilization.yml .github/v41_6_stabilize.py .github/v41_6_contract_fix.py .github/v41_6_contract_fix2.py
+          rm .github/workflows/v41-6-field-stabilization.yml .github/v41_6_stabilize.py .github/v41_6_contract_fix.py .github/v41_6_contract_fix2.py .github/v41_6_contract_fix3.py
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
