@@ -26,9 +26,9 @@ jobs:
           new='''  await persistSession();\n  renderQuestion();\n\n  // Question navigation owns capture routing too. If capture is live, switching\n  // question creates the semantic/audio boundary immediately on the new question.\n  const targetQuestionId = all[index]?.question?.id || null;\n  if (isRecording() && targetQuestionId && recordingQuestionId !== targetQuestionId) {\n    await moveRecordingToViewedQuestion();\n  }\n}\n\nasync function finishActiveCaptureBeforeLeaving'''
           if old not in s: raise SystemExit('goToQuestion anchor not found')
           p.write_text(s.replace(old,new,1))
-          p=Path('offline-interview/index.html'); s=p.read_text().replace('styles.css?v=41.2','styles.css?v=41.3').replace('app.js?v=41.2','app.js?v=41.3'); p.write_text(s)
-          p=Path('offline-interview/sw.js'); s=p.read_text().replace('offline-interview-v41.2','offline-interview-v41.3').replace("'./styles.css?v=41'","'./styles.css?v=41.3'").replace("'./app.js?v=41'","'./app.js?v=41.3'"); p.write_text(s)
-          p=Path('offline-interview/test-runtime-contract.mjs'); s=p.read_text().replace('interview-runtime-v41\\.2','interview-runtime-v41\\.3').replace('runtime-contract.v41.2','runtime-contract.v41.3')
+          for name in ['offline-interview/index.html','offline-interview/sw.js']:
+            p=Path(name); s=p.read_text().replace('v41.2','v41.3').replace('v=41.2','v=41.3'); p.write_text(s)
+          p=Path('offline-interview/test-runtime-contract.mjs'); s=p.read_text().replace('v41\\.2','v41\\.3').replace('v=41\\.2','v=41\\.3').replace('runtime-contract.v41.2','runtime-contract.v41.3')
           anchor="assert.match(app, /replayTurnAudio\\(turn\\)/);"
           checks="""assert.match(app, /const targetQuestionId = all\\[index\\]\\?\\.question\\?\\.id \\|\\| null;/);\nassert.match(app, /if \\(isRecording\\(\\) && targetQuestionId && recordingQuestionId !== targetQuestionId\\)/);\nassert.match(app, /await moveRecordingToViewedQuestion\\(\\);/);"""
           if anchor not in s: raise SystemExit('contract anchor missing')
