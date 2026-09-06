@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-06.interview-runtime-v41.2';
+const BUILD_ID = '2026-09-06.interview-runtime-v41.3';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -1001,6 +1001,13 @@ async function goToQuestion(index) {
   sessionClockLastMs = Date.now();
   await persistSession();
   renderQuestion();
+
+  // Question navigation owns capture routing too. If capture is live, switching
+  // question creates the semantic/audio boundary immediately on the new question.
+  const targetQuestionId = all[index]?.question?.id || null;
+  if (isRecording() && targetQuestionId && recordingQuestionId !== targetQuestionId) {
+    await moveRecordingToViewedQuestion();
+  }
 }
 
 async function finishActiveCaptureBeforeLeaving(message) {

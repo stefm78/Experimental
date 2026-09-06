@@ -13,7 +13,7 @@ const systemStt = read('system-stt.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.2/);
+assert.match(app, /interview-runtime-v41\.3/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -37,9 +37,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.2/);
-assert.match(index, /styles\.css\?v=41\.2/);
-assert.match(index, /app\.js\?v=41\.2/);
+assert.match(sw, /offline-interview-v41\.3/);
+assert.match(index, /styles\.css\?v=41\.3/);
+assert.match(index, /app\.js\?v=41\.3/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
@@ -66,6 +66,9 @@ assert.match(app, /blob: masterBlob/);
 assert.match(app, /const recordingId = recordingCaptureId/);
 assert.match(app, /audioRef: \{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \}/);
 assert.match(app, /replayTurnAudio\(turn\)/);
+assert.match(app, /const targetQuestionId = all\[index\]\?\.question\?\.id \|\| null;/);
+assert.match(app, /if \(isRecording\(\) && targetQuestionId && recordingQuestionId !== targetQuestionId\)/);
+assert.match(app, /await moveRecordingToViewedQuestion\(\);/);
 assert.match(app, /AudioContext \|\| window\.webkitAudioContext/);
 assert.match(app, /getFloatTimeDomainData/);
 assert.match(app, /Math\.sqrt\(sum \/ samples\.length\)/);
@@ -93,7 +96,7 @@ assert.ok(coreBytes <= 200_000, `core source budget exceeded: ${coreBytes} bytes
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41.2',
+  contract: 'offline-interview.runtime-contract.v41.3',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes

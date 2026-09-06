@@ -1,0 +1,66 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v41-3-question-routing",
+  "version": "1.0",
+  "title": "Test V41.3 — navigation et captation",
+  "context": "Vérifier que changer de question déplace aussi la captation active.",
+  "objective": "Confirmer que menu, question affichée et question de captation restent synchronisés.",
+  "language": "fr-FR",
+  "estimatedDurationMinutes": 3,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Navigation",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Question 1",
+          "text": "Commencez à parler, puis sans arrêter la prise cliquez sur Question 2 dans le menu.",
+          "intent": "Tester Q1 vers Q2 pendant la capture.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Question 2",
+          "text": "La captation doit maintenant appartenir à cette question. Continuez à parler puis cliquez sur Question 3.",
+          "intent": "Tester une deuxième navigation.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Question 3",
+          "text": "Vérifiez que la captation est bien sur cette question puis terminez la prise.",
+          "intent": "Confirmer le routage final.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}
