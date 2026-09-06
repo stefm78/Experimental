@@ -1,0 +1,35 @@
+name: Repair V41.6 field stabilization
+on:
+  push:
+    branches: [offline-interview-v41-6-field-stabilization]
+    paths:
+      - '.github/workflows/v41-6-field-stabilization.yml'
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-6-field-stabilization
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - run: python .github/v41_6_stabilize.py
+      - name: Validate V41.6
+        run: |
+          node --check offline-interview/app.js
+          node --check offline-interview/system-stt.js
+          node offline-interview/test-system-stt-boundary.mjs
+          node offline-interview/test-system-stt-hard-cut.mjs
+          node offline-interview/test-runtime-contract.mjs
+          node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41-6.json','utf8'))"
+      - name: Commit stabilization candidate
+        run: |
+          rm .github/workflows/v41-6-field-stabilization.yml .github/v41_6_stabilize.py
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'Build V41.6 field stabilization candidate'
+          git push origin HEAD:offline-interview-v41-6-field-stabilization
