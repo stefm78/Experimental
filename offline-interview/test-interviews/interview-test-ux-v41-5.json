@@ -1,0 +1,66 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v41-5-system-retranscription",
+  "version": "1.0",
+  "title": "Test V41.5 — transcription système et reprise audio",
+  "context": "Vérifier que Whisper ne remplace plus automatiquement une transcription système manquante et que l’audio reste exploitable.",
+  "objective": "Tester la transcription Windows, la conservation audio et la retranscription système depuis un replay.",
+  "language": "fr-FR",
+  "estimatedDurationMinutes": 5,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Transcription système",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Windows",
+          "text": "Sur Windows avec Chrome ou Edge récent, dites une phrase normale pendant environ dix secondes. Vérifiez que le texte vient du système comme avant et qu’aucun secours Whisper ne démarre tout seul.",
+          "intent": "Ne pas régresser le bon fonctionnement Windows.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Après la fin",
+          "text": "Terminez l’entretien, puis choisissez Relire / corriger. Sur une prise avec audio, cliquez sur ▶ pour l’écouter, puis sur ↻ Système. Le texte doit être recalculé depuis cet audio et rester modifiable.",
+          "intent": "Tester la retranscription directe depuis le replay.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Téléphone",
+          "text": "Sur téléphone, faites une petite prise. Si le système ne donne pas de texte, vérifiez qu’aucun Whisper automatique ne se lance et que la prise audio reste visible et réécoutable. Le bouton ↻ Système peut être indisponible sur mobile : son message doit l’expliquer clairement.",
+          "intent": "Vérifier le comportement sûr lorsque le navigateur mobile ne sait pas retranscrire un fichier audio avec le système.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}
