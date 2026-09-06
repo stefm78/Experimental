@@ -1,0 +1,53 @@
+name: Repair V41.3 question routing
+on:
+  push:
+    branches: [offline-interview-v41-3-question-routing]
+    paths: ['.github/workflows/v41-3-question-routing-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-3-question-routing
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Apply V41.3 repair
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          p=Path('offline-interview/app.js'); s=p.read_text()
+          s=s.replace('2026-09-06.interview-runtime-v41.2','2026-09-06.interview-runtime-v41.3')
+          old='''  await persistSession();\n  renderQuestion();\n}\n\nasync function finishActiveCaptureBeforeLeaving'''
+          new='''  await persistSession();\n  renderQuestion();\n\n  // Question navigation owns capture routing too. If capture is live, switching\n  // question creates the semantic/audio boundary immediately on the new question.\n  const targetQuestionId = all[index]?.question?.id || null;\n  if (isRecording() && targetQuestionId && recordingQuestionId !== targetQuestionId) {\n    await moveRecordingToViewedQuestion();\n  }\n}\n\nasync function finishActiveCaptureBeforeLeaving'''
+          if old not in s: raise SystemExit('goToQuestion anchor not found')
+          p.write_text(s.replace(old,new,1))
+          p=Path('offline-interview/index.html'); s=p.read_text().replace('styles.css?v=41.2','styles.css?v=41.3').replace('app.js?v=41.2','app.js?v=41.3'); p.write_text(s)
+          p=Path('offline-interview/sw.js'); s=p.read_text().replace('offline-interview-v41.2','offline-interview-v41.3').replace("'./styles.css?v=41'","'./styles.css?v=41.3'").replace("'./app.js?v=41'","'./app.js?v=41.3'"); p.write_text(s)
+          p=Path('offline-interview/test-runtime-contract.mjs'); s=p.read_text().replace('runtime-contract.v41.2','runtime-contract.v41.3')
+          anchor="assert.match(app, /replayTurnAudio\\(turn\\)/);"
+          checks="""assert.match(app, /const targetQuestionId = all\\[index\\]\\?\\.question\\?\\.id \\|\\| null;/);\nassert.match(app, /if \\(isRecording\\(\\) && targetQuestionId && recordingQuestionId !== targetQuestionId\\)/);\nassert.match(app, /await moveRecordingToViewedQuestion\\(\\);/);"""
+          if anchor not in s: raise SystemExit('contract anchor missing')
+          p.write_text(s.replace(anchor,anchor+'\n'+checks,1))
+          field={'schema':'offline-interview.interview-spec.v1','id':'test-ux-v41-3-question-routing','version':'1.0','title':'Test V41.3 — navigation et captation','context':'Vérifier que changer de question déplace aussi la captation active.','objective':'Confirmer que menu, question affichée et question de captation restent synchronisés.','language':'fr-FR','estimatedDurationMinutes':3,'participants':[{'id':'P1','name':'Interviewer','role':'interviewer'},{'id':'P2','name':'Testeur','role':'interviewee'}],'sections':[{'id':'S1','title':'Navigation','questions':[{'id':'Q1','label':'Question 1','text':'Commencez à parler, puis sans arrêter la prise cliquez sur Question 2 dans le menu.','intent':'Tester Q1 vers Q2 pendant la capture.','estimatedMinutes':1,'required':True,'audience':['P2'],'followUps':[]},{'id':'Q2','label':'Question 2','text':'La captation doit maintenant appartenir à cette question. Continuez à parler puis cliquez sur Question 3.','intent':'Tester une deuxième navigation.','estimatedMinutes':1,'required':True,'audience':['P2'],'followUps':[]},{'id':'Q3','label':'Question 3','text':'Vérifiez que la captation est bien sur cette question puis terminez la prise.','intent':'Confirmer le routage final.','estimatedMinutes':1,'required':True,'audience':['P2'],'followUps':[]}]}]}
+          Path('offline-interview/test-interviews/interview-test-ux-v41-3.json').write_text(json.dumps(field,ensure_ascii=False,indent=2)+'\n')
+          PY
+      - name: Validate
+        run: |
+          node --check offline-interview/app.js
+          node offline-interview/test-system-stt-boundary.mjs
+          node offline-interview/test-system-stt-hard-cut.mjs
+          node offline-interview/test-runtime-contract.mjs
+          node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41-3.json','utf8'))"
+      - name: Commit repair
+        run: |
+          rm .github/workflows/v41-3-question-routing-repair.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'Repair V41.3 question navigation capture routing'
+          git push origin HEAD:offline-interview-v41-3-question-routing
