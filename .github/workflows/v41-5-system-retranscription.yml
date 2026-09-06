@@ -18,7 +18,7 @@ jobs:
           node-version: '22'
       - run: python .github/v41_5_patch.py
       - run: python .github/v41_5_budget_patch.py
-      - name: Validate
+      - name: Validate V41.5
         run: |
           node --check offline-interview/app.js
           node --check offline-interview/system-stt.js
