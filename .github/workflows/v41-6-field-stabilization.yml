@@ -18,6 +18,7 @@ jobs:
           node-version: '22'
       - run: python .github/v41_6_stabilize.py
       - run: python .github/v41_6_contract_fix.py
+      - run: python .github/v41_6_contract_fix2.py
       - name: Validate V41.6
         run: |
           node --check offline-interview/app.js
@@ -28,10 +29,9 @@ jobs:
           node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41-6.json','utf8'))"
       - name: Commit stabilization candidate
         run: |
-          rm .github/workflows/v41-6-field-stabilization.yml .github/v41_6_stabilize.py .github/v41_6_contract_fix.py
+          rm .github/workflows/v41-6-field-stabilization.yml .github/v41_6_stabilize.py .github/v41_6_contract_fix.py .github/v41_6_contract_fix2.py
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
           git commit -m 'Build V41.6 field stabilization candidate'
           git push origin HEAD:offline-interview-v41-6-field-stabilization
-# qualification trigger 3
