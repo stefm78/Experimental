@@ -1,0 +1,145 @@
+name: Repair V41.4 interaction fail-open
+on:
+  push:
+    branches: [offline-interview-v41-4-interaction-repair]
+    paths: ['.github/workflows/v41-4-interaction-repair.yml']
+permissions:
+  contents: write
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-4-interaction-repair
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Apply V41.4 repair
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+
+          p = Path('offline-interview/app.js')
+          s = p.read_text()
+          s = s.replace('2026-09-06.interview-runtime-v41.3', '2026-09-06.interview-runtime-v41.4', 1)
+
+          anchor = "let activeReplayUrl = null;\n"
+          insert = """let activeReplayUrl = null;\nlet failedAudioCaptureIds = new Set();\n\nfunction boundedWait(promise, timeoutMs, label) {\n  let timer = null;\n  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} : délai dépassé`)), timeoutMs); });\n  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));\n}\nfunction recordRuntimeWarning(type, error) {\n  diagnosticError = `${type}: ${error?.message || error}`;\n  if (!session) return;\n  if (!Array.isArray(session.runtimeEvents)) session.runtimeEvents = [];\n  session.runtimeEvents.push({ at: nowIso(), type, error: String(error?.message || error) });\n  if (session.runtimeEvents.length > 100) session.runtimeEvents = session.runtimeEvents.slice(-100);\n}\nfunction persistSessionLater(stage = 'session') {\n  if (!session) return;\n  const snapshot = clone(session);\n  boundedWait(dbPut(STATE_KEY, snapshot), 2500, stage).catch(error => recordRuntimeWarning('storage_warning', error));\n}\nfunction clearAudioRefs(recordingId) {\n  if (!session || !recordingId) return;\n  for (const response of Object.values(session.responses || {})) {\n    for (const turn of response.turns || []) if (turn.audioRef?.recordingId === recordingId) turn.audioRef = null;\n  }\n}\n"""
+          if anchor not in s: raise SystemExit('state anchor missing')
+          s = s.replace(anchor, insert, 1)
+
+          old = """async function selectSpeaker(participantId) {\n  if (!session || !participantById(participantId)) return;\n  session.activeSpeakerId = participantId;\n  session.updatedAt = nowIso();\n  await persistSession();\n  renderSpeakerButtons();\n  updateComposerSpeaker();\n}\n"""
+          new = """async function selectSpeaker(participantId) {\n  if (!session || !participantById(participantId)) return;\n  session.activeSpeakerId = participantId;\n  session.updatedAt = nowIso();\n  renderSpeakerButtons();\n  updateComposerSpeaker();\n  persistSessionLater('speaker-selection');\n}\n"""
+          if old not in s: raise SystemExit('selectSpeaker anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = """async function goToQuestion(index) {\n  const all = flattenedQuestions();\n  if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;\n  flushSessionClock();\n\n  if (!isRecording() && !captureFinalizing) {\n    await addComposerTurn();\n  }\n\n  session.currentIndex = index;\n  session.completed = false;\n  session.completedAt = null;\n  session.updatedAt = nowIso();\n  sessionClockLastMs = Date.now();\n  await persistSession();\n  renderQuestion();\n\n  // Question navigation owns capture routing too. If capture is live, switching\n  // question creates the semantic/audio boundary immediately on the new question.\n  const targetQuestionId = all[index]?.question?.id || null;\n  if (isRecording() && targetQuestionId && recordingQuestionId !== targetQuestionId) {\n    await moveRecordingToViewedQuestion();\n  }\n}\n"""
+          new = """async function goToQuestion(index) {\n  const all = flattenedQuestions();\n  if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;\n  flushSessionClock();\n\n  if (!isRecording() && !captureFinalizing && cleanText(ui.answerText.value)) {\n    addComposerTurn().catch(error => recordRuntimeWarning('composer_autosave_warning', error));\n  }\n\n  session.currentIndex = index;\n  session.completed = false;\n  session.completedAt = null;\n  session.updatedAt = nowIso();\n  sessionClockLastMs = Date.now();\n  renderQuestion();\n\n  // Navigation is an immediate UI transition. Capture routing and persistence\n  // follow it, but neither is allowed to freeze question navigation.\n  const targetQuestionId = all[index]?.question?.id || null;\n  if (isRecording() && targetQuestionId && recordingQuestionId !== targetQuestionId) {\n    moveRecordingToViewedQuestion().catch(error => recordRuntimeWarning('question_capture_transfer_warning', error));\n  }\n  persistSessionLater('question-navigation');\n}\n"""
+          if old not in s: raise SystemExit('goToQuestion anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = """    await semanticBoundaryCommitQueue;\n    const gaps = unresolvedCaptureGaps();\n"""
+          new = """    try { await boundedWait(semanticBoundaryCommitQueue, 3000, 'frontière de transcription'); }\n    catch (error) { recordRuntimeWarning('semantic_boundary_timeout', error); }\n    const gaps = unresolvedCaptureGaps();\n"""
+          if old not in s: raise SystemExit('finalize semantic anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = """    logRuntimeEvent('completion_succeeded', { viewportWidth: Math.round(window.innerWidth || 0) });\n    await persistSession();\n    finishInterview();\n    return true;\n"""
+          new = """    logRuntimeEvent('completion_succeeded', { viewportWidth: Math.round(window.innerWidth || 0) });\n    finishInterview();\n    persistSessionLater('completion');\n    return true;\n"""
+          if old not in s: raise SystemExit('completion persist anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = """  if (captureFinalizing || recordingCompletionPromise) {\n    try {\n      if (recordingCompletionPromise) await recordingCompletionPromise;\n    } catch (error) {\n      diagnosticError = String(error?.message || error);\n      logRuntimeEvent('completion_error', { stage: 'capture_wait', error: diagnosticError });\n      showError(ui.interviewError, `Impossible de finaliser la prise de parole : ${diagnosticError}. Réessayez.`);\n      resetCompletionState();\n      return;\n    }\n  }\n\n  await finalizeInterviewCompletion();\n"""
+          new = """  if (captureFinalizing || recordingCompletionPromise) {\n    // The capture finalizer owns the continuation. Do not await a storage/STT path\n    // from the click handler: it will call finalizeInterviewCompletion() once ready.\n    pendingInterviewCompletion = true;\n    ui.recordState.textContent = 'Finalisation de l’entretien…';\n    updateCaptureUi();\n    return;\n  }\n\n  await finalizeInterviewCompletion();\n"""
+          if old not in s: raise SystemExit('completion wait anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = """    await dbAudioPut({ id: captureId, sessionId: session.id, blob: masterBlob, mimeType: masterBlob.type || 'audio/webm', createdAt: nowIso() });\n    const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };\n"""
+          new = """    let audioStored = false;\n    try {\n      await boundedWait(dbAudioPut({ id: captureId, sessionId: session.id, blob: masterBlob, mimeType: masterBlob.type || 'audio/webm', createdAt: nowIso() }), 5000, 'stockage audio');\n      audioStored = true;\n    } catch (error) {\n      failedAudioCaptureIds.add(captureId);\n      clearAudioRefs(captureId);\n      recordRuntimeWarning('audio_storage_warning', error);\n    }\n    const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };\n"""
+          if old not in s: raise SystemExit('audio put anchor missing')
+          s = s.replace(old, new, 1)
+
+          # Boundary turns only expose replay refs when the master recording remains persistable.
+          old = """      audioRef: { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }\n"""
+          new = """      audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }\n"""
+          if old not in s: raise SystemExit('boundary audioRef anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = """    await semanticBoundaryCommitQueue;\n\n    if (text) {\n"""
+          new = """    try { await boundedWait(semanticBoundaryCommitQueue, 3000, 'frontière de transcription'); }\n    catch (error) { recordRuntimeWarning('semantic_boundary_timeout', error); }\n    if (!audioStored) clearAudioRefs(captureId);\n\n    if (text) {\n"""
+          if old not in s: raise SystemExit('recording semantic anchor missing')
+          s = s.replace(old, new, 1)
+
+          old = """        audioRef: { recordingId: captureId, startMs: recordingAudioOffsetMs, endMs: recordingAudioOffsetMs + Math.max(0, durationSeconds || 0) * 1000 }\n"""
+          new = """        audioRef: audioStored ? { recordingId: captureId, startMs: recordingAudioOffsetMs, endMs: recordingAudioOffsetMs + Math.max(0, durationSeconds || 0) * 1000 } : null\n"""
+          if old not in s: raise SystemExit('final audioRef anchor missing')
+          s = s.replace(old, new, 1)
+
+          p.write_text(s)
+
+          p = Path('offline-interview/index.html')
+          s = p.read_text().replace('styles.css?v=41.3', 'styles.css?v=41.4').replace('app.js?v=41.3', 'app.js?v=41.4')
+          p.write_text(s)
+
+          p = Path('offline-interview/sw.js')
+          s = p.read_text().replace('offline-interview-v41.3', 'offline-interview-v41.4').replace('styles.css?v=41.3', 'styles.css?v=41.4').replace('app.js?v=41.3', 'app.js?v=41.4')
+          p.write_text(s)
+
+          p = Path('offline-interview/test-runtime-contract.mjs')
+          s = p.read_text()
+          s = s.replace('interview-runtime-v41\\.3', 'interview-runtime-v41\\.4')
+          s = s.replace('offline-interview-v41\\.3', 'offline-interview-v41\\.4')
+          s = s.replace('styles\\.css\\?v=41\\.3', 'styles\\.css\\?v=41\\.4')
+          s = s.replace('app\\.js\\?v=41\\.3', 'app\\.js\\?v=41\\.4')
+          s = s.replace("assert.doesNotMatch(app, /if \\(captureFinalizing \\|\\| recordingCompletionPromise\\) \\{\\s+pendingInterviewCompletion = true;/);", "assert.match(app, /if \\(captureFinalizing \\|\\| recordingCompletionPromise\\) \\{[\\s\\S]*pendingInterviewCompletion = true;[\\s\\S]*return;/);")
+          s = s.replace("assert.match(app, /await moveRecordingToViewedQuestion\\(\\);/);", "assert.match(app, /moveRecordingToViewedQuestion\\(\\)\\.catch/);")
+          s = s.replace("assert.match(app, /session = newSession\\(\\);\\s+renderQuestion\\(\\);\\s+try \\{ await persistSession\\(\\); \\}/);", "assert.match(app, /session = newSession\\(\\);\\s+renderQuestion\\(\\);\\s+try \\{ await persistSession\\(\\); \\}/);")
+          marker = "// Explicit anti-growth budgets. Raising one requires a conscious code-review decision."
+          checks = r'''// V41.4: interaction state is fail-open with respect to local persistence/finalizers.
+const navBody = app.match(/async function goToQuestion\(index\) \{[\s\S]*?\n\}/)?.[0] || '';
+assert.ok(navBody.indexOf('renderQuestion();') >= 0 && navBody.indexOf('renderQuestion();') < navBody.indexOf("persistSessionLater('question-navigation')"), 'question UI must render before persistence');
+assert.doesNotMatch(navBody, /await persistSession\(\)/);
+assert.match(navBody, /moveRecordingToViewedQuestion\(\)\.catch/);
+const selectBody = app.match(/async function selectSpeaker\(participantId\) \{[\s\S]*?\n\}/)?.[0] || '';
+assert.ok(selectBody.indexOf('renderSpeakerButtons();') >= 0 && selectBody.indexOf('renderSpeakerButtons();') < selectBody.indexOf("persistSessionLater('speaker-selection')"), 'speaker control must update before persistence');
+assert.doesNotMatch(selectBody, /await persistSession\(\)/);
+assert.match(app, /boundedWait\(dbAudioPut\([\s\S]*5000, 'stockage audio'\)/);
+assert.match(app, /finishInterview\(\);\s+persistSessionLater\('completion'\)/);
+assert.match(app, /failedAudioCaptureIds\.has\(recordingId\) \? null/);
+
+'''
+          if marker not in s: raise SystemExit('contract marker missing')
+          s = s.replace(marker, checks + marker, 1)
+          s = s.replace("contract: 'offline-interview.runtime-contract.v41.3'", "contract: 'offline-interview.runtime-contract.v41.4'")
+          p.write_text(s)
+
+          field = {
+            'schema':'offline-interview.interview-spec.v1','id':'test-ux-v41-4-interaction-fail-open','version':'1.0',
+            'title':'Test V41.4 — navigation, locuteurs et fin','context':'Vérifier les trois interactions qui étaient bloquées.',
+            'objective':'Confirmer que la navigation, les boutons de locuteur et Terminer répondent immédiatement.',
+            'language':'fr-FR','estimatedDurationMinutes':4,
+            'participants':[{'id':'P1','name':'Interviewer','role':'interviewer'},{'id':'P2','name':'Testeur','role':'interviewee'}],
+            'sections':[{'id':'S1','title':'Interactions','questions':[
+              {'id':'Q1','label':'Question 1','text':'Sans enregistrer, cliquez sur Question 2 puis revenez ici. Le texte affiché doit changer à chaque clic.','intent':'Tester la navigation simple.','estimatedMinutes':1,'required':True,'audience':['P2'],'followUps':[]},
+              {'id':'Q2','label':'Question 2','text':'Cliquez sur Testeur pour démarrer le micro, arrêtez, puis cliquez sur Interviewer et arrêtez. Les deux boutons doivent pouvoir lancer une prise.','intent':'Tester les deux locuteurs.','estimatedMinutes':2,'required':True,'audience':['P2'],'followUps':[]},
+              {'id':'Q3','label':'Question 3','text':'Cliquez sur Terminer dans le menu de gauche. L’écran de résultat doit apparaître sans rester bloqué dans l’entretien.','intent':'Tester la terminaison par la barre latérale.','estimatedMinutes':1,'required':True,'audience':['P2'],'followUps':[]}
+            ]}]
+          }
+          Path('offline-interview/test-interviews/interview-test-ux-v41-4.json').write_text(json.dumps(field, ensure_ascii=False, indent=2)+'\n')
+          PY
+      - name: Validate
+        run: |
+          node --check offline-interview/app.js
+          node offline-interview/test-system-stt-boundary.mjs
+          node offline-interview/test-system-stt-hard-cut.mjs
+          node offline-interview/test-runtime-contract.mjs
+          node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41-4.json','utf8'))"
+      - name: Commit repair
+        run: |
+          rm .github/workflows/v41-4-interaction-repair.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'Repair V41.4 interaction state from storage blocking'
+          git push origin HEAD:offline-interview-v41-4-interaction-repair
