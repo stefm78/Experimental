@@ -464,3 +464,61 @@ export function createSystemSpeechSession({
     }
   };
 }
+
+
+// V41.5 — direct post-hoc recognition from a saved audio MediaStreamTrack.
+// Chromium exposes SpeechRecognition.start(audioTrack) on desktop from 135 onward.
+// Mobile engines do not currently expose this path, so capability is deliberately conservative.
+export function supportsSystemAudioTrackRecognition() {
+  const ua = navigator.userAgent || '';
+  const mobile = navigator.userAgentData?.mobile === true || /Android|iPhone|iPad|iPod/i.test(ua);
+  const version = ua.match(/(?:Chrome|Chromium|Edg)\/(\d+)/);
+  return Boolean(SpeechRecognitionCtor && !mobile && version && Number(version[1]) >= 135);
+}
+
+export function transcribeSystemAudioTrack(audioTrack, {
+  lang = 'fr-FR', mode = 'standard', durationMs = 0, onStart = () => {}
+} = {}) {
+  return new Promise((resolve, reject) => {
+    if (!SpeechRecognitionCtor) { reject(new Error('SpeechRecognition indisponible')); return; }
+    if (!audioTrack || audioTrack.kind !== 'audio' || audioTrack.readyState !== 'live') { reject(new Error('Piste audio invalide')); return; }
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = lang;
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+    if ('processLocally' in recognition) recognition.processLocally = mode === 'local';
+    const results = new Map();
+    let settled = false;
+    let stopTimer = null;
+    let hardTimer = null;
+    const text = () => [...results.keys()].sort((a, b) => a - b).map(i => results.get(i)).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    const finish = error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(stopTimer); clearTimeout(hardTimer);
+      try { recognition.abort(); } catch {}
+      if (error) reject(error); else resolve({ text: text(), finalText: text(), mode });
+    };
+    recognition.onresult = event => {
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const value = String(event.results[i]?.[0]?.transcript || '').trim();
+        if (value) results.set(i, value);
+      }
+    };
+    recognition.onerror = event => {
+      const code = event?.error || 'speech-recognition-error';
+      if (code === 'no-speech') return;
+      finish(new Error(code));
+    };
+    recognition.onend = () => finish();
+    recognition.onstart = () => {
+      try { onStart(); }
+      catch (error) { finish(error instanceof Error ? error : new Error(String(error))); return; }
+      stopTimer = setTimeout(() => { try { recognition.stop(); } catch { finish(); } }, Math.max(800, Number(durationMs) || 0) + 700);
+    };
+    hardTimer = setTimeout(() => finish(new Error('Délai de retranscription système dépassé')), Math.max(8000, (Number(durationMs) || 0) + 8000));
+    try { recognition.start(audioTrack); }
+    catch (error) { finish(error instanceof Error ? error : new Error(String(error))); }
+  });
+}

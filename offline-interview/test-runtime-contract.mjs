@@ -13,7 +13,7 @@ const systemStt = read('system-stt.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.4/);
+assert.match(app, /interview-runtime-v41\.5/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -37,9 +37,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.4/);
-assert.match(index, /styles\.css\?v=41\.4/);
-assert.match(index, /app\.js\?v=41\.4/);
+assert.match(sw, /offline-interview-v41\.5/);
+assert.match(index, /styles\.css\?v=41\.5/);
+assert.match(index, /app\.js\?v=41\.5/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
@@ -99,16 +99,27 @@ assert.match(app, /boundedWait\(dbAudioPut\([\s\S]*5000, 'stockage audio'\)/);
 assert.match(app, /finishInterview\(\);\s+persistSessionLater\('completion'\)/);
 assert.match(app, /failedAudioCaptureIds\.has\(recordingId\) \? null/);
 
+// V41.5: automatic transcription is system-first/system-only; saved audio remains usable when text is absent.
+assert.doesNotMatch(app, /Aucun texte système · secours Whisper/);
+assert.doesNotMatch(app, /Transcription Whisper locale/);
+assert.match(app, /appendAudioOnlyTurn\(/);
+assert.match(app, /audio-system-pending/);
+assert.match(app, /retranscribeTurnWithSystem\(turn, retranscribe\)/);
+assert.match(app, /supportsSystemAudioTrackRecognition\(\)/);
+assert.match(systemStt, /export function transcribeSystemAudioTrack\(/);
+assert.match(systemStt, /recognition\.start\(audioTrack\)/);
+assert.match(systemStt, /Chrome\|Chromium\|Edg/);
+
 // Explicit anti-growth budgets. Raising one requires a conscious code-review decision.
 const coreBytes = bytes(app) + bytes(css) + bytes(systemStt) + bytes(index) + bytes(sw);
-assert.ok(bytes(app) <= 101_000, `app.js budget exceeded: ${bytes(app)} bytes`);
+assert.ok(bytes(app) <= 106_500, `app.js budget exceeded: ${bytes(app)} bytes`);
 assert.ok(bytes(css) <= 66_000, `styles.css budget exceeded: ${bytes(css)} bytes`);
-assert.ok(coreBytes <= 200_000, `core source budget exceeded: ${coreBytes} bytes`);
+assert.ok(coreBytes <= 207_000, `core source budget exceeded: ${coreBytes} bytes`);
 
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41.4',
+  contract: 'offline-interview.runtime-contract.v41.5',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes

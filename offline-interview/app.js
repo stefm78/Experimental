@@ -1,6 +1,6 @@
-import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
+import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';
 
-const BUILD_ID = '2026-09-06.interview-runtime-v41.4';
+const BUILD_ID = '2026-09-06.interview-runtime-v41.5';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -209,6 +209,78 @@ async function replayTurnAudio(turn) {
   audio.addEventListener('loadedmetadata', () => { audio.currentTime = Math.max(0, Number(ref.startMs) || 0) / 1000; audio.play().catch(() => stopReplay()); }, { once: true });
   audio.addEventListener('timeupdate', () => { if (end && audio.currentTime >= end) stopReplay(); });
   audio.addEventListener('ended', stopReplay, { once: true });
+}
+
+async function buildTurnRecognitionTrack(turn) {
+  const ref = turn?.audioRef;
+  if (!ref?.recordingId) throw new Error('Audio local absent pour cette prise.');
+  const record = await dbAudioGet(ref.recordingId);
+  if (!record?.blob) throw new Error('Audio local introuvable pour cette prise.');
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) throw new Error('Web Audio indisponible.');
+  const context = new Context();
+  await context.resume();
+  const decoded = await context.decodeAudioData((await record.blob.arrayBuffer()).slice(0));
+  const startSeconds = Math.max(0, Number(ref.startMs) || 0) / 1000;
+  const requestedEnd = Math.max(startSeconds, Number(ref.endMs) || 0) / 1000;
+  const endSeconds = Math.min(decoded.duration, requestedEnd > startSeconds ? requestedEnd : decoded.duration);
+  const durationSeconds = Math.max(0.05, endSeconds - startSeconds);
+  const destination = context.createMediaStreamDestination();
+  const source = context.createBufferSource();
+  source.buffer = decoded;
+  source.connect(destination);
+  const track = destination.stream.getAudioTracks()[0];
+  if ('contentHint' in track) track.contentHint = 'speech-recognition';
+  let started = false;
+  return {
+    track,
+    durationMs: Math.ceil(durationSeconds * 1000),
+    start() { if (!started) { started = true; source.start(0, startSeconds, durationSeconds); } },
+    cleanup() { try { if (started) source.stop(); } catch {} try { track.stop(); } catch {} context.close().catch(() => {}); }
+  };
+}
+
+async function retranscribeTurnWithSystem(turn, button) {
+  showError(ui.interviewError, '');
+  if (!supportsSystemAudioTrackRecognition()) {
+    showError(ui.interviewError, 'La retranscription système d’un enregistrement est disponible dans Chrome/Edge de bureau récents, mais pas encore dans les navigateurs mobiles. L’audio reste réécoutable et le texte modifiable.');
+    return;
+  }
+  if (systemSpeechCapability.mode === 'unavailable') {
+    showError(ui.interviewError, 'La transcription système n’est pas disponible dans ce navigateur.');
+    return;
+  }
+  const previousLabel = button?.textContent || '↻ Système';
+  if (button) { button.disabled = true; button.textContent = '…'; }
+  stopReplay();
+  let input = null;
+  try {
+    input = await buildTurnRecognitionTrack(turn);
+    const result = await transcribeSystemAudioTrack(input.track, {
+      lang: interview?.language || 'fr-FR',
+      mode: systemSpeechCapability.mode,
+      durationMs: input.durationMs,
+      onStart: () => input.start()
+    });
+    const text = cleanText(result?.text);
+    if (!meaningfulTranscript(text)) throw new Error('Aucun texte reconnu par le système pour cet extrait.');
+    if (!Array.isArray(turn.transcriptionHistory)) turn.transcriptionHistory = [];
+    if (cleanText(turn.text)) turn.transcriptionHistory.push({ text: turn.text, source: turn.source || null, at: nowIso() });
+    turn.text = text;
+    turn.rawTranscript = text;
+    turn.source = result.mode === 'local' ? 'system-local-retranscribed' : 'system-retranscribed';
+    turn.updatedAt = nowIso();
+    session.updatedAt = nowIso();
+    logRuntimeEvent('system_retranscription_succeeded', { turnId: turn.id, mode: result.mode });
+    renderTurns();
+    persistSessionLater('system-retranscription');
+  } catch (error) {
+    recordRuntimeWarning('system_retranscription_error', error);
+    showError(ui.interviewError, `Retranscription système impossible : ${error.message || error}`);
+  } finally {
+    input?.cleanup();
+    if (button?.isConnected) { button.disabled = false; button.textContent = previousLabel; }
+  }
 }
 
 function setView(name) {
@@ -902,11 +974,13 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
     try { settled = await cut.settled; } catch {}
     const text = cleanText(settled?.text || cut.text);
     if (!meaningfulTranscript(text)) {
-      registerCaptureGap(
-        previousQuestionId,
-        previousSpeakerId,
-        'Aucun texte reconnu pour ce passage au changement de personne. Répétez ce passage.'
-      );
+      await appendAudioOnlyTurn({
+        questionId: previousQuestionId,
+        speakerId: previousSpeakerId,
+        durationSeconds,
+        audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }
+      });
+      logRuntimeEvent('system_transcription_missing', { questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true });
       return;
     }
     await appendAnswerTurn({
@@ -1416,6 +1490,19 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
   return true;
 }
 
+async function appendAudioOnlyTurn({ questionId, speakerId, durationSeconds = 0, audioRef = null }) {
+  if (!questionId || !speakerId || !audioRef?.recordingId) return false;
+  const response = responseFor(questionId);
+  response.turns.push(createTurn({ type: 'answer', speakerId, text: '', source: 'audio-system-pending', durationSeconds, audioRef }));
+  response.status = 'answered';
+  session.updatedAt = nowIso();
+  await persistSession();
+  renderTurns();
+  renderQuestionNav();
+  renderInterviewMetrics();
+  return true;
+}
+
 async function addComposerTurn() {
   const entry = currentEntry();
   if (!entry) return false;
@@ -1508,7 +1595,7 @@ function renderTurns() {
 
     const type = document.createElement('span');
     type.className = 'turn-type';
-    type.textContent = turn.type === 'follow_up' ? (turn.followUpKind === 'ad_hoc' ? 'Relance spontanée' : 'Relance') : (/system|whisper|speech/.test(turn.source || '') ? 'Voix' : 'Texte');
+    type.textContent = turn.type === 'follow_up' ? (turn.followUpKind === 'ad_hoc' ? 'Relance spontanée' : 'Relance') : (/system|whisper|speech|audio/.test(turn.source || '') ? 'Voix' : 'Texte');
 
     const meta = document.createElement('span');
     meta.className = 'turn-meta-inline';
@@ -1542,7 +1629,18 @@ function renderTurns() {
     replay.setAttribute('aria-label', replay.title);
     replay.disabled = !turn.audioRef?.recordingId;
     replay.addEventListener('click', () => replayTurnAudio(turn));
-    if (turn.type === 'answer') head.append(select, type, meta, replay, remove);
+    const retranscribe = document.createElement('button');
+    retranscribe.type = 'button';
+    retranscribe.className = 'ghost small turn-retranscribe-button';
+    retranscribe.textContent = '↻ Système';
+    const trackSupported = supportsSystemAudioTrackRecognition();
+    retranscribe.disabled = !turn.audioRef?.recordingId || !trackSupported || systemSpeechCapability.mode === 'unavailable';
+    retranscribe.title = trackSupported
+      ? 'Relancer la transcription système directement depuis cet audio'
+      : 'Retranscription système depuis un audio enregistré non prise en charge sur ce navigateur mobile ou ancien';
+    retranscribe.setAttribute('aria-label', retranscribe.title);
+    retranscribe.addEventListener('click', () => retranscribeTurnWithSystem(turn, retranscribe));
+    if (turn.type === 'answer') head.append(select, type, meta, replay, retranscribe, remove);
     else head.append(select, type, meta, remove);
 
     const text = document.createElement('textarea');
@@ -1837,22 +1935,22 @@ async function requestPersistentStorage() {
 function systemSpeechLabel() {
   if (systemSpeechCapability.mode === 'local') return 'Système local';
   if (systemSpeechCapability.mode === 'standard') return 'Système';
-  return 'Whisper local';
+  return 'Audio seul';
 }
 
 function refreshSttStatus() {
   if (systemSpeechCapability.mode === 'local') {
-    ui.modelStatus.textContent = transcriber ? 'Automatique · secours local prêt' : 'Automatique · secours local';
-    if (ui.diagStt) ui.diagStt.textContent = 'Système local · Whisper secours';
+    ui.modelStatus.textContent = 'Automatique · système local';
+    if (ui.diagStt) ui.diagStt.textContent = 'Système local · Whisper uniquement manuel';
     return;
   }
   if (systemSpeechCapability.mode === 'standard') {
-    ui.modelStatus.textContent = transcriber ? 'Automatique · secours local prêt' : 'Automatique · secours local';
-    if (ui.diagStt) ui.diagStt.textContent = 'Système (réseau possible) · Whisper secours';
+    ui.modelStatus.textContent = 'Automatique · système';
+    if (ui.diagStt) ui.diagStt.textContent = 'Système (réseau possible) · Whisper uniquement manuel';
     return;
   }
-  ui.modelStatus.textContent = transcriber ? 'Local prêt' : 'Secours local disponible';
-  if (ui.diagStt) ui.diagStt.textContent = 'Système indisponible · Whisper secours';
+  ui.modelStatus.textContent = transcriber ? 'Audio seul · Whisper manuel prêt' : 'Audio seul · système indisponible';
+  if (ui.diagStt) ui.diagStt.textContent = 'Système indisponible · aucun Whisper automatique';
 }
 
 async function detectRuntimeSystemSpeech() {
@@ -2052,21 +2150,8 @@ async function handleRecordingStopped() {
     let rawTranscript = systemSnapshot.finalText || text;
 
     if (!text) {
-      show(ui.transcribing, true);
-      if (recordingHadCuts) {
-        const message = 'Aucun texte système pour cette prise après un changement de personne. Répétez ce passage.';
-        registerCaptureGap(questionId, speakerId, message);
-        throw new Error(message);
-      }
-      ui.recordState.textContent = systemSpeechCapability.mode === 'unavailable'
-        ? 'Transcription Whisper locale…'
-        : 'Aucun texte système · secours Whisper…';
-      if (!transcriber) await prepareModel();
-      const samples = await blobTo16kMono(blob);
-      const result = await transcriber(samples, { language: 'french', task: 'transcribe', chunk_length_s: 30, stride_length_s: 5 });
-      text = cleanText(result?.text);
-      source = 'whisper-local';
-      rawTranscript = text;
+      ui.recordState.textContent = 'Audio enregistré · transcription système à relancer';
+      logRuntimeEvent('system_transcription_missing', { questionId, speakerId, boundary: false, systemMode: systemSpeechCapability.mode });
     }
 
     try { await boundedWait(semanticBoundaryCommitQueue, 3000, 'frontière de transcription'); }
@@ -2089,9 +2174,18 @@ async function handleRecordingStopped() {
       composerRawTranscript = null;
       composerSource = 'keyboard';
       composerDurationSeconds = 0;
+    } else if (audioStored) {
+      await appendAudioOnlyTurn({
+        questionId,
+        speakerId,
+        durationSeconds,
+        audioRef: { recordingId: captureId, startMs: recordingAudioOffsetMs, endMs: recordingAudioOffsetMs + Math.max(0, durationSeconds || 0) * 1000 }
+      });
+      ui.recordState.textContent = 'Audio enregistré · texte à retranscrire';
+      showError(ui.interviewError, 'La transcription système n’a rien renvoyé. L’audio est conservé : vous pourrez le réécouter et relancer la transcription système après l’entretien.');
     } else {
-      ui.recordState.textContent = 'Aucun texte reconnu';
-      showError(ui.interviewError, 'Aucun texte n’a été reconnu pour cette prise de parole.');
+      ui.recordState.textContent = 'Audio non conservé';
+      showError(ui.interviewError, 'La transcription système n’a rien renvoyé et l’audio local n’a pas pu être conservé.');
     }
   } catch (error) {
     diagnosticError = String(error?.message || error);
