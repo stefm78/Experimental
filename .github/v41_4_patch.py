@@ -71,6 +71,7 @@ s = s.replace('offline-interview-v41\\.3', 'offline-interview-v41\\.4')
 s = s.replace('styles\\.css\\?v=41\\.3', 'styles\\.css\\?v=41\\.4')
 s = s.replace('app\\.js\\?v=41\\.3', 'app\\.js\\?v=41\\.4')
 s = s.replace("assert.doesNotMatch(app, /if \\(captureFinalizing \\|\\| recordingCompletionPromise\\) \\{\\s+pendingInterviewCompletion = true;/);", "assert.match(app, /if \\(captureFinalizing \\|\\| recordingCompletionPromise\\) \\{[\\s\\S]*pendingInterviewCompletion = true;[\\s\\S]*return;/);")
+s = s.replace("assert.match(app, /audioRef: \\{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \\}/);", "assert.match(app, /audioRef: failedAudioCaptureIds\\.has\\(recordingId\\) \\? null : \\{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \\}/);")
 s = s.replace("assert.match(app, /await moveRecordingToViewedQuestion\\(\\);/);", "assert.match(app, /moveRecordingToViewedQuestion\\(\\)\\.catch/);")
 marker = "// Explicit anti-growth budgets. Raising one requires a conscious code-review decision."
 checks = r'''// V41.4: interaction state is fail-open with respect to local persistence/finalizers.
