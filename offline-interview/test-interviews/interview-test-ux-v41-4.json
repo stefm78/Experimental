@@ -1,0 +1,66 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v41-4-interaction-fail-open",
+  "version": "1.0",
+  "title": "Test V41.4 — navigation, locuteurs et fin",
+  "context": "Vérifier les trois interactions qui étaient bloquées.",
+  "objective": "Confirmer que la navigation, les boutons de locuteur et Terminer répondent immédiatement.",
+  "language": "fr-FR",
+  "estimatedDurationMinutes": 4,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Interactions",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Question 1",
+          "text": "Sans enregistrer, cliquez sur Question 2 puis revenez ici. Le texte affiché doit changer à chaque clic.",
+          "intent": "Tester la navigation simple.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Question 2",
+          "text": "Cliquez sur Testeur pour démarrer le micro, arrêtez, puis cliquez sur Interviewer et arrêtez. Les deux boutons doivent pouvoir lancer une prise.",
+          "intent": "Tester les deux locuteurs.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Question 3",
+          "text": "Cliquez sur Terminer dans le menu de gauche. L’écran de résultat doit apparaître sans rester bloqué dans l’entretien.",
+          "intent": "Tester la terminaison par la barre latérale.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

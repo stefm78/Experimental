@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 
-const BUILD_ID = '2026-09-06.interview-runtime-v41.3';
+const BUILD_ID = '2026-09-06.interview-runtime-v41.4';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -73,6 +73,31 @@ let audioSourceNode = null;
 let audioMeterFrame = 0;
 let activeReplayAudio = null;
 let activeReplayUrl = null;
+let failedAudioCaptureIds = new Set();
+
+function boundedWait(promise, timeoutMs, label) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} : délai dépassé`)), timeoutMs); });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+function recordRuntimeWarning(type, error) {
+  diagnosticError = `${type}: ${error?.message || error}`;
+  if (!session) return;
+  if (!Array.isArray(session.runtimeEvents)) session.runtimeEvents = [];
+  session.runtimeEvents.push({ at: nowIso(), type, error: String(error?.message || error) });
+  if (session.runtimeEvents.length > 100) session.runtimeEvents = session.runtimeEvents.slice(-100);
+}
+function persistSessionLater(stage = 'session') {
+  if (!session) return;
+  const snapshot = clone(session);
+  boundedWait(dbPut(STATE_KEY, snapshot), 2500, stage).catch(error => recordRuntimeWarning('storage_warning', error));
+}
+function clearAudioRefs(recordingId) {
+  if (!session || !recordingId) return;
+  for (const response of Object.values(session.responses || {})) {
+    for (const turn of response.turns || []) if (turn.audioRef?.recordingId === recordingId) turn.audioRef = null;
+  }
+}
 
 function show(el, visible = true) {
   if (!el) return;
@@ -891,7 +916,7 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
       source: baseSource,
       rawTranscript: settled?.finalText || text,
       durationSeconds,
-      audioRef: { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }
+      audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }
     });
     await persistSession();
   };
@@ -990,8 +1015,8 @@ async function goToQuestion(index) {
   if (!session || index < 0 || index >= all.length || index === session.currentIndex) return;
   flushSessionClock();
 
-  if (!isRecording() && !captureFinalizing) {
-    await addComposerTurn();
+  if (!isRecording() && !captureFinalizing && cleanText(ui.answerText.value)) {
+    addComposerTurn().catch(error => recordRuntimeWarning('composer_autosave_warning', error));
   }
 
   session.currentIndex = index;
@@ -999,15 +1024,13 @@ async function goToQuestion(index) {
   session.completedAt = null;
   session.updatedAt = nowIso();
   sessionClockLastMs = Date.now();
-  await persistSession();
   renderQuestion();
 
-  // Question navigation owns capture routing too. If capture is live, switching
-  // question creates the semantic/audio boundary immediately on the new question.
   const targetQuestionId = all[index]?.question?.id || null;
   if (isRecording() && targetQuestionId && recordingQuestionId !== targetQuestionId) {
-    await moveRecordingToViewedQuestion();
+    moveRecordingToViewedQuestion().catch(error => recordRuntimeWarning('question_capture_transfer_warning', error));
   }
+  persistSessionLater('question-navigation');
 }
 
 async function finishActiveCaptureBeforeLeaving(message) {
@@ -1054,7 +1077,8 @@ async function finalizeInterviewCompletion() {
     return false;
   }
   try {
-    await semanticBoundaryCommitQueue;
+    try { await boundedWait(semanticBoundaryCommitQueue, 3000, 'frontière de transcription'); }
+    catch (error) { recordRuntimeWarning('semantic_boundary_timeout', error); }
     const gaps = unresolvedCaptureGaps();
     if (gaps.length && !confirm(`${gaps.length} passage${gaps.length > 1 ? 's' : ''} reste${gaps.length > 1 ? 'nt' : ''} à reprendre après un échec de transcription. Terminer quand même ?`)) {
       logRuntimeEvent('completion_cancelled', { stage: 'capture_gaps', gapCount: gaps.length });
@@ -1066,8 +1090,8 @@ async function finalizeInterviewCompletion() {
     session.completedAt = nowIso();
     session.updatedAt = nowIso();
     logRuntimeEvent('completion_succeeded', { viewportWidth: Math.round(window.innerWidth || 0) });
-    await persistSession();
     finishInterview();
+    persistSessionLater('completion');
     return true;
   } catch (error) {
     diagnosticError = String(error?.message || error);
@@ -1108,15 +1132,10 @@ async function completeInterview(event) {
   }
 
   if (captureFinalizing || recordingCompletionPromise) {
-    try {
-      if (recordingCompletionPromise) await recordingCompletionPromise;
-    } catch (error) {
-      diagnosticError = String(error?.message || error);
-      logRuntimeEvent('completion_error', { stage: 'capture_wait', error: diagnosticError });
-      showError(ui.interviewError, `Impossible de finaliser la prise de parole : ${diagnosticError}. Réessayez.`);
-      resetCompletionState();
-      return;
-    }
+    pendingInterviewCompletion = true;
+    ui.recordState.textContent = 'Finalisation de l’entretien…';
+    updateCaptureUi();
+    return;
   }
 
   await finalizeInterviewCompletion();
@@ -1163,9 +1182,9 @@ async function selectSpeaker(participantId) {
   if (!session || !participantById(participantId)) return;
   session.activeSpeakerId = participantId;
   session.updatedAt = nowIso();
-  await persistSession();
   renderSpeakerButtons();
   updateComposerSpeaker();
+  persistSessionLater('speaker-selection');
 }
 
 async function handleSpeakerButtonClick(participantId) {
@@ -2018,7 +2037,15 @@ async function handleRecordingStopped() {
     if (!chunks.length) return;
     const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
     const masterBlob = new Blob(masterAudioChunks, { type: recorder.mimeType || 'audio/webm' });
-    await dbAudioPut({ id: captureId, sessionId: session.id, blob: masterBlob, mimeType: masterBlob.type || 'audio/webm', createdAt: nowIso() });
+    let audioStored = false;
+    try {
+      await boundedWait(dbAudioPut({ id: captureId, sessionId: session.id, blob: masterBlob, mimeType: masterBlob.type || 'audio/webm', createdAt: nowIso() }), 5000, 'stockage audio');
+      audioStored = true;
+    } catch (error) {
+      failedAudioCaptureIds.add(captureId);
+      clearAudioRefs(captureId);
+      recordRuntimeWarning('audio_storage_warning', error);
+    }
     const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
     let text = cleanText(systemSnapshot.text);
     let source = systemSnapshot.mode === 'local' ? 'system-local' : 'system';
@@ -2042,7 +2069,9 @@ async function handleRecordingStopped() {
       rawTranscript = text;
     }
 
-    await semanticBoundaryCommitQueue;
+    try { await boundedWait(semanticBoundaryCommitQueue, 3000, 'frontière de transcription'); }
+    catch (error) { recordRuntimeWarning('semantic_boundary_timeout', error); }
+    if (!audioStored) clearAudioRefs(captureId);
 
     if (text) {
       await appendAnswerTurn({
@@ -2052,7 +2081,7 @@ async function handleRecordingStopped() {
         source,
         rawTranscript,
         durationSeconds,
-        audioRef: { recordingId: captureId, startMs: recordingAudioOffsetMs, endMs: recordingAudioOffsetMs + Math.max(0, durationSeconds || 0) * 1000 }
+        audioRef: audioStored ? { recordingId: captureId, startMs: recordingAudioOffsetMs, endMs: recordingAudioOffsetMs + Math.max(0, durationSeconds || 0) * 1000 } : null
       });
       ui.recordState.textContent = `Propos enregistré · ${participantById(speakerId)?.name || 'locuteur'}`;
       ui.answerText.value = '';
