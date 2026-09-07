@@ -17,6 +17,15 @@ jobs:
           node-version: 22
       - name: Apply V41.10 patch
         run: python .github/v41_10_field_repair.py
+      - name: Trim nonfunctional source comment
+        run: python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('offline-interview/app.js')
+          s=p.read_text()
+          s=re.sub(r'^\s*//[^\n]*\n','',s,count=1,flags=re.M)
+          p.write_text(s)
+          PY
       - name: Parse JavaScript
         run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/audio-window.js
       - name: Semantic boundary regression
