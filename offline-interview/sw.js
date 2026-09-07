@@ -1,7 +1,7 @@
-const VERSION = 'offline-interview-v41.6';
+const VERSION = 'offline-interview-v41.7';
 const SHELL_CACHE = `${VERSION}-shell`;
 const SHELL = [
-  './', './index.html', './styles.css?v=41.6', './app.js?v=41.6', './system-stt.js',
+  './', './index.html', './styles.css?v=41.7', './app.js?v=41.7', './system-stt.js',
   './interview.json', './manifest.webmanifest', './icon.svg', './INTERVIEW_FORMAT.md',
   './INTERVIEW_AUTHORING_KIT.md', './interview-spec.schema.json'
 ];

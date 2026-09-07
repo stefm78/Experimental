@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';
 
-const BUILD_ID = '2026-09-06.interview-runtime-v41.6';
+const BUILD_ID = '2026-09-07.interview-runtime-v41.7';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -41,6 +41,7 @@ let stream = null;
 let chunks = [];
 let masterAudioChunks = [];
 let startedRecordingAt = 0;
+let recordingMasterStartedAt = 0;
 let timerHandle = null;
 let composerDurationSeconds = 0;
 let composerSource = 'keyboard';
@@ -267,7 +268,7 @@ async function buildTurnRecognitionTrack(turn) {
   };
 }
 
-async function retranscribeTurnWithSystem(turn, button) {
+async function retranscribeTurnWithSystem(turn, button, reason = 'manual') {
   showError(ui.interviewError, '');
   const ref = turn?.audioRef;
   const audioKey = ref?.recordingId ? `${ref.recordingId}:${Math.round(ref.startMs || 0)}:${Math.round(ref.endMs || 0)}` : null;
@@ -315,7 +316,7 @@ async function retranscribeTurnWithSystem(turn, button) {
     turn.systemRetranscription = { audioKey, status: 'succeeded', text, mode: result.mode, at: nowIso() };
     turn.updatedAt = nowIso();
     session.updatedAt = nowIso();
-    logRuntimeEvent('system_retranscription_succeeded', { turnId: turn.id, mode: result.mode, stable: true });
+    logRuntimeEvent('system_retranscription_succeeded', { turnId: turn.id, mode: result.mode, stable: true, reason });
     persistSessionLater('system-retranscription');
   } catch (error) {
     turn.systemRetranscription = { audioKey, status: 'failed', error: String(error?.message || error), at: nowIso() };
@@ -988,10 +989,10 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
 
   const previousSpeakerId = recordingSpeakerId;
   const previousQuestionId = recordingQuestionId;
-  const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
   const recordingId = recordingCaptureId;
   const segmentStartMs = recordingAudioOffsetMs;
-  const segmentEndMs = segmentStartMs + durationSeconds * 1000;
+  const segmentEndMs = Math.max(segmentStartMs, recordingMasterStartedAt ? performance.now() - recordingMasterStartedAt : segmentStartMs);
+  const durationSeconds = Math.max(0, (segmentEndMs - segmentStartMs) / 1000);
   const cut = systemSpeechSession.takeSegment();
   if (!cut) return false;
   recordingAudioOffsetMs = segmentEndMs;
@@ -1014,31 +1015,24 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   renderQuestionNav();
   updateCaptureUi();
 
-  const baseSource = systemSpeechCapability.mode === 'local' ? 'system-local-cut' : 'system-cut';
   const commit = async () => {
     let settled = null;
     try { settled = await cut.settled; } catch {}
-    const text = cleanText(settled?.text || cut.text);
-    if (!meaningfulTranscript(text)) {
-      await appendAudioOnlyTurn({
-        questionId: previousQuestionId,
-        speakerId: previousSpeakerId,
-        durationSeconds,
-        audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }
-      });
-      logRuntimeEvent('system_transcription_missing', { questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true });
-      return;
-    }
-    await appendAnswerTurn({
+    const provisionalText = cleanText(settled?.text || cut.text);
+    // Continuous SpeechRecognition may emit one hypothesis spanning a human click.
+    // Never assign that hypothesis across speakers as authoritative text. Preserve the
+    // exact audio interval and recover it from that immutable interval after capture.
+    await appendAudioOnlyTurn({
       questionId: previousQuestionId,
       speakerId: previousSpeakerId,
-      text,
-      source: baseSource,
-      rawTranscript: settled?.finalText || text,
       durationSeconds,
-      audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }
+      audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs },
+      source: 'audio-system-boundary-pending',
+      rawTranscript: provisionalText || null
     });
-    await persistSession();
+    logRuntimeEvent('system_boundary_deferred', {
+      questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true, provisionalText: Boolean(provisionalText)
+    });
   };
   semanticBoundaryCommitQueue = semanticBoundaryCommitQueue.then(commit, commit);
 
@@ -1526,10 +1520,10 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
   return true;
 }
 
-async function appendAudioOnlyTurn({ questionId, speakerId, durationSeconds = 0, audioRef = null }) {
+async function appendAudioOnlyTurn({ questionId, speakerId, durationSeconds = 0, audioRef = null, source = 'audio-system-pending', rawTranscript = null }) {
   if (!questionId || !speakerId || !audioRef?.recordingId) return false;
   const response = responseFor(questionId);
-  response.turns.push(createTurn({ type: 'answer', speakerId, text: '', source: 'audio-system-pending', durationSeconds, audioRef }));
+  response.turns.push(createTurn({ type: 'answer', speakerId, text: '', source, rawTranscript, durationSeconds, audioRef }));
   response.status = 'answered';
   session.updatedAt = nowIso();
   await persistSession();
@@ -1537,6 +1531,18 @@ async function appendAudioOnlyTurn({ questionId, speakerId, durationSeconds = 0,
   renderQuestionNav();
   renderInterviewMetrics();
   return true;
+}
+
+async function recoverBoundaryTurnsWithSystem(captureId) {
+  const pending = Object.values(session?.responses || {}).flatMap(response => response.turns || []).filter(turn =>
+    turn.audioRef?.recordingId === captureId && turn.source === 'audio-system-boundary-pending'
+  );
+  if (!pending.length) return;
+  if (!supportsSystemAudioTrackRecognition() || systemSpeechCapability.mode === 'unavailable') {
+    logRuntimeEvent('system_boundary_recovery_deferred', { captureId, count: pending.length, reason: 'audio-track-unsupported' });
+    return;
+  }
+  for (const turn of pending) await retranscribeTurnWithSystem(turn, null, 'boundary-recovery');
 }
 
 async function addComposerTurn() {
@@ -1663,7 +1669,8 @@ function renderTurns() {
     replay.textContent = '▶';
     replay.title = 'Réécouter cette prise de parole';
     replay.setAttribute('aria-label', replay.title);
-    replay.disabled = !turn.audioRef?.recordingId;
+    const audioReady = Boolean(turn.audioRef?.recordingId) && !isRecording() && !captureFinalizing;
+    replay.disabled = !audioReady;
     replay.addEventListener('click', () => replayTurnAudio(turn, replay));
     const retranscribe = document.createElement('button');
     retranscribe.type = 'button';
@@ -1672,7 +1679,7 @@ function renderTurns() {
     const trackSupported = supportsSystemAudioTrackRecognition();
     const stableRetranscription = turn.systemRetranscription?.status;
     retranscribe.textContent = stableRetranscription === 'succeeded' ? '✓ Système' : stableRetranscription === 'failed' ? '× Système' : '↻ Système';
-    retranscribe.disabled = !turn.audioRef?.recordingId || !trackSupported || systemSpeechCapability.mode === 'unavailable' || ['succeeded', 'failed'].includes(stableRetranscription);
+    retranscribe.disabled = !audioReady || !trackSupported || systemSpeechCapability.mode === 'unavailable' || ['succeeded', 'failed'].includes(stableRetranscription);
     retranscribe.title = stableRetranscription === 'succeeded'
       ? 'Retranscription système stabilisée pour cet audio'
       : stableRetranscription === 'failed'
@@ -2095,6 +2102,7 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     };
     recorder.onstop = handleRecordingStopped;
     recorder.start(500);
+    recordingMasterStartedAt = performance.now();
 
     systemSpeechSession = createSystemSpeechSession({
       lang: interview?.language || 'fr-FR',
@@ -2113,7 +2121,7 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     const usingSystem = Boolean(systemSpeechSession?.start());
 
     recordingHadCuts = false;
-    startedRecordingAt = performance.now();
+    startedRecordingAt = recordingMasterStartedAt || performance.now();
     if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
     if (!usingSystem) ui.recordState.textContent = 'Transcription système indisponible';
     renderSpeakerButtons();
@@ -2131,7 +2139,8 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
 }
 function stopRecording() {
   if (!recorder || recorder.state === 'inactive') return;
-  composerDurationSeconds = (performance.now() - startedRecordingAt) / 1000;
+  const masterEndMs = recordingMasterStartedAt ? Math.max(recordingAudioOffsetMs, performance.now() - recordingMasterStartedAt) : recordingAudioOffsetMs + Math.max(0, performance.now() - startedRecordingAt);
+  composerDurationSeconds = Math.max(0, (masterEndMs - recordingAudioOffsetMs) / 1000);
   clearInterval(timerHandle);
   try { systemSpeechSession?.stop(); } catch {}
   ui.recordState.textContent = 'Finalisation…';
@@ -2229,6 +2238,7 @@ async function handleRecordingStopped() {
       ui.recordState.textContent = 'Audio non conservé';
       showError(ui.interviewError, 'La transcription système n’a rien renvoyé et l’audio local n’a pas pu être conservé.');
     }
+    if (audioStored) await recoverBoundaryTurnsWithSystem(captureId);
   } catch (error) {
     diagnosticError = String(error?.message || error);
     logRuntimeEvent('transcription_error', {
@@ -2245,6 +2255,7 @@ async function handleRecordingStopped() {
     ui.validateBtn.disabled = false;
     recordingSpeakerId = null;
     recordingQuestionId = null;
+    recordingMasterStartedAt = 0;
     recorder = null;
     captureFinalizing = false;
     const keepMicrophoneOpen = Boolean(nextSpeakerId && participantById(nextSpeakerId));
