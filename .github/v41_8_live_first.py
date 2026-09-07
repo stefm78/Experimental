@@ -27,6 +27,7 @@ for name in ['offline-interview/index.html', 'offline-interview/sw.js']:
 
 contract = Path('offline-interview/test-runtime-contract.mjs')
 t = contract.read_text().replace('41\\.7', '41\\.8').replace('41.7', '41.8')
+t = t.replace("assert.match(app, /audioRef: failedAudioCaptureIds\\.has\\(recordingId\\) \\? null : \\{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \\}/);", "assert.match(app, /const audioRef = failedAudioCaptureIds\\.has\\(recordingId\\) \\? null : \\{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \\}/);")
 t = t.replace("assert.match(app, /audio-system-boundary-pending/);\nassert.match(app, /recoverBoundaryTurnsWithSystem\\(captureId\\)/);\nassert.match(app, /'boundary-recovery'/);\n", "assert.match(app, /audio-system-boundary-pending/);\n")
 anchor = "assert.match(app, /const audioReady = Boolean\\(turn\\.audioRef\\?\\.recordingId\\) && !isRecording\\(\\) && !captureFinalizing/);\n"
 extra = """\n// V41.8: live system text is committed immediately; saved-audio retranscription is recovery, never a critical-path prerequisite.\nassert.match(app, /system-boundary-draft/);\nassert.match(app, /system_boundary_live_committed/);\nassert.match(app, /system_boundary_live_missing/);\nassert.match(app, /boundary_audio_ready/);\nassert.doesNotMatch(app, /recoverBoundaryTurnsWithSystem/);\nassert.doesNotMatch(app, /await retranscribeTurnWithSystem\\(turn, null, 'boundary-recovery'\\)/);\n"""
