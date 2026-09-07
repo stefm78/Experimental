@@ -1,7 +1,7 @@
 import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';
 import { turnAudioWindow } from './audio-window.js';
 
-const BUILD_ID = '2026-09-07.interview-runtime-v41.9';
+const BUILD_ID = '2026-09-08.interview-runtime-v41.10';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -1004,8 +1004,6 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   if (!cut) return false;
   recordingAudioOffsetMs = segmentEndMs;
   recordingHadCuts = true;
-
-  // UI ownership changes immediately, but ON AIR is briefly replaced by PASSAGE until
   // the fresh SpeechRecognition session is listening. This makes the semantic boundary
   // real instead of guessing from late result indexes.
   recordingSpeakerId = nextSpeakerId;
@@ -1685,7 +1683,7 @@ function renderTurns() {
     retranscribe.className = 'ghost small turn-retranscribe-button';
     const trackSupported = supportsSystemAudioTrackRecognition();
     const stableRetranscription = turn.systemRetranscription?.status;
-    const transcriptionGlyph = stableRetranscription === 'succeeded' ? '✓' : stableRetranscription === 'failed' ? '×' : '<svg class="audio-to-text-svg" viewBox="0 0 28 18" aria-hidden="true"><path d="M2 9h2m2-4v8m3-11v14m3-9v4m4-5h10M16 10h10M16 14h7"/></svg>';
+    const transcriptionGlyph = stableRetranscription === 'succeeded' ? '✓' : stableRetranscription === 'failed' ? '×' : '<svg class="audio-to-text-svg" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 9h2m2-4v8m3-11v14m3-9v4"/><path class="audio-to-text-arrow" d="M16 9h6m-2-2 2 2-2 2"/><path d="M25 5h7M25 9h7M25 13h5"/></svg>';
     retranscribe.innerHTML = `<span class="audio-to-text-icon" aria-hidden="true">${transcriptionGlyph}</span>`;
     retranscribe.disabled = !audioReady || !trackSupported || systemSpeechCapability.mode === 'unavailable' || ['succeeded', 'failed'].includes(stableRetranscription);
     retranscribe.title = stableRetranscription === 'succeeded'
@@ -2270,6 +2268,7 @@ async function handleRecordingStopped() {
     recordingMasterStartedAt = 0;
     recorder = null;
     captureFinalizing = false;
+    renderTurns();
     const keepMicrophoneOpen = Boolean(nextSpeakerId && participantById(nextSpeakerId));
     if (!keepMicrophoneOpen) releaseMicrophone();
     try { resolveRecordingCompletion?.(); } catch {}

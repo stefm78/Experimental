@@ -8,7 +8,7 @@
   <title>Interview locale structurée</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=41.9">
+  <link rel="stylesheet" href="./styles.css?v=41.10">
 </head>
 <body>
   <main class="shell">
@@ -122,6 +122,14 @@
                 <strong>ON AIR</strong>
                 <span id="topOnAirSpeaker"></span>
               </div>
+              <div class="mic-meter-row" aria-label="État du microphone">
+                <button id="micPreviewBtn" class="ghost small mic-preview-button" type="button" aria-pressed="false">Micro</button>
+                <div class="mic-meter" role="meter" aria-label="Niveau du microphone" aria-valuemin="0" aria-valuemax="100">
+                  <span class="mic-meter-recommended" aria-hidden="true"></span>
+                  <span id="micMeterFill" class="mic-meter-fill" style="--level:0" aria-hidden="true"></span>
+                </div>
+                <span id="micMeterState" class="mic-meter-state" data-level-state="silence">Silence</span>
+              </div>
               <div class="interview-clock-copy">
                 <strong id="sessionClockText">00:00</strong>
                 <span aria-hidden="true">·</span>
@@ -222,14 +230,6 @@
             <span id="timer" class="timer">00:00</span>
           </div>
 
-          <div class="mic-meter-row">
-            <button id="micPreviewBtn" class="ghost small mic-preview-button" type="button" aria-pressed="false">Tester le micro</button>
-            <div class="mic-meter" role="meter" aria-label="Niveau du microphone" aria-valuemin="0" aria-valuemax="100">
-              <span class="mic-meter-recommended" aria-hidden="true"></span>
-              <span id="micMeterFill" class="mic-meter-fill" style="--level:0" aria-hidden="true"></span>
-            </div>
-            <span id="micMeterState" class="mic-meter-state" data-level-state="silence">Silence</span>
-          </div>
 
           <div id="speakerButtons" class="speaker-buttons"></div>
 
@@ -280,6 +280,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=41.9"></script>
+  <script type="module" src="./app.js?v=41.10"></script>
 </body>
 </html>
