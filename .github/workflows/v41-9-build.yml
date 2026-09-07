@@ -17,10 +17,12 @@ jobs:
           node-version: 22
       - name: Apply V41.9 patch
         run: python .github/v41_9_hybrid_refined.py
+      - name: Modularize audio-window helper
+        run: python .github/v41_9_extract_audio_window.py
       - name: Remove superseded V41.8 visual assertion
         run: node -e "const fs=require('fs'); const p='offline-interview/test-runtime-contract.mjs'; let s=fs.readFileSync(p,'utf8'); s=s.replace('assert.match(app, /⏳ Système…/);\\n',''); fs.writeFileSync(p,s);"
       - name: Parse JavaScript
-        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/audio-window.js
       - name: Semantic boundary regression
         run: node offline-interview/test-system-stt-boundary.mjs
       - name: Hard STT handoff regression
@@ -35,7 +37,7 @@ jobs:
           ! grep -q "boundary-recovery" offline-interview/app.js
       - name: Commit exact candidate
         run: |
-          rm .github/v41_9_hybrid_refined.py .github/workflows/v41-9-build.yml
+          rm .github/v41_9_hybrid_refined.py .github/v41_9_extract_audio_window.py .github/workflows/v41-9-build.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
