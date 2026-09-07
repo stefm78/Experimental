@@ -1,0 +1,41 @@
+name: Build V41.10 field repair candidate
+on:
+  push:
+    branches: [offline-interview-v41-10-field-repair]
+permissions:
+  contents: write
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-10-field-repair
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Apply V41.10 patch
+        run: python .github/v41_10_field_repair.py
+      - name: Parse JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/audio-window.js
+      - name: Semantic boundary regression
+        run: node offline-interview/test-system-stt-boundary.mjs
+      - name: Hard STT handoff regression
+        run: node offline-interview/test-system-stt-hard-cut.mjs
+      - name: Runtime contract
+        run: node offline-interview/test-runtime-contract.mjs
+      - name: Parse V41.10 questionnaire
+        run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41-10.json','utf8')); console.log('PASS questionnaire')"
+      - name: Verify no automatic saved-audio recovery
+        run: |
+          ! grep -q "recoverBoundaryTurnsWithSystem" offline-interview/app.js
+          ! grep -q "boundary-recovery" offline-interview/app.js
+      - name: Commit exact candidate
+        run: |
+          rm .github/v41_10_field_repair.py .github/workflows/v41-10-build.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Build V41.10 targeted field repair candidate"
+          git push
