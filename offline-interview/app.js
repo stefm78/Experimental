@@ -1,6 +1,7 @@
 import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';
+import { turnAudioWindow } from './audio-window.js';
 
-const BUILD_ID = '2026-09-07.interview-runtime-v41.8';
+const BUILD_ID = '2026-09-07.interview-runtime-v41.9';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -120,6 +121,7 @@ function formatTime(seconds) {
 }
 function safeFilePart(value) { return String(value || 'interview').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'interview'; }
 
+
 function updateMicMeter(level = 0, peak = 0) {
   const rms = Math.max(0, Math.min(1, Number(level) || 0));
   const pk = Math.max(0, Math.min(1, Number(peak) || 0));
@@ -131,7 +133,12 @@ function updateMicMeter(level = 0, peak = 0) {
   else if (db >= -30) { state = 'Bon niveau'; key = 'good'; }
   else if (db >= -50) { state = 'Faible'; key = 'low'; }
   if (ui.micMeterFill) ui.micMeterFill.style.setProperty('--level', visual.toFixed(3));
-  if (ui.micMeterState) { ui.micMeterState.textContent = state; ui.micMeterState.dataset.levelState = key; }
+  if (ui.micMeterState) { ui.micMeterState.textContent = state === 'Bon niveau' ? 'Bon' : state; ui.micMeterState.dataset.levelState = key; }
+  if (ui.micPreviewBtn) {
+    ui.micPreviewBtn.dataset.levelState = key;
+    ui.micPreviewBtn.title = `Niveau micro : ${state}`;
+    ui.micPreviewBtn.setAttribute('aria-label', `Microphone — ${state}`);
+  }
 }
 
 async function startMicrophoneMeter(targetStream) {
@@ -172,7 +179,7 @@ async function ensureMicrophoneStream() {
   const reusable = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
   if (!reusable) stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
   if (!audioAnalyser) await startMicrophoneMeter(stream);
-  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = isRecording() ? 'Micro actif' : 'Couper le test micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'true'); }
+  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = isRecording() ? 'Micro' : 'Micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'true'); }
   return stream;
 }
 
@@ -180,7 +187,7 @@ function releaseMicrophone() {
   stopMicrophoneMeter();
   stream?.getTracks().forEach(track => track.stop());
   stream = null;
-  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = 'Tester le micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'false'); }
+  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = 'Micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'false'); }
 }
 
 async function toggleMicrophonePreview() {
@@ -212,7 +219,7 @@ function stopReplay() {
 }
 
 async function replayTurnAudio(turn, button) {
-  const ref = turn?.audioRef;
+  const ref = turnAudioWindow(turn, 'canonical');
   if (!ref?.recordingId) return;
   if (activeReplayTurnId === turn.id && activeReplayAudio) {
     if (activeReplayAudio.paused) {
@@ -240,7 +247,7 @@ async function replayTurnAudio(turn, button) {
 }
 
 async function buildTurnRecognitionTrack(turn) {
-  const ref = turn?.audioRef;
+  const ref = turnAudioWindow(turn, 'canonical');
   if (!ref?.recordingId) throw new Error('Audio local absent pour cette prise.');
   const record = await dbAudioGet(ref.recordingId);
   if (!record?.blob) throw new Error('Audio local introuvable pour cette prise.');
@@ -292,7 +299,7 @@ async function retranscribeTurnWithSystem(turn, button, reason = 'manual') {
   activeSystemRetranscriptions.add(audioKey);
   if (button) {
     button.disabled = true;
-    button.textContent = '⏳ Système…';
+    button.innerHTML = '<span class="audio-to-text-icon is-busy" aria-hidden="true">···</span>';
     button.classList.add('is-working');
     button.setAttribute('aria-busy', 'true');
   }
@@ -1047,7 +1054,6 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   };
   semanticBoundaryCommitQueue = semanticBoundaryCommitQueue.then(commit, commit);
 
-  // takeSegment keeps the recognizer running: no restart gap at speaker/question boundaries.
   return true;
 }
 
@@ -1603,8 +1609,11 @@ function renderTurns() {
   }
 
   for (const turn of turns) {
+    const hasText = Boolean(cleanText(turn.text));
+    const hasAudio = Boolean(turn.audioRef?.recordingId);
+    if (turn.type === 'answer' && !hasText && !hasAudio) continue;
     const card = document.createElement('article');
-    card.className = `turn-card ${turn.type === 'follow_up' ? 'follow-up-turn' : ''}`;
+    card.className = `turn-card ${turn.type === 'follow_up' ? 'follow-up-turn' : ''}${turn.type === 'answer' && !hasText && hasAudio ? ' audio-only-turn' : ''}`;
     const head = document.createElement('div');
     head.className = 'turn-head';
 
@@ -1674,18 +1683,18 @@ function renderTurns() {
     const retranscribe = document.createElement('button');
     retranscribe.type = 'button';
     retranscribe.className = 'ghost small turn-retranscribe-button';
-    retranscribe.textContent = '↻ Système';
     const trackSupported = supportsSystemAudioTrackRecognition();
     const stableRetranscription = turn.systemRetranscription?.status;
-    retranscribe.textContent = stableRetranscription === 'succeeded' ? '✓ Système' : stableRetranscription === 'failed' ? '× Système' : '↻ Système';
+    const transcriptionGlyph = stableRetranscription === 'succeeded' ? '✓' : stableRetranscription === 'failed' ? '×' : '<svg class="audio-to-text-svg" viewBox="0 0 28 18" aria-hidden="true"><path d="M2 9h2m2-4v8m3-11v14m3-9v4m4-5h10M16 10h10M16 14h7"/></svg>';
+    retranscribe.innerHTML = `<span class="audio-to-text-icon" aria-hidden="true">${transcriptionGlyph}</span>`;
     retranscribe.disabled = !audioReady || !trackSupported || systemSpeechCapability.mode === 'unavailable' || ['succeeded', 'failed'].includes(stableRetranscription);
     retranscribe.title = stableRetranscription === 'succeeded'
-      ? 'Retranscription système stabilisée pour cet audio'
+      ? 'Transcription de cet audio terminée'
       : stableRetranscription === 'failed'
-        ? 'Tentative système terminée sans texte : correction manuelle disponible'
+        ? 'Transcription terminée sans texte : correction manuelle disponible'
         : trackSupported
-          ? 'Transcrire une seule fois cet audio avec le système'
-          : 'Retranscription système depuis un audio enregistré non prise en charge sur ce navigateur mobile ou ancien';
+          ? 'Transcrire cet audio en texte'
+          : 'Transcription depuis un audio enregistré non prise en charge sur ce navigateur';
     retranscribe.setAttribute('aria-label', retranscribe.title);
     retranscribe.addEventListener('click', () => retranscribeTurnWithSystem(turn, retranscribe));
     if (turn.type === 'answer') head.append(select, type, meta, replay, retranscribe, remove);
@@ -1709,9 +1718,13 @@ function renderTurns() {
       renderInterviewMetrics();
     });
 
-    card.append(head, text);
+    if (turn.type === 'answer' && !hasText && hasAudio) {
+      card.append(head);
+    } else {
+      card.append(head, text);
+      requestAnimationFrame(resizeTurnText);
+    }
     ui.turnsList.append(card);
-    requestAnimationFrame(resizeTurnText);
   }
 }
 
