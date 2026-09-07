@@ -19,10 +19,11 @@ jobs:
         run: python .github/v41_9_hybrid_refined.py
       - name: Modularize audio-window helper
         run: python .github/v41_9_extract_audio_window.py
-      - name: Remove superseded assertions and comment
+      - name: Remove superseded assertions and nonfunctional comments
         run: |
-          node -e "const fs=require('fs'); const p='offline-interview/test-runtime-contract.mjs'; let s=fs.readFileSync(p,'utf8'); s=s.replace('assert.match(app, /⏳ Système…/);\\n',''); fs.writeFileSync(p,s);"
-          node -e "const fs=require('fs'); const p='offline-interview/app.js'; let s=fs.readFileSync(p,'utf8'); s=s.replace('  // takeSegment keeps the recognizer running: no restart gap at speaker/question boundaries.\\n',''); fs.writeFileSync(p,s);"
+          node -e "const fs=require('fs'); let p='offline-interview/test-runtime-contract.mjs',s=fs.readFileSync(p,'utf8'); s=s.replace('assert.match(app, /⏳ Système…/);\\n',''); fs.writeFileSync(p,s);"
+          node -e "const fs=require('fs'); let p='offline-interview/app.js',s=fs.readFileSync(p,'utf8'); s=s.replace('  // takeSegment keeps the recognizer running: no restart gap at speaker/question boundaries.\\n',''); fs.writeFileSync(p,s);"
+          node -e "const fs=require('fs'); let p='offline-interview/styles.css',s=fs.readFileSync(p,'utf8'); s=s.replace(/\/\*[\s\S]*?\*\//g,''); fs.writeFileSync(p,s);"
       - name: Parse JavaScript
         run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/audio-window.js
       - name: Semantic boundary regression
