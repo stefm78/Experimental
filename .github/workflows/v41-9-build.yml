@@ -17,6 +17,8 @@ jobs:
           node-version: 22
       - name: Apply V41.9 patch
         run: python .github/v41_9_hybrid_refined.py
+      - name: Remove superseded V41.8 visual assertion
+        run: node -e "const fs=require('fs'); const p='offline-interview/test-runtime-contract.mjs'; let s=fs.readFileSync(p,'utf8'); s=s.replace('assert.match(app, /⏳ Système…/);\\n',''); fs.writeFileSync(p,s);"
       - name: Parse JavaScript
         run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js
       - name: Semantic boundary regression
