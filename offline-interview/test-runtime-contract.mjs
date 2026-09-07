@@ -13,7 +13,7 @@ const systemStt = read('system-stt.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.7/);
+assert.match(app, /interview-runtime-v41\.8/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -37,9 +37,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.7/);
-assert.match(index, /styles\.css\?v=41\.7/);
-assert.match(index, /app\.js\?v=41\.7/);
+assert.match(sw, /offline-interview-v41\.8/);
+assert.match(index, /styles\.css\?v=41\.8/);
+assert.match(index, /app\.js\?v=41\.8/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
@@ -64,7 +64,7 @@ assert.match(app, /masterAudioChunks = \[\]/);
 assert.match(app, /masterAudioChunks\.push\(event\.data\)/);
 assert.match(app, /blob: masterBlob/);
 assert.match(app, /const recordingId = recordingCaptureId/);
-assert.match(app, /audioRef: failedAudioCaptureIds\.has\(recordingId\) \? null : \{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \}/);
+assert.match(app, /const audioRef = failedAudioCaptureIds\.has\(recordingId\) \? null : \{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \}/);
 assert.match(app, /replayTurnAudio\(turn, replay\)/);
 assert.match(app, /AudioContext \|\| window\.webkitAudioContext/);
 assert.match(app, /getFloatTimeDomainData/);
@@ -97,7 +97,7 @@ assert.match(app, /boundedWait\(dbAudioPut\([\s\S]*5000, 'stockage audio'\)/);
 assert.match(app, /finishInterview\(\);\s+persistSessionLater\('completion'\)/);
 assert.match(app, /failedAudioCaptureIds\.has\(recordingId\) \? null/);
 
-// V41.7: automatic transcription is system-first/system-only; saved audio remains usable when text is absent.
+// V41.8: automatic transcription is system-first/system-only; saved audio remains usable when text is absent.
 assert.doesNotMatch(app, /Aucun texte système · secours Whisper/);
 assert.doesNotMatch(app, /Transcription Whisper locale/);
 assert.match(app, /appendAudioOnlyTurn\(/);
@@ -109,7 +109,7 @@ assert.match(systemStt, /recognition\.start\(audioTrack\)/);
 assert.match(systemStt, /Chrome\|Chromium\|Edg/);
 
 
-// V41.7 field stabilization: explicit capture ownership, gapless semantic boundaries, replay pause, idempotent retranscription.
+// V41.8 field stabilization: explicit capture ownership, gapless semantic boundaries, replay pause, idempotent retranscription.
 assert.match(app, /systemSpeechSession\?\.takeSegment/);
 assert.doesNotMatch(app.match(/async function rotateLiveSegment[\s\S]*?return true;\n\}/)?.[0] || '', /cutSegment\(/);
 assert.match(app, /L’enregistrement reste sur/);
@@ -119,13 +119,19 @@ assert.match(app, /⏳ Système…/);
 assert.match(app, /systemRetranscription = \{ audioKey, status: 'succeeded'/);
 assert.match(app, /\['succeeded', 'failed'\]\.includes\(stableRetranscription\)/);
 
-// V41.7: semantic boundary text is derived from immutable saved-audio intervals, not cross-boundary live hypotheses.
+// V41.8: semantic boundary text is derived from immutable saved-audio intervals, not cross-boundary live hypotheses.
 assert.match(app, /let recordingMasterStartedAt = 0/);
 assert.match(app, /performance\.now\(\) - recordingMasterStartedAt/);
 assert.match(app, /audio-system-boundary-pending/);
-assert.match(app, /recoverBoundaryTurnsWithSystem\(captureId\)/);
-assert.match(app, /'boundary-recovery'/);
 assert.match(app, /const audioReady = Boolean\(turn\.audioRef\?\.recordingId\) && !isRecording\(\) && !captureFinalizing/);
+
+// V41.8: live system text is committed immediately; saved-audio retranscription is recovery, never a critical-path prerequisite.
+assert.match(app, /system-boundary-draft/);
+assert.match(app, /system_boundary_live_committed/);
+assert.match(app, /system_boundary_live_missing/);
+assert.match(app, /boundary_audio_ready/);
+assert.doesNotMatch(app, /recoverBoundaryTurnsWithSystem/);
+assert.doesNotMatch(app, /await retranscribeTurnWithSystem\(turn, null, 'boundary-recovery'\)/);
 
 // Explicit anti-growth budgets. Raising one requires a conscious code-review decision.
 const coreBytes = bytes(app) + bytes(css) + bytes(systemStt) + bytes(index) + bytes(sw);
@@ -136,7 +142,7 @@ assert.ok(coreBytes <= 211_000, `core source budget exceeded: ${coreBytes} bytes
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41.7',
+  contract: 'offline-interview.runtime-contract.v41.8',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes

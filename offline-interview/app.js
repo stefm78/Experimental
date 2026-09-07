@@ -1,6 +1,6 @@
 import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';
 
-const BUILD_ID = '2026-09-07.interview-runtime-v41.7';
+const BUILD_ID = '2026-09-07.interview-runtime-v41.8';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -1016,22 +1016,33 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   updateCaptureUi();
 
   const commit = async () => {
-    let settled = null;
-    try { settled = await cut.settled; } catch {}
-    const provisionalText = cleanText(settled?.text || cut.text);
-    // Continuous SpeechRecognition may emit one hypothesis spanning a human click.
-    // Never assign that hypothesis across speakers as authoritative text. Preserve the
-    // exact audio interval and recover it from that immutable interval after capture.
+    const provisionalText = cleanText(cut.text);
+    const audioRef = failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs };
+    if (meaningfulTranscript(provisionalText)) {
+      await appendAnswerTurn({
+        questionId: previousQuestionId,
+        speakerId: previousSpeakerId,
+        text: provisionalText,
+        source: systemSpeechCapability.mode === 'local' ? 'system-local-boundary-draft' : 'system-boundary-draft',
+        rawTranscript: provisionalText,
+        durationSeconds,
+        audioRef
+      });
+      logRuntimeEvent('system_boundary_live_committed', {
+        questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true, textLength: provisionalText.length
+      });
+      return;
+    }
     await appendAudioOnlyTurn({
       questionId: previousQuestionId,
       speakerId: previousSpeakerId,
       durationSeconds,
-      audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs },
+      audioRef,
       source: 'audio-system-boundary-pending',
-      rawTranscript: provisionalText || null
+      rawTranscript: null
     });
-    logRuntimeEvent('system_boundary_deferred', {
-      questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true, provisionalText: Boolean(provisionalText)
+    logRuntimeEvent('system_boundary_live_missing', {
+      questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true
     });
   };
   semanticBoundaryCommitQueue = semanticBoundaryCommitQueue.then(commit, commit);
@@ -1531,18 +1542,6 @@ async function appendAudioOnlyTurn({ questionId, speakerId, durationSeconds = 0,
   renderQuestionNav();
   renderInterviewMetrics();
   return true;
-}
-
-async function recoverBoundaryTurnsWithSystem(captureId) {
-  const pending = Object.values(session?.responses || {}).flatMap(response => response.turns || []).filter(turn =>
-    turn.audioRef?.recordingId === captureId && turn.source === 'audio-system-boundary-pending'
-  );
-  if (!pending.length) return;
-  if (!supportsSystemAudioTrackRecognition() || systemSpeechCapability.mode === 'unavailable') {
-    logRuntimeEvent('system_boundary_recovery_deferred', { captureId, count: pending.length, reason: 'audio-track-unsupported' });
-    return;
-  }
-  for (const turn of pending) await retranscribeTurnWithSystem(turn, null, 'boundary-recovery');
 }
 
 async function addComposerTurn() {
@@ -2238,7 +2237,7 @@ async function handleRecordingStopped() {
       ui.recordState.textContent = 'Audio non conservé';
       showError(ui.interviewError, 'La transcription système n’a rien renvoyé et l’audio local n’a pas pu être conservé.');
     }
-    if (audioStored) await recoverBoundaryTurnsWithSystem(captureId);
+    if (audioStored) logRuntimeEvent('boundary_audio_ready', { captureId });
   } catch (error) {
     diagnosticError = String(error?.message || error);
     logRuntimeEvent('transcription_error', {
