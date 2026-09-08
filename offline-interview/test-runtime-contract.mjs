@@ -14,7 +14,7 @@ const audioWindow = read('audio-window.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.11/);
+assert.match(app, /interview-runtime-v41\.12/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -38,9 +38,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.11/);
-assert.match(index, /styles\.css\?v=41\.11/);
-assert.match(index, /app\.js\?v=41\.11/);
+assert.match(sw, /offline-interview-v41\.12/);
+assert.match(index, /styles\.css\?v=41\.12/);
+assert.match(index, /app\.js\?v=41\.12/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
@@ -132,7 +132,7 @@ assert.match(app, /system_boundary_live_missing/);
 assert.match(app, /boundary_audio_ready/);
 
 // V41.11 hybrid audio: master remains authoritative; context is a derived window only.
-assert.match(app, /import \{ turnAudioWindow \} from '.\/audio-window\.js'/);
+assert.match(app, /import \{ turnAudioWindow, sliceAudioBuffer \} from '.\/audio-window\.js'/);
 assert.match(audioWindow, /AUDIO_CONTEXT_BEFORE_MS = 250/);
 assert.match(audioWindow, /AUDIO_CONTEXT_AFTER_MS = 250/);
 assert.match(audioWindow, /canonicalStartMs/);
@@ -162,6 +162,10 @@ assert.doesNotMatch(app, /await retranscribeTurnWithSystem\(turn, null, 'boundar
 assert.match(app, /resolveDirectInterviewLink/);
 assert.match(app, /directLaunch\?\.view === 'interview'/);
 assert.match(app, /turnAudioWindow\(turn, 'recovery'\)/);
+assert.match(app, /sliceAudioBuffer\(context, decoded, ref\.startMs, ref\.endMs\)/);
+assert.match(app, /source\.addEventListener\('ended',[\s\S]*track\.stop/);
+assert.match(app, /armReplayStop\(end\)/);
+assert.match(css, /min-width:641px[\s\S]*max-width:979px[\s\S]*mobile-only-metrics/);
 assert.doesNotMatch(app, /\['succeeded', 'failed'\]\.includes\(stableRetranscription\)/);
 assert.match(index, /class="mic-meter" role="meter"/);
 assert.doesNotMatch(index, />Micro<\/button>/);
@@ -175,7 +179,7 @@ assert.ok(coreBytes <= 211_000, `core source budget exceeded: ${coreBytes} bytes
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41.11',
+  contract: 'offline-interview.runtime-contract.v41.12',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes

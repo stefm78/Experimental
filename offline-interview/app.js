@@ -1,8 +1,8 @@
 import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';
-import { turnAudioWindow } from './audio-window.js';
+import { turnAudioWindow, sliceAudioBuffer } from './audio-window.js';
 import { resolveDirectInterviewLink } from './direct-interview-link.js';
 
-const BUILD_ID = '2026-09-08.interview-runtime-v41.11';
+const BUILD_ID = '2026-09-08.interview-runtime-v41.12';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -78,6 +78,7 @@ let activeReplayAudio = null;
 let activeReplayUrl = null;
 let activeReplayTurnId = null;
 let activeReplayButton = null;
+let activeReplayTimer = null;
 const activeSystemRetranscriptions = new Set();
 let failedAudioCaptureIds = new Set();
 
@@ -121,7 +122,6 @@ function formatTime(seconds) {
   return `${m}:${s}`;
 }
 function safeFilePart(value) { return String(value || 'interview').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'interview'; }
-
 
 function updateMicMeter(level = 0, peak = 0) {
   const rms = Math.max(0, Math.min(1, Number(level) || 0));
@@ -205,6 +205,8 @@ function updateReplayButton(button, playing) {
 }
 
 function stopReplay() {
+  if (activeReplayTimer) clearTimeout(activeReplayTimer);
+  activeReplayTimer = null;
   try { activeReplayAudio?.pause(); } catch {}
   updateReplayButton(activeReplayButton, false);
   activeReplayAudio = null;
@@ -214,15 +216,27 @@ function stopReplay() {
   activeReplayUrl = null;
 }
 
+function armReplayStop(endSeconds) {
+  if (activeReplayTimer) clearTimeout(activeReplayTimer);
+  activeReplayTimer = null;
+  if (!activeReplayAudio || activeReplayAudio.paused) return;
+  const remainingMs = Math.max(0, (endSeconds - activeReplayAudio.currentTime) * 1000);
+  activeReplayTimer = setTimeout(stopReplay, remainingMs + 20);
+}
+
 async function replayTurnAudio(turn, button) {
   const ref = turnAudioWindow(turn, 'recovery');
   if (!ref?.recordingId) return;
+  const end = Math.max(0, Number(ref.endMs) || 0) / 1000;
   if (activeReplayTurnId === turn.id && activeReplayAudio) {
     if (activeReplayAudio.paused) {
       await activeReplayAudio.play();
       updateReplayButton(activeReplayButton, true);
+      armReplayStop(end);
     } else {
       activeReplayAudio.pause();
+      if (activeReplayTimer) clearTimeout(activeReplayTimer);
+      activeReplayTimer = null;
       updateReplayButton(activeReplayButton, false);
     }
     return;
@@ -233,12 +247,10 @@ async function replayTurnAudio(turn, button) {
   const url = URL.createObjectURL(record.blob);
   const audio = new Audio(url);
   activeReplayAudio = audio; activeReplayUrl = url; activeReplayTurnId = turn.id; activeReplayButton = button || null;
-  const end = Math.max(0, Number(ref.endMs) || 0) / 1000;
   audio.addEventListener('loadedmetadata', () => {
     audio.currentTime = Math.max(0, Number(ref.startMs) || 0) / 1000;
-    audio.play().then(() => updateReplayButton(activeReplayButton, true)).catch(() => stopReplay());
+    audio.play().then(() => { updateReplayButton(activeReplayButton, true); armReplayStop(end); }).catch(() => stopReplay());
   }, { once: true });
-  audio.addEventListener('timeupdate', () => { if (end && audio.currentTime >= end) stopReplay(); });
   audio.addEventListener('ended', stopReplay, { once: true });
 }
 
@@ -252,21 +264,19 @@ async function buildTurnRecognitionTrack(turn) {
   const context = new Context();
   await context.resume();
   const decoded = await context.decodeAudioData((await record.blob.arrayBuffer()).slice(0));
-  const startSeconds = Math.max(0, Number(ref.startMs) || 0) / 1000;
-  const requestedEnd = Math.max(startSeconds, Number(ref.endMs) || 0) / 1000;
-  const endSeconds = Math.min(decoded.duration, requestedEnd > startSeconds ? requestedEnd : decoded.duration);
-  const durationSeconds = Math.max(0.05, endSeconds - startSeconds);
+  const segment = sliceAudioBuffer(context, decoded, ref.startMs, ref.endMs);
   const destination = context.createMediaStreamDestination();
   const source = context.createBufferSource();
-  source.buffer = decoded;
+  source.buffer = segment;
   source.connect(destination);
   const track = destination.stream.getAudioTracks()[0];
   if ('contentHint' in track) track.contentHint = 'speech-recognition';
   let started = false;
+  source.addEventListener('ended', () => { try { track.stop(); } catch {} }, { once: true });
   return {
     track,
-    durationMs: Math.ceil(durationSeconds * 1000),
-    start() { if (!started) { started = true; source.start(0, startSeconds, durationSeconds); } },
+    durationMs: Math.ceil(segment.duration * 1000),
+    start() { if (!started) { started = true; source.start(0); } },
     cleanup() { try { if (started) source.stop(); } catch {} try { track.stop(); } catch {} context.close().catch(() => {}); }
   };
 }
@@ -981,7 +991,6 @@ function renderQuestionNav() {
   }
 }
 
-
 async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   if (!isRecording() || !recordingSpeakerId || !recordingQuestionId) return false;
   if (!nextSpeakerId || !nextQuestionId) return false;
@@ -1058,8 +1067,6 @@ function renderCaptureQuestionContext() {
   const finalizing = captureFinalizing && Boolean(recordingQuestionId);
   const active = recording || finalizing;
   show(ui.captureQuestionContext, false);
-  // Audio capture remains live during the short SpeechRecognition handoff.
-  // Keep the global ON AIR indicator continuous instead of blinking.
   show(ui.topOnAir, recording);
 
   if (!active) {
@@ -1075,7 +1082,6 @@ function renderCaptureQuestionContext() {
   const ownerLabel = owner ? ((ownerIndex + 1) + '. ' + (owner.question.label || questionNavLabel(owner.question))) : 'Question en cours';
   const differs = Boolean(recording && viewed?.question?.id && viewed.question.id !== recordingQuestionId);
 
-  // The context row is useful only when the interviewer can transfer capture.
   show(ui.captureQuestionContext, differs);
 
   if (ui.captureQuestionStatus) {
@@ -1083,8 +1089,6 @@ function renderCaptureQuestionContext() {
   }
   if (ui.captureQuestionLabel) ui.captureQuestionLabel.textContent = ownerLabel;
 
-  // Speaker identity already lives in the capture dock and active speaker button.
-  // Keep the global ON AIR pill intentionally static to avoid visual flicker.
   if (ui.topOnAirSpeaker) ui.topOnAirSpeaker.textContent = '';
 
   show(ui.moveCaptureBtn, differs);
@@ -1138,8 +1142,6 @@ async function goToQuestion(index) {
   sessionClockLastMs = Date.now();
   renderQuestion();
 
-  // Navigation changes only the viewed question. Capture ownership remains explicit until
-  // the interviewer uses the visible transfer action in the capture banner.
   renderCaptureQuestionContext();
   persistSessionLater('question-navigation');
 }
@@ -1340,8 +1342,6 @@ function updateCaptureUi() {
   if (ui.micPreviewBtn) { ui.micPreviewBtn.disabled = recording || captureFinalizing; if (recording) { ui.micPreviewBtn.textContent = 'Micro actif'; ui.micPreviewBtn.setAttribute('aria-pressed', 'true'); } }
 
   if (recording) {
-    // The active red speaker button already identifies the person. Keep capture chrome stable
-    // across the sub-second recognition handoff: no PASSAGE flash and no duplicated name.
     if (ui.captureModeLabel) ui.captureModeLabel.textContent = 'ON AIR';
     ui.recordState.textContent = '';
   } else if (captureFinalizing) {
@@ -1669,6 +1669,7 @@ function renderTurns() {
     replay.setAttribute('aria-label', replay.title);
     const audioReady = Boolean(turn.audioRef?.recordingId) && !isRecording() && !captureFinalizing;
     replay.disabled = !audioReady;
+    if (hasAudio && (isRecording() || captureFinalizing)) replay.title = 'Réécoute disponible après la prise en cours';
     replay.addEventListener('click', () => replayTurnAudio(turn, replay));
     const retranscribe = document.createElement('button');
     retranscribe.type = 'button';
@@ -2404,7 +2405,6 @@ async function copyDiagnosticReport() {
     ui.copyDiagStatus.textContent = 'Copiez manuellement le rapport ci-dessous.';
   }
 }
-
 
 async function loadDirectInterviewFromLocation(){
   const direct=await resolveDirectInterviewLink(window.location);

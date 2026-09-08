@@ -1183,3 +1183,9 @@
 .audio-to-text-icon{display:grid;place-items:center;width:18px;height:18px;font-size:.78rem;font-weight:900;line-height:1}.audio-to-text-icon.is-busy{letter-spacing:1px}.audio-to-text-svg{width:23px;height:14px;fill:none;stroke:currentColor;stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}.audio-to-text-arrow{stroke-width:1.35}
 .audio-only-turn{padding-block:6px;background:#fbfcfd}.audio-only-turn .turn-head{margin-bottom:0}
 @media(max-width:560px){.mic-meter-row{width:12px;min-width:12px}.mic-meter{width:5px;height:26px}}
+
+
+/* V41.12: at intermediate widths the header already exposes question count, elapsed time and remaining estimate. */
+@media (min-width:641px) and (max-width:979px){
+  .mobile-only-metrics,.question-progress-mobile{display:none!important}
+}

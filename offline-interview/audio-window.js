@@ -10,3 +10,19 @@ export function turnAudioWindow(turn, mode='canonical', durationMs=null){
   const beforeMs=Math.max(0,Number(r.contextBeforeMs??AUDIO_CONTEXT_BEFORE_MS)||0),afterMs=Math.max(0,Number(r.contextAfterMs??AUDIO_CONTEXT_AFTER_MS)||0),startMs=Math.max(0,canonicalStartMs-beforeMs),endMs=limit==null?canonicalEndMs+afterMs:Math.min(limit,canonicalEndMs+afterMs);
   return{recordingId:r.recordingId,startMs,endMs:Math.max(startMs,endMs),canonicalStartMs,canonicalEndMs,beforeMs,afterMs,mode:'context'};
 }
+
+
+export function sliceAudioBuffer(context, decoded, startMs, endMs){
+  if(!context||!decoded)throw new Error('Buffer audio invalide.');
+  const rate=Number(decoded.sampleRate)||0;if(!rate)throw new Error('Fréquence audio invalide.');
+  const maxFrames=Number(decoded.length)||Math.round((Number(decoded.duration)||0)*rate);
+  const startFrame=Math.max(0,Math.min(maxFrames,Math.floor((Math.max(0,Number(startMs)||0)/1000)*rate)));
+  const requestedEnd=Math.max(Number(startMs)||0,Number(endMs)||0);
+  const endFrame=Math.max(startFrame+1,Math.min(maxFrames,Math.ceil((requestedEnd/1000)*rate)));
+  const length=Math.max(1,endFrame-startFrame);
+  const segment=context.createBuffer(decoded.numberOfChannels,length,rate);
+  for(let channel=0;channel<decoded.numberOfChannels;channel+=1){
+    segment.copyToChannel(decoded.getChannelData(channel).subarray(startFrame,endFrame),channel);
+  }
+  return segment;
+}
