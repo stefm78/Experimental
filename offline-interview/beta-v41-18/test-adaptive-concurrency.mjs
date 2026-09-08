@@ -11,8 +11,10 @@ assert.match(controller,/recording&&\(!concurrentAllowed\|\|concurrentRuntimeDis
 assert.match(controller,/executionMode:duringLive\?'concurrent':'near-line'/);
 assert.match(controller,/concurrentRuntimeDisabled=true/);
 assert.match(controller,/end<=start/);
-assert.match(probe,/saveCapability\('PASS_STRICT'/);
-assert.match(probe,/saveCapability\('FAIL_FAST'/);
+assert.match(probe,/function saveCapability\(status,detail=\{\}\)/);
+assert.match(probe,/if\(status\)saveCapability\(status,detail\)/);
+assert.match(probe,/,'PASS_STRICT',detail\)/);
+assert.match(probe,/,'FAIL_FAST',\{/);
 assert.match(probe,/userAgent:navigator\.userAgent/);
 assert.doesNotMatch(controller,/Edg\//);
 assert.doesNotMatch(controller,/Chrome\//);
