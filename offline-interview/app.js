@@ -2,7 +2,7 @@ import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrack
 import { turnAudioWindow } from './audio-window.js';
 import { resolveDirectInterviewLink } from './direct-interview-link.js';
 
-const BUILD_ID = '2026-09-08.interview-runtime-v41.11';
+const BUILD_ID = '2026-09-08.interview-runtime-v41.12';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -266,7 +266,7 @@ async function buildTurnRecognitionTrack(turn) {
   return {
     track,
     durationMs: Math.ceil(durationSeconds * 1000),
-    start() { if (!started) { started = true; source.start(0, startSeconds, durationSeconds); } },
+    start() { if (started) return; started = true; source.start(0, startSeconds, durationSeconds); setTimeout(() => track.stop(), Math.ceil(durationSeconds * 1000) + 350); },
     cleanup() { try { if (started) source.stop(); } catch {} try { track.stop(); } catch {} context.close().catch(() => {}); }
   };
 }

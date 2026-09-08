@@ -777,6 +777,7 @@
   .interview-mode .shell{width:min(860px,100%)!important;padding:8px!important;min-height:0!important}
   .interview-layout{display:block}
   .question-sidebar{display:none!important}
+  .mobile-only-metrics,.question-progress-mobile{display:none!important}
   .interview-main{min-height:0!important;border-radius:14px!important;padding:16px 14px 22px!important;margin:0!important}
   .question-sticky{position:relative!important;top:auto!important;z-index:auto!important;background:#fff;padding-bottom:8px;border-bottom:1px solid #edf1f5}
   .mobile-only-metrics{display:flex!important}

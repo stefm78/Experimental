@@ -14,7 +14,7 @@ const audioWindow = read('audio-window.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.11/);
+assert.match(app, /interview-runtime-v41\.12/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -38,9 +38,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.11/);
-assert.match(index, /styles\.css\?v=41\.11/);
-assert.match(index, /app\.js\?v=41\.11/);
+assert.match(sw, /offline-interview-v41\.12/);
+assert.match(index, /styles\.css\?v=41\.12/);
+assert.match(index, /app\.js\?v=41\.12/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
