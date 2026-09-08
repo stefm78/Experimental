@@ -4,7 +4,9 @@ const BUILD = '2026-09-08.interview-runtime-v41.17-quality-lanes';
 const DB_NAME = 'offline-interview';
 const DB_VERSION = 2;
 const STATE_KEY = 'current-session';
+const SPEC_KEY = 'last-interview-spec';
 const POLL_MS = 4500;
+const MAX_AUTO_ATTEMPTS = 2;
 let running = false;
 let stopped = false;
 const status = document.getElementById('qualityLaneStatus');
@@ -20,6 +22,7 @@ async function kvGet(key){const db=await openDb();try{return await req(db.transa
 async function kvPut(key,value){const db=await openDb();try{await req(db.transaction('kv','readwrite').objectStore('kv').put(value,key));}finally{db.close();}}
 async function audioGet(id){const db=await openDb();try{return await req(db.transaction('audio','readonly').objectStore('audio').get(id));}finally{db.close();}}
 function allTurns(session){return Object.entries(session?.responses||{}).flatMap(([questionId,response])=>(response?.turns||[]).map((turn,index)=>({questionId,turn,index})));}
+function flattenedQuestions(spec){return (spec?.sections||[]).flatMap(section=>(section.questions||[]).map(question=>({section,question})));}
 function isRecording(){
   const onAir=document.getElementById('topOnAir');
   const finalizing=document.getElementById('transcribing');
@@ -27,8 +30,9 @@ function isRecording(){
 }
 function eligible(turn){
   if(!turn?.audioRef?.recordingId || turn.humanEdited) return false;
-  if(turn.qualityRetranscription?.status==='succeeded') return false;
-  if(turn.qualityRetranscription?.status==='running') return false;
+  const quality=turn.qualityRetranscription||{};
+  if(quality.status==='succeeded'||quality.status==='running') return false;
+  if((Number(quality.attempt)||0)>=MAX_AUTO_ATTEMPTS) return false;
   return true;
 }
 async function decodeTurn(turn){
@@ -54,17 +58,19 @@ async function decodeTurn(turn){
   }catch(error){await context.close().catch(()=>{});throw error;}
 }
 async function persistQuality(questionId, turnId, patch, eventType){
-  const session=await kvGet(STATE_KEY);if(!session) return;
-  const turn=(session.responses?.[questionId]?.turns||[]).find(t=>t.id===turnId);if(!turn) return;
+  const session=await kvGet(STATE_KEY);if(!session) return null;
+  const turn=(session.responses?.[questionId]?.turns||[]).find(t=>t.id===turnId);if(!turn) return null;
   turn.qualityRetranscription={...(turn.qualityRetranscription||{}),...patch};
   session.runtimeEvents=Array.isArray(session.runtimeEvents)?session.runtimeEvents:[];
   session.runtimeEvents.push({at:new Date().toISOString(),type:eventType,turnId,questionId,...patch});
   session.runtimeEvents=session.runtimeEvents.slice(-220);
   await kvPut(STATE_KEY,session);
+  return turn;
 }
 async function qualityPass(item,capability){
   const {questionId,turn}=item;
-  await persistQuality(questionId,turn.id,{status:'running',engine:'system-audio-track',startedAt:new Date().toISOString()},'quality_retranscription_started');
+  const attempt=(Number(turn.qualityRetranscription?.attempt)||0)+1;
+  await persistQuality(questionId,turn.id,{status:'running',attempt,engine:'system-audio-track',startedAt:new Date().toISOString()},'quality_retranscription_started');
   const {context,source,track,durationMs}=await decodeTurn(turn);
   try{
     const result=await transcribeSystemAudioTrack(track,{lang:'fr-FR',mode:capability.mode,durationMs,onStart:()=>source.start()});
@@ -73,7 +79,7 @@ async function qualityPass(item,capability){
     const session=await kvGet(STATE_KEY);
     const fresh=(session?.responses?.[questionId]?.turns||[]).find(t=>t.id===turn.id);
     const protectedByHuman=Boolean(fresh?.humanEdited);
-    const patch={status:'succeeded',engine:'system-audio-track',mode:capability.mode,text,completedAt:new Date().toISOString(),humanProtected:protectedByHuman};
+    const patch={status:'succeeded',attempt,engine:'system-audio-track',mode:capability.mode,text,completedAt:new Date().toISOString(),humanProtected:protectedByHuman};
     await persistQuality(questionId,turn.id,patch,'quality_retranscription_succeeded');
     if(!protectedByHuman && !String(fresh?.text||'').trim()) {
       const latest=await kvGet(STATE_KEY);
@@ -83,10 +89,10 @@ async function qualityPass(item,capability){
         await kvPut(STATE_KEY,latest);
       }
     }
-    setStatus(`qualité prête · ${text.length} caractères · interview jamais bloquée`,'ok');
+    setStatus(`qualité prête · ${text.length} caractères · live préservé`,'ok');
   } catch(error) {
-    await persistQuality(questionId,turn.id,{status:'failed',engine:'system-audio-track',error:String(error?.message||error),completedAt:new Date().toISOString()},'quality_retranscription_failed');
-    setStatus(`passe qualité différée : ${error?.message||error}`,'warn');
+    await persistQuality(questionId,turn.id,{status:'failed',attempt,engine:'system-audio-track',error:String(error?.message||error),completedAt:new Date().toISOString()},'quality_retranscription_failed');
+    setStatus(`passe qualité différée (${attempt}/${MAX_AUTO_ATTEMPTS}) · ${error?.message||error}`,'warn');
   } finally {
     try{source.stop();}catch{}try{track.stop();}catch{}await context.close().catch(()=>{});
   }
@@ -99,7 +105,7 @@ async function scheduler(){
     if(!supportsSystemAudioTrackRecognition()||capability.mode==='unavailable'){
       setStatus('live système actif · passe qualité audio-track indisponible ici','warn');return;
     }
-    const session=await kvGet(STATE_KEY);if(!session||session.completed) return;
+    const session=await kvGet(STATE_KEY);if(!session) return;
     const next=allTurns(session).find(({turn})=>eligible(turn));
     if(next) await qualityPass(next,capability);
   } catch(error) {
@@ -113,12 +119,11 @@ function visualState(button,state){
   button.title=state==='succeeded'?'Retranscription réussie — relancer si nécessaire':state==='rejected'?'Transcription rejetée — réessayer':'Échec de retranscription — réessayer';
 }
 async function cardTurn(card){
-  const session=await kvGet(STATE_KEY);if(!session) return null;
+  const [session,spec]=await Promise.all([kvGet(STATE_KEY),kvGet(SPEC_KEY)]);if(!session||!spec) return null;
   const cards=[...document.querySelectorAll('#turnsList .turn-card')];
   const index=cards.indexOf(card);if(index<0) return null;
-  const questionId=Object.keys(session.responses||{})[session.currentIndex??0] || null;
-  const response=questionId?session.responses?.[questionId]:null;
-  const turn=response?.turns?.[index];
+  const questionId=flattenedQuestions(spec)[session.currentIndex??0]?.question?.id;
+  const turn=questionId?session.responses?.[questionId]?.turns?.[index]:null;
   return turn?{questionId,turn}:null;
 }
 async function watchRetry(button,card){
