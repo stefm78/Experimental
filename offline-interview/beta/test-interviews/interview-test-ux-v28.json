@@ -1,0 +1,102 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v28-adaptive-boundary",
+  "version": "1.0",
+  "title": "Test UX V28 — frontières adaptatives sans carré micro",
+  "context": "Ce test valide exclusivement la correction V28 du décalage de locuteur observé en V27.2. Le runtime doit rester fluide, conserver SpeechRecognition continu, absorber les finalisations tardives du locuteur précédent au bon endroit et ne jamais déclencher Whisper à chaque changement. Le carré microphone rejeté en V27.2 doit avoir disparu ; ON AIR reste le signal principal.",
+  "objective": "Vérifier que les derniers mots d'un locuteur ne migrent plus vers le suivant, que la calibration automatique de finalisation n'introduit aucune attente perceptible et que l'interface reste stable.",
+  "language": "fr-FR",
+  "tags": ["ux", "v28", "speaker-boundary", "adaptive-settle", "system-stt", "stability"],
+  "estimatedDurationMinutes": 8,
+  "participants": [
+    { "id": "P1", "name": "Interviewer", "role": "interviewer" },
+    { "id": "P2", "name": "Testeur", "role": "interviewee" },
+    { "id": "P3", "name": "Second participant", "role": "interviewee" }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Runtime et signal ON AIR",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Version et simplification visuelle",
+          "text": "Avant de commencer, ouvrez « Transcription et confidentialité » et vérifiez que Runtime affiche exactement « 2026-09-04.interview-runtime-v28 ». Pendant l'enregistrement, vérifiez ensuite qu'il n'y a plus de carré microphone vide : le badge ON AIR et le nom du locuteur doivent suffire. Décrivez ce que vous voyez.",
+          "intent": "Valider l'identité V28 et la suppression définitive du cue microphone défectueux.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Frontières contrôlées",
+      "questions": [
+        {
+          "id": "Q2",
+          "label": "Mots sentinelles — quatre bascules",
+          "text": "Faites quatre bascules de locuteur. Testeur dit « La phrase du testeur se termine par volcan », puis cliquez immédiatement sur Second participant. Second participant dit « La phrase du participant se termine par rivière », puis basculez. Testeur dit « Mon second mot sentinelle est satellite », puis basculez. Second participant dit « Mon second mot sentinelle est chocolat ». Ne laissez pas volontairement une longue pause avant les clics.",
+          "intent": "Détecter précisément si volcan, rivière, satellite ou chocolat est attribué au locuteur suivant à cause d'une finalisation STT tardive.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": ["P2", "P3"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Dix bascules naturelles",
+          "text": "Alternez au moins dix fois entre Testeur et Second participant. Chaque personne prononce une phrase naturelle de cinq à douze mots et clique sur l'autre locuteur juste après avoir fini. Ne ralentissez pas volontairement votre rythme pour aider l'application. Signalez immédiatement toute attente perceptible, perte de réactivité ou mot du locuteur précédent qui apparaît chez le suivant.",
+          "intent": "Valider la frontière adaptative en conversation réaliste et vérifier que le settling reste asynchrone et non bloquant.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": ["P2", "P3"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Conversation et transfert",
+      "questions": [
+        {
+          "id": "Q4",
+          "label": "Conversation continue",
+          "text": "Pendant environ une minute, échangez naturellement à deux sur le thème de votre choix. Utilisez les boutons de locuteur normalement, sans attendre une confirmation technique entre les personnes. À la fin, dites si les frontières semblent correctes et si l'entretien reste fluide.",
+          "intent": "Vérifier que la correction contrôlée se généralise à une conversation réelle sans transformer l'usage en protocole artificiel.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": ["P2", "P3"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q5",
+          "label": "Transfert de question sous ON AIR",
+          "text": "Pendant que cette question reste ON AIR, affichez la question suivante puis utilisez « Basculer sur la question N → ». Vérifiez que le transfert reste immédiat, que les prises précédentes restent dans le bon ordre et qu'aucun texte tardif ne migre vers la nouvelle question.",
+          "intent": "Valider que la même frontière adaptative fonctionne aussi sur les changements de question.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Verdict",
+      "questions": [
+        {
+          "id": "Q6",
+          "label": "Verdict V28",
+          "text": "Après ce test, avez-vous observé : un mot de fin attribué au mauvais locuteur, un gel ou ralentissement, une attente perceptible au clic, une hallucination répétitive, un carré microphone résiduel ou une autre anomalie ? Si tout semble correct, dites simplement ce qui vous paraît désormais suffisamment fiable et ce qui reste éventuellement à améliorer.",
+          "intent": "Décider si V28 peut fermer le défaut de frontière tardive sans réintroduire les régressions V27.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    }
+  ]
+}

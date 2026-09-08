@@ -1,0 +1,112 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v34-field-polish",
+  "version": "1.0",
+  "title": "Test UX V34 — écran plus calme et réponses plus compactes",
+  "context": "La V33 a corrigé le défaut principal : la question reste visible quand les réponses s'ajoutent. Ce test vérifie seulement les petits défauts encore observés : le bandeau ON AIR du haut ne doit plus bouger quand on change de personne, les réponses doivent prendre moins de place, une très longue question ne doit pas écraser la zone des réponses et le nom d'un nouveau participant doit être facile à remplacer.",
+  "objective": "Vérifier que la V34 garde les acquis de la V33 tout en rendant l'écran plus calme et plus compact. Ce test sert aussi à décider, après comparaison, s'il existe encore une vraie raison d'afficher les réponses les plus récentes en premier.",
+  "language": "fr-FR",
+  "tags": ["ux", "v34", "density", "on-air", "long-question", "participant-name", "responsive", "stt-boundary"],
+  "estimatedDurationMinutes": 7,
+  "participants": [
+    {"id": "P1", "name": "Interviewer", "role": "interviewer"},
+    {"id": "P2", "name": "Testeur", "role": "interviewee"},
+    {"id": "P3", "name": "Second participant", "role": "interviewee"}
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Calme visuel",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Version et bandeau ON AIR",
+          "text": "Vérifiez que la version affichée est exactement 2026-09-04.interview-runtime-v34. Gardez la fenêtre large et changez six fois de personne pendant que l'enregistrement tourne. Le bandeau rouge ON AIR placé en haut doit rester de la même largeur et ne pas afficher le nom de la personne. Le nom de la personne qui parle doit rester visible dans la zone rouge du bas et sur le bouton actif. Dites si l'écran paraît plus calme.",
+          "intent": "Vérifier que le changement de locuteur ne fait plus varier le bandeau ON AIR du haut.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Réponses plus resserrées",
+          "text": "Restez sur cette question et faites six petites prises de parole. Regardez la liste des réponses : chaque réponse courte doit utiliser nettement moins de hauteur qu'en V33, tout en restant facile à lire et à corriger. Vérifiez aussi que les menus de personne et les boutons de suppression restent faciles à utiliser. Dites si la densité vous paraît correcte, trop serrée ou encore trop aérée.",
+          "intent": "Valider la densité des cartes de réponse sans sacrifier la lisibilité.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Petite fenêtre",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Très longue question",
+          "text": "Rendez maintenant la fenêtre très étroite. Cette question est volontairement longue pour vérifier un cas difficile. Même si le texte de la question contient beaucoup de mots et plusieurs phrases, il ne doit pas prendre presque tout l'écran. Vous devez pouvoir lire le reste de la question en faisant défiler sa petite zone si nécessaire, tout en gardant assez de place pour voir et parcourir les réponses situées dessous ainsi que la zone rouge de capture. Changez deux fois de personne et confirmez que la question reste dans son cadre sans faire disparaître les réponses ni les boutons du bas.",
+          "intent": "Vérifier qu'une question longue est bornée et ne vole pas l'espace nécessaire à la conversation.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Ajouter un participant",
+          "text": "Toujours en petite fenêtre, ouvrez Participants puis ajoutez une personne. Le champ contient d'abord « Nouveau participant ». Cliquez une fois dans ce champ puis tapez directement « Toto » sans sélectionner ni effacer le texte à la main. Le nouveau nom doit remplacer immédiatement le texte par défaut. Refermez ensuite Participants et vérifiez que le bouton Toto apparaît bien en bas.",
+          "intent": "Vérifier que le nom par défaut est remplacé sans manipulation inutile.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Régressions",
+      "questions": [
+        {
+          "id": "Q5",
+          "label": "Changer de question pendant l'enregistrement",
+          "text": "Laissez l'enregistrement tourner puis affichez une autre question avec le menu. La petite ligne qui indique que l'enregistrement est encore sur l'ancienne question doit apparaître avec le bouton de bascule. Utilisez le bouton. La ligne doit disparaître dès que l'enregistrement et la question affichée sont les mêmes. Revenez ensuite ici.",
+          "intent": "Vérifier que la simplification V34 n'a pas cassé le transfert de question validé en V33.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        },
+        {
+          "id": "Q6",
+          "label": "Changement rapide de personne",
+          "text": "Faites ce test sans ralentir exprès. Testeur dit « un deux trois », puis cliquez tout de suite sur Second participant. Second participant dit « quatre cinq six », puis cliquez sur Testeur. Testeur dit « sept huit neuf », puis cliquez sur Second participant. Second participant dit « dix onze douze ». Vérifiez surtout qu'un groupe de nombres ne se retrouve pas chez la mauvaise personne. Une petite erreur de reconnaissance d'un mot n'est pas le défaut recherché ici.",
+          "intent": "Vérifier la frontière entre locuteurs sans confondre attribution et qualité générale de reconnaissance vocale.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Décision",
+      "questions": [
+        {
+          "id": "Q7",
+          "label": "Verdict et ordre des réponses",
+          "text": "Donnez quatre réponses simples. 1 : le bandeau ON AIR du haut est-il resté stable quand vous changiez de personne ? 2 : les réponses sont-elles maintenant assez compactes ? 3 : une longue question laisse-t-elle assez de place aux réponses ? 4 : après avoir utilisé cette version plus compacte, souhaitez-vous toujours que les réponses les plus récentes soient affichées au-dessus des anciennes, ou l'ordre actuel vous convient-il ? Ne proposez l'inversion que si elle apporte encore un avantage clair.",
+          "intent": "Décider les derniers points de finition avec une preuve d'usage plutôt qu'une préférence théorique.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v38-result-visible",
+  "version": "1.0",
+  "title": "Test UX V38 — résultat accessible à toutes les largeurs",
+  "context": "V37 a rendu le bouton Terminer accessible en fenêtre très étroite. Le test terrain a ensuite montré que l'écran final avec les exports apparaissait correctement en grande largeur mais pouvait devenir inaccessible en largeur intermédiaire ou petite.",
+  "objective": "Vérifier que la transition Terminer → Entretien terminé → Exporter pour une IA fonctionne en largeur intermédiaire puis très étroite, sans agrandir la fenêtre ni passer par Accueil.",
+  "language": "fr-FR",
+  "tags": ["ux", "v38", "responsive", "completion", "export", "result-view"],
+  "estimatedDurationMinutes": 2,
+  "participants": [
+    {"id": "P1", "name": "Interviewer", "role": "interviewer"},
+    {"id": "P2", "name": "Testeur", "role": "interviewee"}
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Fin et export",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Résultat visible après Terminer",
+          "text": "Vérifiez d'abord que Runtime affiche 2026-09-04.interview-runtime-v38. Placez la fenêtre en largeur intermédiaire, lancez une courte prise de parole puis cliquez sur Terminer. L'écran « Entretien terminé » doit apparaître immédiatement et « Exporter pour une IA » doit être visible ou atteignable par un défilement normal. Cliquez ensuite sur « Relire / corriger », rendez la fenêtre très étroite et recommencez sans l'agrandir. Vérifiez à nouveau que l'écran final et l'export sont accessibles. Dites simplement si les deux largeurs fonctionnent de bout en bout.",
+          "intent": "Fermer le défaut V37 où le résultat final devenait inaccessible en largeur intermédiaire ou petite.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

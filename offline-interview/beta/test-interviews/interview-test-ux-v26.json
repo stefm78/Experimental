@@ -1,0 +1,172 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v26-segmentation-speaker-boundaries",
+  "version": "1.0",
+  "title": "Test UX V26 — segmentation locuteurs et ON AIR",
+  "context": "Ce questionnaire teste la V26 après le retour terrain V25. Le modèle de question propriétaire reste inchangé. Le test cible surtout la correction de l’historique cumulatif de SpeechRecognition entre locuteurs, ainsi que la réduction visuelle du cercle autour du micro.",
+  "objective": "Vérifier que chaque changement de locuteur produit un segment propre, sans recopier l’historique du locuteur précédent, tout en conservant la navigation libre, le transfert explicite de question et un état ON AIR clair.",
+  "language": "fr-FR",
+  "tags": [
+    "ux",
+    "v26",
+    "speaker-segmentation",
+    "speech-recognition-delta",
+    "stable-owner",
+    "on-air"
+  ],
+  "estimatedDurationMinutes": 14,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    },
+    {
+      "id": "P3",
+      "name": "Second participant",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Question propriétaire",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Parcourir librement",
+          "text": "Commencez une réponse sur cette question puis consultez les questions 2 et 3 sans arrêter de parler. Vérifiez que l’enregistrement reste bien attaché ici et que l’indication dans la barre de capture reste compréhensible.",
+          "intent": "Revalider le modèle V25 sans changement architectural.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Transfert explicite",
+          "text": "Pendant que la question 1 reste propriétaire de l’enregistrement, affichez cette question puis utilisez l’action proposée dans la barre de capture pour continuer ici. Vérifiez que seuls les propos suivants arrivent dans cette question.",
+          "intent": "Valider la frontière de question après correction du segmenter.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Frontières de locuteurs",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Mots uniques",
+          "text": "Faites quatre changements rapides de locuteur sans pause. Testeur dit exactement « alpha bravo charlie delta echo ». Second participant dit « foxtrot golf hotel india juliet ». Testeur dit « kilo lima mike novembre oscar ». Second participant dit « papa quebec romeo sierra tango ». Vérifiez que chaque prise de parole contient uniquement son groupe et ne répète pas le groupe précédent.",
+          "intent": "Détecter immédiatement tout historique cumulatif copié dans le segment suivant.",
+          "required": true,
+          "estimatedMinutes": 3,
+          "audience": [
+            "P2",
+            "P3"
+          ],
+          "followUps": [
+            {
+              "id": "Q3-R1",
+              "text": "Un segment contient-il des mots appartenant au locuteur précédent ?",
+              "kind": "planned"
+            }
+          ]
+        },
+        {
+          "id": "Q4",
+          "label": "Décompte 1 à 20",
+          "text": "Refaites un décompte continu : Testeur dit un deux trois quatre cinq ; Second participant six sept huit neuf dix ; Testeur onze douze treize quatorze quinze ; Second participant seize dix-sept dix-huit dix-neuf vingt.",
+          "intent": "Séparer les pertes éventuelles de mots du problème d’attribution.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2",
+            "P3"
+          ],
+          "followUps": [
+            {
+              "id": "Q4-R1",
+              "text": "Quels nombres sont manquants et lesquels sont attribués au mauvais locuteur ?",
+              "kind": "planned"
+            }
+          ]
+        },
+        {
+          "id": "Q5",
+          "label": "Conversation naturelle",
+          "text": "Faites ensuite quatre changements de locuteur dans une conversation normale avec des phrases différentes. Est-ce que les segments semblent maintenant propres et correctement attribués ?",
+          "intent": "Valider le comportement dans un usage moins artificiel.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2",
+            "P3"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "État visuel",
+      "questions": [
+        {
+          "id": "Q6",
+          "label": "Micro et ON AIR",
+          "text": "Pendant un enregistrement, le micro est-il maintenant suffisamment visible sans le grand cercle rouge respirant, et le badge ON AIR reste-t-il assez évident ?",
+          "intent": "Valider la correction visuelle issue de la capture V25.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q7",
+          "label": "Transcription live",
+          "text": "Faites une réponse longue d’au moins trente secondes. Vérifiez que la transcription live reste lisible, s’étend vers le haut et garde les commandes de locuteur stables.",
+          "intent": "Contrôler qu’aucune régression n’a été introduite dans la zone live.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Bilan",
+      "questions": [
+        {
+          "id": "Q8",
+          "label": "Friction restante",
+          "text": "Après ce test, quelle est la principale friction qui reste encore perceptible dans une vraie interview sous pression ?",
+          "intent": "Déterminer si la prochaine itération doit encore porter sur la captation ou peut revenir à une optimisation UX plus fine.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

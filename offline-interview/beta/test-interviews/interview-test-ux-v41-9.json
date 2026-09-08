@@ -1,0 +1,91 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "version": "1.0",
+  "id": "test-ux-v41-9-hybrid-refined",
+  "title": "Test V41.9 — audio hybride et interface affinée",
+  "context": "Qualification humaine exact-head avant toute promotion.",
+  "objective": "Vérifier que live-first reste fluide, que les prises audio sans texte restent utiles, et que les nouveaux contrôles sont plus discrets et compréhensibles.",
+  "language": "fr-FR",
+  "estimatedDurationMinutes": 6,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Qualification V41.9",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Préflight exact-head",
+          "text": "Ouvrez Diagnostic et vérifiez exactement 2026-09-07.interview-runtime-v41.9. Si une autre version apparaît, arrêtez immédiatement et répondez INVALID_TEST_TARGET.",
+          "intent": "Empêcher un test sur la mauvaise version.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Live-first et changements de personne",
+          "text": "Dans une seule captation, changez de personne plusieurs fois. Vérifiez que le texte déjà reconnu apparaît rapidement dans la conversation, sans retraitement audio automatique ni attente perceptible. Réécoutez deux prises et confirmez qu’il n’y a pas de trou évident au changement.",
+          "intent": "Préserver le chemin live-first et le master continu.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P1",
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Prise audio sans texte",
+          "text": "Provoquez si possible une prise très courte ou silencieuse. Si aucun texte n’est obtenu mais que du son existe, vérifiez que la ligne reste compacte avec lecture et action de transcription, sans grande zone de texte vide. Si vous obtenez du texte partout, dites-le simplement.",
+          "intent": "Absence de texte ne doit pas supprimer un audio réel ni créer une ligne visuellement vide.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Micro discret et lisible",
+          "text": "Observez le contrôle du micro pendant quelques secondes en parlant doucement, normalement puis fort. Dites s’il indique encore clairement faible, bon ou trop fort tout en restant discret et peu agité.",
+          "intent": "Qualifier la nouvelle représentation du niveau sonore.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q5",
+          "label": "Audio vers texte et densité",
+          "text": "Regardez les prises de parole. L’action qui transforme un audio en texte doit être compréhensible sans afficher le mot Système. Dites aussi si la conversation paraît plus dense, plus calme et toujours facile à utiliser.",
+          "intent": "Qualifier l’icône audio-vers-texte et la densité générale.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

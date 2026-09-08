@@ -1,0 +1,176 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v25-stable-owner-explicit-retarget",
+  "version": "1.0",
+  "title": "Test UX V25 — question propriétaire, ON AIR et continuité",
+  "context": "Ce questionnaire teste la V25 après le retour terrain V24. Il vérifie que parcourir les questions ne déplace jamais l’enregistrement, que le changement de question d’enregistrement est explicite dans la barre de capture, que l’état ON AIR est visible globalement, que les rôles des participants ne polluent plus l’interface et que la captation rapide reste fluide.",
+  "objective": "Valider un modèle simple sous pression : consulter librement les questions, garder une question propriétaire de l’enregistrement, puis décider explicitement quand la suite doit être rattachée à une autre question.",
+  "language": "fr-FR",
+  "tags": [
+    "ux",
+    "v25",
+    "stable-recording-owner",
+    "explicit-retarget",
+    "on-air",
+    "speaker-handoff"
+  ],
+  "estimatedDurationMinutes": 15,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    },
+    {
+      "id": "P3",
+      "name": "Second participant",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Question propriétaire",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Parcourir sans déplacer",
+          "text": "Démarrez une réponse sur cette question puis, sans arrêter de parler, consultez successivement les questions 2 et 3 dans la colonne de gauche. L’enregistrement doit rester attaché à cette question. Est-ce évident et rassurant ?",
+          "intent": "Vérifier que navigation visuelle et destination de capture sont correctement découplées.",
+          "required": true,
+          "estimatedMinutes": 3,
+          "audience": [
+            "P2"
+          ],
+          "followUps": [
+            {
+              "id": "Q1-R1",
+              "text": "Pendant que vous consultiez une autre question, saviez-vous toujours clairement où la parole était enregistrée ?",
+              "kind": "planned"
+            }
+          ]
+        },
+        {
+          "id": "Q2",
+          "label": "Continuer ici",
+          "text": "Pendant que l’enregistrement de la question 1 continue et que cette question est affichée, utilisez le bouton proposé dans la barre de capture pour décider que la suite doit maintenant être enregistrée ici. Le mécanisme vous paraît-il évident ?",
+          "intent": "Tester le transfert explicite depuis la barre de capture.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2"
+          ],
+          "followUps": [
+            {
+              "id": "Q2-R1",
+              "text": "Le libellé du bouton explique-t-il suffisamment ce qui va changer ?",
+              "kind": "planned"
+            }
+          ]
+        },
+        {
+          "id": "Q3",
+          "label": "Frontière correcte",
+          "text": "Vérifiez que les propos prononcés avant le transfert sont restés sur l’ancienne question et que seuls les propos prononcés après le transfert apparaissent ici. Est-ce correct ?",
+          "intent": "Valider la frontière sémantique lors du transfert explicite.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Visibilité ON AIR",
+      "questions": [
+        {
+          "id": "Q4",
+          "label": "ON AIR global",
+          "text": "Pendant qu’une personne parle, l’état ON AIR est-il maintenant suffisamment visible à la fois dans la colonne de gauche, dans la barre de capture et dans le bandeau supérieur ?",
+          "intent": "Évaluer la nouvelle visibilité globale de l’enregistrement.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2"
+          ],
+          "followUps": [
+            {
+              "id": "Q4-R1",
+              "text": "Le micro est-il maintenant assez présent sans devenir envahissant ?",
+              "kind": "planned"
+            }
+          ]
+        },
+        {
+          "id": "Q5",
+          "label": "Texte live extensible",
+          "text": "Faites une réponse longue pendant au moins quarante secondes. La zone de transcription s’agrandit-elle naturellement vers le haut tout en gardant les boutons des locuteurs stables et les derniers mots visibles ?",
+          "intent": "Tester la croissance de la zone live jusqu’à une limite raisonnable.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Locuteurs",
+      "questions": [
+        {
+          "id": "Q6",
+          "label": "Changement rapide",
+          "text": "Alternez rapidement entre Testeur et Second participant en disant successivement : un deux trois quatre cinq ; six sept huit neuf dix ; onze douze treize quatorze quinze ; seize dix-sept dix-huit dix-neuf vingt. Vérifiez les mots perdus ou mal attribués.",
+          "intent": "Rejouer le test de frontière locuteur après conservation du moteur continu.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2",
+            "P3"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q7",
+          "label": "Noms seulement",
+          "text": "Dans l’interface normale, les participants sont-ils maintenant identifiés de façon suffisamment claire uniquement par leur nom, sans les libellés de rôle interviewer ou interviewé ?",
+          "intent": "Valider la simplification visuelle des participants tout en conservant les rôles dans les métadonnées.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Bilan",
+      "questions": [
+        {
+          "id": "Q8",
+          "label": "Friction restante",
+          "text": "Après ce test, quelle est la principale friction qui vous empêcherait encore de mener une vraie interview sans penser à l’outil ?",
+          "intent": "Identifier le prochain défaut réellement prioritaire.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

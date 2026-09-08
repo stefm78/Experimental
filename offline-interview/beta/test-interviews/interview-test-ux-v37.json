@@ -1,0 +1,49 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v37-mobile-finish",
+  "version": "1.0",
+  "title": "Test UX V37 — terminer en fenêtre très étroite",
+  "context": "V36 est globalement validée mais, en fenêtre très étroite, l'action de fin d'entretien pouvait devenir inaccessible alors qu'Accueil restait visible. L'utilisateur devait élargir la fenêtre pour terminer et atteindre l'écran d'export.",
+  "objective": "Vérifier que Terminer reste directement accessible en fenêtre très étroite, y compris pendant une prise de parole, et qu'il conduit correctement à l'écran d'export sans devoir élargir la fenêtre.",
+  "language": "fr-FR",
+  "tags": [
+    "ux",
+    "v37",
+    "responsive",
+    "completion",
+    "export"
+  ],
+  "estimatedDurationMinutes": 1,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Fin d'entretien",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Terminer sans élargir",
+          "text": "Réduisez la fenêtre à une largeur très étroite. Vérifiez que le bouton « Terminer » reste visible dans l'en-tête à côté des commandes d'entretien. Lancez une courte prise de parole puis, sans élargir la fenêtre, utilisez « Terminer ». Confirmez si nécessaire. Vérifiez que la prise est finalisée, que l'écran « Entretien terminé » apparaît et que « Exporter pour une IA » est accessible. Dites simplement si le parcours fonctionne de bout en bout sans passer par Accueil ni agrandir la fenêtre.",
+          "intent": "Fermer le défaut bloquant V36 : impossibilité pratique de terminer depuis une fenêtre très étroite.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v27-2-visible-runtime",
+  "version": "1.0",
+  "title": "Test UX V27.2 — version visible et stabilité runtime",
+  "context": "Ce test valide la V27.2 après la récupération V27.1. Il vérifie que la version exacte du runtime est visible depuis l'accueil dans « Transcription et confidentialité », que le lien de base recharge bien cette même version, et que la stabilité interactive récupérée en V27.1 reste intacte. La précision fine de frontière entre locuteurs reste un sujet séparé.",
+  "objective": "Vérifier une identité de runtime immédiatement contrôlable par l'utilisateur, une cohérence de cache entre réouvertures Chrome et l'absence de régression de fluidité pendant les changements de locuteur.",
+  "language": "fr-FR",
+  "tags": ["ux", "v27-2", "runtime-version", "cache-identity", "chrome", "stability"],
+  "estimatedDurationMinutes": 7,
+  "participants": [
+    { "id": "P1", "name": "Interviewer", "role": "interviewer" },
+    { "id": "P2", "name": "Testeur", "role": "interviewee" },
+    { "id": "P3", "name": "Second participant", "role": "interviewee" }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Identité du runtime",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Version visible à l'accueil",
+          "text": "Avant de commencer, ouvrez « Transcription et confidentialité ». Vérifiez qu'une ligne Runtime est visible et qu'elle affiche exactement « 2026-09-04.interview-runtime-v27-2 ». Dites à voix haute la version que vous voyez et signalez toute différence.",
+          "intent": "Valider que l'utilisateur peut identifier immédiatement le runtime réellement chargé sans ouvrir le diagnostic technique.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Réouverture du lien de base",
+          "text": "Ouvrez le lien de base de l'application dans un nouvel onglet Chrome, sans paramètre spécial. Ouvrez à nouveau « Transcription et confidentialité » et vérifiez que la même version V27.2 apparaît. Revenez ensuite à cet entretien et décrivez ce que vous avez observé.",
+          "intent": "Détecter une incohérence entre le runtime déployé et un ancien runtime conservé par le cache ou le service worker.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Stabilité interactive",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Dix changements de locuteur",
+          "text": "Alternez au moins dix fois entre Testeur et Second participant. Chaque personne dit une phrase naturelle de cinq à dix mots après son clic. Les boutons doivent répondre immédiatement et la page ne doit ni ralentir fortement ni afficher « Page ne répondant pas ».",
+          "intent": "Revalider que le retrait de Whisper au changement de locuteur reste effectif et que V27.2 n'introduit aucune régression de performance.",
+          "required": true,
+          "estimatedMinutes": 2,
+          "audience": ["P2", "P3"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Micro et ON AIR",
+          "text": "Pendant un enregistrement, vérifiez que le pictogramme microphone est visible, que le badge ON AIR reste le signal principal et que le rendu reste identique après plusieurs changements de locuteur.",
+          "intent": "Confirmer la stabilité du rendu microphone SVG et de l'état ON AIR.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q5",
+          "label": "Transfert de question",
+          "text": "Pendant que cette question reste ON AIR, affichez une autre question puis utilisez l'action explicite de bascule. Vérifiez que l'action mentionne bien le numéro de la question cible et que l'interface reste réactive.",
+          "intent": "Revalider le transfert explicite de question sans régression de fluidité.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Verdict",
+      "questions": [
+        {
+          "id": "Q6",
+          "label": "Verdict V27.2",
+          "text": "Après ce test, la version du runtime est-elle facile à vérifier et avez-vous observé une différence de version entre deux ouvertures du lien de base, un gel, une hallucination répétitive ou une anomalie visuelle du microphone ?",
+          "intent": "Décider si V27.2 peut être considérée comme stable pour l'identité de runtime et la récupération interactive.",
+          "required": true,
+          "estimatedMinutes": 1,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v33-question-frame",
+  "version": "1.0",
+  "title": "Test UX V33 — question stable et conversation séparée",
+  "context": "Ce test vérifie les défauts vus en V32. La question doit rester visible pendant que les nouvelles réponses s'ajoutent. La zone rouge du bas doit rester stable. En petite fenêtre, on enlève les informations inutiles. Les consignes sont volontairement écrites avec des mots simples.",
+  "objective": "Vérifier que la question ne disparaît plus quand on change de personne, que seules les réponses défilent, que la zone rouge du bas montre environ trois lignes de transcription et que l'interface reste simple quand la fenêtre est étroite.",
+  "language": "fr-FR",
+  "tags": ["ux", "v33", "question-stable", "conversation-scroll", "responsive", "simple-wording", "stt-observation"],
+  "estimatedDurationMinutes": 7,
+  "participants": [
+    {"id": "P1", "name": "Interviewer", "role": "interviewer"},
+    {"id": "P2", "name": "Testeur", "role": "interviewee"},
+    {"id": "P3", "name": "Second participant", "role": "interviewee"}
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Écran principal",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Version et écran large",
+          "text": "Vérifiez d'abord que la version affichée dans « Transcription et confidentialité » est exactement 2026-09-04.interview-runtime-v33. Gardez ensuite la fenêtre assez large et parlez pendant environ 40 secondes. La question doit rester visible en haut, la zone rouge doit rester en bas et la petite transcription dans la zone rouge doit montrer environ trois lignes complètes. Dites simplement ce qui vous paraît bon ou mauvais.",
+          "intent": "Vérifier la version et l'équilibre général de l'écran.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"]
+        },
+        {
+          "id": "Q2",
+          "label": "Changer de personne sans perdre la question",
+          "text": "Sans changer de question, passez six fois entre Testeur et Second participant. Dites une petite phrase à chaque fois. Les réponses doivent s'ajouter dans leur zone sans faire disparaître la question. La liste des réponses peut descendre toute seule, mais la question doit rester à sa place. Vérifiez aussi que les boutons des personnes restent visibles.",
+          "intent": "Reproduire le défaut V32 où une nouvelle réponse faisait glisser la question hors de l'écran.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"]
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Petite fenêtre",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Rétrécir puis agrandir",
+          "text": "Rétrécissez puis agrandissez la fenêtre plusieurs fois. Faites-le au moins six fois. À chaque taille, vérifiez trois choses : la question reste visible, les réponses sont dans leur propre zone et la zone rouge reste en bas avec tous les boutons. Aucun morceau de l'ancien affichage ne doit rester après un changement de taille.",
+          "intent": "Vérifier que l'écran reste stable quand sa largeur change.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"]
+        },
+        {
+          "id": "Q4",
+          "label": "Écran très étroit et participants",
+          "text": "Rendez la fenêtre très étroite. En haut, il doit rester surtout ON AIR, le temps, Pause et Accueil. Le menu des questions et Participants doivent rester faciles à trouver. Ouvrez Participants : vous devez voir les noms, mais pas de menu qui demande si la personne est interviewer ou interviewé. Ajoutez un participant nommé toto, puis refermez Participants. Dites si l'écran vous paraît plus simple qu'avant.",
+          "intent": "Vérifier la simplification demandée en V32.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"]
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Navigation",
+      "questions": [
+        {
+          "id": "Q5",
+          "label": "Changer de question pendant l'enregistrement",
+          "text": "Laissez l'enregistrement tourner. Avec le menu des questions, affichez une autre question sans déplacer tout de suite l'enregistrement. Une petite ligne doit alors expliquer que l'enregistrement est encore sur l'ancienne question et proposer le bouton de bascule. Utilisez ce bouton. Dès que l'enregistrement et la question affichée sont les mêmes, cette ligne doit disparaître. Revenez ensuite à cette question.",
+          "intent": "Vérifier que la ligne « Enregistrement sur… » n'apparaît que lorsqu'elle sert vraiment.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"]
+        },
+        {
+          "id": "Q6",
+          "label": "Vérification rapide de la voix",
+          "text": "Faites maintenant ce petit test sans ralentir exprès. Testeur dit « fin volcan », puis cliquez tout de suite sur Second participant. Second participant dit « début bonjour fin rivière », puis cliquez sur Testeur. Testeur dit « début salut fin satellite », puis cliquez sur Second participant. Second participant dit « début coucou fin chocolat ». Dites ensuite si un mot de fin a disparu ou s'il est arrivé chez la mauvaise personne.",
+          "intent": "Observer séparément le dernier défaut possible de changement de locuteur.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"]
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Verdict",
+      "questions": [
+        {
+          "id": "Q7",
+          "label": "Verdict simple",
+          "text": "Donnez trois réponses simples. 1 : la question est-elle restée visible quand les réponses s'ajoutaient ? 2 : en petite fenêtre, les boutons et les menus utiles sont-ils restés faciles à utiliser ? 3 : pendant le test de voix, avez-vous vu un mot passer chez la mauvaise personne ou disparaître ? Ajoutez seulement les défauts que vous avez réellement vus.",
+          "intent": "Obtenir un verdict compréhensible sans jargon technique.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"]
+        }
+      ]
+    }
+  ]
+}

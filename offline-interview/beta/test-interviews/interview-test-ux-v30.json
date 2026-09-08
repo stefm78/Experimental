@@ -1,0 +1,112 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v30-responsive-shell",
+  "version": "1.0",
+  "title": "Test UX V30 — hiérarchie responsive et capture stable",
+  "context": "Ce test valide exclusivement la V30 responsive sur la base de capture V29. La mécanique STT V29 ne doit pas changer. L'objectif est d'obtenir une hiérarchie claire lorsque la largeur et la hauteur disponibles diminuent : navigation toujours disponible, question longue contenue, transcription live bornée, capture jamais superposée au contenu et participants accessibles.",
+  "objective": "Vérifier quatre régimes de largeur sans perdre la navigation ni les commandes essentielles, puis confirmer par un court test de bascule que la capture V29 n'a pas régressé.",
+  "language": "fr-FR",
+  "tags": ["ux", "v30", "responsive", "navigation", "long-question", "live-transcript", "v29-capture-regression"],
+  "estimatedDurationMinutes": 8,
+  "participants": [
+    { "id": "P1", "name": "Interviewer", "role": "interviewer" },
+    { "id": "P2", "name": "Testeur", "role": "interviewee" },
+    { "id": "P3", "name": "Second participant", "role": "interviewee" }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Runtime et largeur",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Version et mode large",
+          "text": "Vérifiez dans « Transcription et confidentialité » que Runtime affiche exactement 2026-09-04.interview-runtime-v30. Avec une fenêtre large, vérifiez que le panneau des questions reste à gauche, que la question et la zone de capture sont clairement séparées et que rien ne se superpose. Décrivez rapidement le résultat.",
+          "intent": "Valider l'identité V30 et préserver le mode desktop.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Mode intermédiaire sans sidebar",
+          "text": "Resserrez la fenêtre jusqu'à faire disparaître le panneau de gauche, sans aller encore au format téléphone. Vérifiez qu'un sélecteur compact de question apparaît, qu'il permet d'aller directement à une autre question et qu'un accès Participants reste disponible. Revenez ensuite à cette question. Dites si cette transition vous paraît plus claire que la V29.",
+          "intent": "Valider le remplacement explicite de la sidebar lorsque sa largeur n'est plus raisonnable.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Question, transcription et capture",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Question longue sous contrainte",
+          "text": "Resserrez encore la fenêtre. Cette question est volontairement longue afin de vérifier que le texte principal garde une place importante sans envahir toute la hauteur : la question doit pouvoir défiler dans sa propre zone si nécessaire, mais la zone de capture doit rester dans le flux de la page et ne jamais recouvrir la question, la navigation ou les autres contrôles. Vérifiez également qu'en faisant défiler la page il n'apparaît pas de grande zone blanche artificielle liée à un ancien positionnement fixe ou sticky. Dites ce qui vous paraît encore trop grand, trop petit ou difficile à atteindre.",
+          "intent": "Valider la suppression des superpositions et du min-height artificiel observés en V29.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Réponse longue et transcription live",
+          "text": "Parlez sans changer de locuteur pendant environ une minute sur le thème de votre choix. La transcription live doit rester bornée à une petite zone montrant les mots récents au lieu de grandir jusqu'à prendre une part majeure de l'écran. Pendant que vous parlez, vérifiez que ON AIR, le nom du locuteur, le chronomètre et les boutons de locuteur restent visibles et utilisables. Dites si la hiérarchie vous paraît naturelle.",
+          "intent": "Vérifier que la transcription live reste un aperçu et non un second panneau principal.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Navigation et capture",
+      "questions": [
+        {
+          "id": "Q5",
+          "label": "Navigation et participants",
+          "text": "En mode étroit, utilisez le sélecteur compact pour afficher une autre question puis revenez ici. Ouvrez aussi Participants, modifiez temporairement un nom puis remettez-le comme avant. Vérifiez enfin que « Question suivante » reste atteignable par défilement normal et que la zone de capture ne le masque pas.",
+          "intent": "Vérifier que les fonctions perdues avec la sidebar V29 restent accessibles en espace contraint.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        },
+        {
+          "id": "Q6",
+          "label": "Régression capture V29",
+          "text": "Faites quatre bascules rapides : Testeur dit « fin volcan », Second participant dit « début bonjour fin rivière », Testeur dit « début salut fin satellite », Second participant dit « début coucou fin chocolat ». Ne ralentissez pas volontairement. Le but est seulement de vérifier que V30 n'a pas régressé la capture V29 : aucun gel, aucun mot de fin chez le mauvais locuteur et aucun début de phrase manifestement perdu. Signalez aussi si un mot de fin disparaît complètement.",
+          "intent": "Conserver la base V29 pendant le changement purement responsive.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "followUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Verdict",
+      "questions": [
+        {
+          "id": "Q7",
+          "label": "Verdict V30",
+          "text": "Donnez votre verdict V30 : en mode large, intermédiaire et étroit, la navigation est-elle toujours compréhensible ? La question et la transcription live restent-elles proportionnées ? La capture masque-t-elle encore du contenu ? Avez-vous retrouvé une grande zone blanche ou une zone sans moyen évident de changer de question ou de participant ? Enfin, la capture vocale vous semble-t-elle inchangée par rapport à V29 ?",
+          "intent": "Décider si la hiérarchie responsive peut être promue indépendamment de la qualité STT résiduelle.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

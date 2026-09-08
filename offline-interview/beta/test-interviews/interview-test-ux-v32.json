@@ -1,0 +1,112 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v32-footer-stability",
+  "version": "1.0",
+  "title": "Test UX V32 — footer stable et navigation compacte",
+  "context": "Ce test valide la V32 après le défaut V31 où le footer de capture pouvait absorber trop de hauteur ou sortir partiellement du viewport selon la largeur. La V32 remplace le grid sizing par une colonne flex stricte : workspace défilant + footer de capture à hauteur naturelle. La mécanique STT reste inchangée.",
+  "objective": "Vérifier que les boutons de locuteur restent toujours visibles, que le footer ne grandit pas avec la transcription, que le sélecteur compact reste accessible pendant le scroll et que les transitions large/intermédiaire/étroit sont stables.",
+  "language": "fr-FR",
+  "tags": ["ux", "v32", "responsive", "footer", "flex", "compact-nav", "resize", "stt-observation"],
+  "estimatedDurationMinutes": 7,
+  "participants": [
+    { "id": "P1", "name": "Interviewer", "role": "interviewer" },
+    { "id": "P2", "name": "Testeur", "role": "interviewee" },
+    { "id": "P3", "name": "Second participant", "role": "interviewee" }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Footer",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Version et footer large",
+          "text": "Vérifiez que Runtime affiche exactement 2026-09-04.interview-runtime-v32. En fenêtre large, parlez pendant environ une minute sans changer de locuteur. Le footer de capture doit rester aligné en bas de la zone d'entretien, ne pas absorber une grande zone vide et garder les trois boutons de locuteur entièrement visibles pendant que la transcription live défile dans sa petite zone.",
+          "intent": "Reproduire directement le défaut V31 de footer trop haut et boutons qui sortent du viewport.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Stress de largeur",
+          "text": "Sans arrêter l'enregistrement, passez au moins six fois entre fenêtre large, intermédiaire et très étroite. À chaque largeur, vérifiez que le footer reste entièrement visible, que les boutons ne migrent ni vers le haut ni vers le bas et qu'aucun état hybride ne subsiste après réélargissement.",
+          "intent": "Attaquer la dépendance à la largeur observée en V31.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "title": "Mode compact",
+      "questions": [
+        {
+          "id": "Q3",
+          "label": "Navigation compacte persistante",
+          "text": "Restez en mode étroit. Faites défiler assez loin la question et l'historique. Le sélecteur compact de question doit rester accessible en haut de la zone de contenu et le footer de capture doit rester accessible en bas. Vérifiez aussi qu'en très petite largeur l'en-tête est plus compact et que les commandes essentielles restent lisibles.",
+          "intent": "Valider que le sélecteur sticky n'est plus borné par l'ancien conteneur de question.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Accumulation de tours",
+          "text": "Toujours en mode étroit, alternez huit fois entre Testeur et Second participant avec des phrases courtes. Les réponses doivent s'accumuler uniquement dans le workspace. Le footer doit conserver la même hauteur et les trois boutons doivent rester disponibles à chaque bascule.",
+          "intent": "Vérifier que l'accumulation de tours ne modifie plus la géométrie du footer.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "title": "Navigation et transfert",
+      "questions": [
+        {
+          "id": "Q5",
+          "label": "Changer de question sous capture",
+          "text": "Pendant que l'enregistrement continue, utilisez le sélecteur compact pour afficher une autre question. Vérifiez que la ligne de contexte de capture n'apparaît que lorsqu'une action de transfert est réellement nécessaire, puis utilisez le bouton de bascule et revenez ici.",
+          "intent": "Valider la suppression de la ligne redondante Enregistrement sur quand la question affichée est déjà la question enregistrée.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        },
+        {
+          "id": "Q6",
+          "label": "Retour large et observation STT",
+          "text": "Réélargissez complètement la fenêtre et vérifiez que le footer reste compact et au bas de l'entretien. Puis faites quatre bascules rapides : Testeur dit « fin volcan », Second participant dit « début bonjour fin rivière », Testeur dit « début salut fin satellite », Second participant dit « début coucou fin chocolat ». Ne ralentissez pas volontairement. Signalez séparément tout défaut visuel et tout mot de fin perdu ou attribué au mauvais locuteur.",
+          "intent": "Vérifier la réversibilité responsive et observer le défaut STT résiduel sans le confondre avec la V32.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2", "P3"],
+          "plannedFollowUps": []
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "title": "Verdict",
+      "questions": [
+        {
+          "id": "Q7",
+          "label": "Verdict V32",
+          "text": "Donnez deux verdicts séparés. RESPONSIVE : le footer reste-t-il toujours entièrement visible et stable en hauteur, et le sélecteur compact reste-t-il accessible pendant le scroll ? STT : avez-vous observé un mot de fin perdu ou attribué au mauvais locuteur ? Mentionnez la largeur où tout défaut apparaît.",
+          "intent": "Décider séparément la qualification de l'interface et le prochain travail STT.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": ["P2"],
+          "plannedFollowUps": []
+        }
+      ]
+    }
+  ]
+}
