@@ -8,7 +8,7 @@
   <title>Interview locale structurée</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=41.14">
+  <link rel="stylesheet" href="./styles.css?v=41.15">
 </head>
 <body>
   <main class="shell">
@@ -201,6 +201,10 @@
 
           <p id="interviewError" class="error hidden" role="alert"></p>
           <div id="audioRecoveryBar" class="capture-integrity-alert hidden" role="status"><span id="audioRecoveryStatus">Audio dégradé · la session reste disponible.</span> <button id="audioRecoveryBtn" class="ghost small" type="button">Réinitialiser l’audio</button></div>
+          <details id="interviewDiagnosticPanel" class="manual-entry interview-diagnostics">
+            <summary>Diagnostic</summary>
+            <div class="actions compact-actions"><span>Audio <strong id="interviewAudioHealth">HEALTHY</strong></span><button id="interviewSimulateAudioFaultBtn" class="ghost small" type="button">Simuler panne audio</button></div>
+          </details>
 
           <div class="actions interview-nav-actions">
             <button id="prevBtn" class="ghost">← Précédente</button>
@@ -281,6 +285,6 @@
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=41.14"></script>
+  <script type="module" src="./app.js?v=41.15"></script>
 </body>
 </html>

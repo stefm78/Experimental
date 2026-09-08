@@ -11,10 +11,11 @@ const index = read('index.html');
 const sw = read('sw.js');
 const systemStt = read('system-stt.js');
 const audioWindow = read('audio-window.js');
+const whisperQuality = read('whisper-quality.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.14/);
+assert.match(app, /interview-runtime-v41\.15/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -38,9 +39,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.14/);
-assert.match(index, /styles\.css\?v=41\.14/);
-assert.match(index, /app\.js\?v=41\.14/);
+assert.match(sw, /offline-interview-v41\.15/);
+assert.match(index, /styles\.css\?v=41\.15/);
+assert.match(index, /app\.js\?v=41\.15/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
@@ -165,19 +166,27 @@ assert.doesNotMatch(app, /\['succeeded', 'failed'\]\.includes\(stableRetranscrip
 assert.match(index, /class="mic-meter" role="meter"/);
 assert.doesNotMatch(index, />Micro<\/button>/);
 assert.doesNotMatch(index, />Silence<\/span>/);
+// V41.15 field-integrity invariants: active diagnostic access, measured timeline, conservative Whisper quality gate + retry.
+assert.match(index, /id="interviewDiagnosticPanel"/);
+assert.match(app, /audio_timeline_measured/);
+assert.match(app, /manual_whisper_rejected/);
+assert.match(app, /retranscribe\.disabled = !audioReady/);
+assert.match(app, /turn\.humanEdited = true/);
+assert.match(sw, /whisper-quality\.js/);
 // Explicit anti-growth budgets. Raising one requires a conscious code-review decision.
-const coreBytes = bytes(app) + bytes(css) + bytes(systemStt) + bytes(index) + bytes(sw);
-// V41.14 adds bounded validation/recovery because field evidence showed decode failures could poison the audio lifecycle.
-assert.ok(bytes(app) <= 119_000, `app.js V41.14 resilience budget exceeded: ${bytes(app)} bytes`);
+const coreBytes = bytes(app) + bytes(css) + bytes(systemStt) + bytes(index) + bytes(sw) + bytes(whisperQuality);
+// V41.15 adds only bounded field-integrity logic on top of V41.14 resilience.
+assert.ok(bytes(app) <= 121_000, `app.js V41.15 field-integrity budget exceeded: ${bytes(app)} bytes`);
 assert.ok(bytes(css) <= 66_000, `styles.css budget exceeded: ${bytes(css)} bytes`);
-assert.ok(coreBytes <= 220_000, `core source V41.14 resilience budget exceeded: ${coreBytes} bytes`);
+assert.ok(coreBytes <= 223_000, `core source V41.15 field-integrity budget exceeded: ${coreBytes} bytes`);
 
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
 await import('./test-v41-13-field-repair.mjs');
 await import('./test-v41-14-audio-resilience.mjs');
+await import('./test-v41-15-field-integrity.mjs');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41.14',
+  contract: 'offline-interview.runtime-contract.v41.15',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes
