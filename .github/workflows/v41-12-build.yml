@@ -25,7 +25,17 @@ jobs:
           s=p.read_text().replace("segment.copyToChannel(decoded.getChannelData(channel).subarray(startFrame,endFrame),0);","segment.copyToChannel(decoded.getChannelData(channel).subarray(startFrame,endFrame),channel);")
           p.write_text(s)
           PY
-      - name: Trim nonfunctional source comments if needed
+      - name: Align V41.12 runtime contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('offline-interview/test-runtime-contract.mjs')
+          s=p.read_text()
+          s=s.replace(r'interview-runtime-v41\.11', r'interview-runtime-v41\.12')
+          s=s.replace('offline-interview.runtime-contract.v41.11', 'offline-interview.runtime-contract.v41.12')
+          p.write_text(s)
+          PY
+      - name: Trim nonfunctional source whitespace
         run: |
           python - <<'PY'
           from pathlib import Path
