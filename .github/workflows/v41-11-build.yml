@@ -26,6 +26,7 @@ jobs:
           s=s.replace('assert.match(index, /id="micPreviewBtn"/);','assert.doesNotMatch(index, /id="micPreviewBtn"/);')
           s=s.replace('assert.match(css, /mic-preview-button\\[data-level-state=good\\]/);','assert.doesNotMatch(css, /mic-preview-button\\[data-level-state=good\\]/);')
           s=s.replace("assert.match(app, /\\['succeeded', 'failed'\\]\\.includes\\(stableRetranscription\\)/);","assert.doesNotMatch(app, /\\['succeeded', 'failed'\\]\\.includes\\(stableRetranscription\\)/);")
+          s=s.replace("assert.match(audioWindow, /mode!==?'context'|mode !== 'context'/);","assert.match(audioWindow, /mode==='recovery'/);")
           p.write_text(s)
           PY
       - name: Parse JavaScript
