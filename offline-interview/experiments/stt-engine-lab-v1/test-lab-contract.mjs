@@ -3,7 +3,7 @@ const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const js=fs.readFileSync(new URL('./lab.js',import.meta.url),'utf8');
 assert.match(html,/STT Engine Lab V1/);
 assert.match(html,/Frontière A\/B/);
-assert.match(html,/Retranscrire audio/);
+assert.match(js,/Retranscrire audio/);
 assert.match(js,/new MediaRecorder\(stream\)/);
 assert.match(js,/masterRecorder\.start\(\)/);
 assert.match(js,/segmentRecorder\.start\(\)/);
