@@ -36,12 +36,15 @@ jobs:
           s=s.replace("assert.match(app, /import \\{ turnAudioWindow \\} from '.\\/audio-window\\.js'/);", "assert.match(app, /import \\{ turnAudioWindow, sliceAudioBuffer \\} from '.\\/audio-window\\.js'/);")
           p.write_text(s)
           PY
-      - name: Trim nonfunctional source whitespace
+      - name: Trim nonfunctional app source
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('offline-interview/app.js')
-          s=p.read_text()
+          lines=p.read_text().splitlines()
+          # Remove only standalone JS comments; strings and executable code are untouched.
+          lines=[line for line in lines if not line.lstrip().startswith('//')]
+          s='\n'.join(lines)+'\n'
           while '\n\n\n' in s: s=s.replace('\n\n\n','\n\n')
           p.write_text(s)
           PY
