@@ -17,13 +17,20 @@ jobs:
           node-version: 22
       - name: Apply V41.12 patch
         run: python .github/v41_12_segment_isolation.py
+      - name: Fix isolated channel mapping
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('offline-interview/audio-window.js')
+          s=p.read_text().replace("segment.copyToChannel(decoded.getChannelData(channel).subarray(startFrame,endFrame),0);","segment.copyToChannel(decoded.getChannelData(channel).subarray(startFrame,endFrame),channel);")
+          p.write_text(s)
+          PY
       - name: Trim nonfunctional source comments if needed
         run: |
           python - <<'PY'
           from pathlib import Path
           p=Path('offline-interview/app.js')
           s=p.read_text()
-          # Keep source-size budgets authoritative; remove only redundant blank lines.
           while '\n\n\n' in s: s=s.replace('\n\n\n','\n\n')
           p.write_text(s)
           PY
