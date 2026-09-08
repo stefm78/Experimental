@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: offline-interview-v41-11-direct-link
-          fetch-depth: 2
+          fetch-depth: 3
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -25,15 +25,33 @@ jobs:
         run: |
           python - <<'PY'
           import pathlib, subprocess
-          text = subprocess.check_output(['git','show','HEAD^:.github/workflows/v41-15-field-integrity.yml'], text=True)
+          text = subprocess.check_output(['git','show','HEAD^^:.github/workflows/v41-15-field-integrity.yml'], text=True)
           marker = "          cat > /tmp/patch_v4115.py <<'PY'\n"
           if marker not in text or "\n          PY\n          python /tmp/patch_v4115.py" not in text:
-              raise SystemExit('previous embedded patch not found')
+              raise SystemExit('original embedded patch not found')
           body = text.split(marker, 1)[1].split("\n          PY\n          python /tmp/patch_v4115.py", 1)[0]
           lines = [line[10:] if line.startswith('          ') else line for line in body.splitlines()]
-          pathlib.Path('/tmp/patch_v4115.py').write_text('\n'.join(lines) + '\n')
+          patch = '\n'.join(lines) + '\n'
+          patch = patch.replace("app = repl(app, old_render, new_render, 'retry render')", "pass  # retry render patched in a dedicated robust step")
+          pathlib.Path('/tmp/patch_v4115.py').write_text(patch)
           PY
           python /tmp/patch_v4115.py
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('offline-interview/app.js')
+          app = p.read_text()
+          anchors = [
+              ("stableRetranscription === 'failed' ? '×' :", "stableRetranscription === 'rejected' ? '!' : stableRetranscription === 'failed' ? '×' :"),
+              ("retranscribe.disabled = !audioReady || stableRetranscription === 'succeeded';", "retranscribe.disabled = !audioReady;"),
+              ("? 'Transcription de cet audio terminée'", "? 'Retranscrire cet audio'"),
+              (": stableRetranscription === 'failed'\n        ? 'Aucun texte reconnu — réessayer'", ": stableRetranscription === 'rejected'\n        ? 'Transcription rejetée — réessayer'\n        : stableRetranscription === 'failed'\n          ? 'Aucun texte reconnu — réessayer'")
+          ]
+          for old, new in anchors:
+              if old not in app:
+                  raise SystemExit(f'missing robust retry anchor: {old[:60]}')
+              app = app.replace(old, new, 1)
+          p.write_text(app)
+          PY
       - name: Parse JavaScript
         run: |
           node --check offline-interview/app.js
