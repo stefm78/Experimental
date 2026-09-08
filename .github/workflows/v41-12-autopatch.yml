@@ -53,6 +53,12 @@ jobs:
               raise SystemExit('sw.js: V41.11 cache anchor missing')
           (root/'sw.js').write_text(sw.replace('41.11', '41.12'))
 
+          runtime_contract = root/'test-runtime-contract.mjs'
+          runtime_text = runtime_contract.read_text()
+          if 'interview-runtime-v41\\.11' not in runtime_text:
+              raise SystemExit('runtime contract V41.11 build anchor missing')
+          runtime_contract.write_text(runtime_text.replace('interview-runtime-v41\\.11', 'interview-runtime-v41\\.12'))
+
           css = (root/'styles.css').read_text()
           anchor = "@media(max-width:979px){\n  .interview-mode .shell{width:min(860px,100%)!important;padding:8px!important;min-height:0!important}\n  .interview-layout{display:block}\n  .question-sidebar{display:none!important}"
           if css.count(anchor) != 1:
