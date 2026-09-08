@@ -1,0 +1,60 @@
+name: Build V41.12 segment-isolation candidate
+on:
+  push:
+    branches: [offline-interview-v41-12-segment-isolation]
+permissions:
+  contents: write
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-12-segment-isolation
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Apply V41.12 patch
+        run: python .github/v41_12_segment_isolation.py
+      - name: Trim nonfunctional source comments if needed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('offline-interview/app.js')
+          s=p.read_text()
+          # Keep source-size budgets authoritative; remove only redundant blank lines.
+          while '\n\n\n' in s: s=s.replace('\n\n\n','\n\n')
+          p.write_text(s)
+          PY
+      - name: Parse JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/audio-window.js && node --check offline-interview/direct-interview-link.js
+      - name: Isolated audio-window contract
+        run: node offline-interview/test-audio-segment-window.mjs
+      - name: Authoring kit cold-start E2E
+        run: node offline-interview/test-authoring-kit-e2e.mjs
+      - name: Direct-link regression
+        run: node offline-interview/test-direct-interview-link.mjs
+      - name: Semantic boundary regression
+        run: node offline-interview/test-system-stt-boundary.mjs
+      - name: Hard STT handoff regression
+        run: node offline-interview/test-system-stt-hard-cut.mjs
+      - name: Runtime contract
+        run: node offline-interview/test-runtime-contract.mjs
+      - name: Parse V41.12 questionnaire
+        run: node -e "JSON.parse(require('fs').readFileSync('offline-interview/test-interviews/interview-test-ux-v41-12.json','utf8')); console.log('PASS questionnaire')"
+      - name: Verify fail-closed invariants
+        run: |
+          ! grep -q "recoverBoundaryTurnsWithSystem" offline-interview/app.js
+          ! grep -q "boundary-recovery" offline-interview/app.js
+          ! grep -q "recorder.stop().*selectSpeaker" offline-interview/app.js
+          grep -q "sliceAudioBuffer(context, decoded, ref.startMs, ref.endMs)" offline-interview/app.js
+          grep -q "source.addEventListener('ended'" offline-interview/app.js
+      - name: Commit exact candidate
+        run: |
+          rm .github/v41_12_segment_isolation.py .github/workflows/v41-12-build.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Build V41.12 isolated audio segment candidate"
+          git push
