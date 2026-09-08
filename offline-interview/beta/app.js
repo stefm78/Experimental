@@ -1,8 +1,9 @@
 import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
 import { turnAudioWindow } from './audio-window.js';
 import { resolveDirectInterviewLink } from './direct-interview-link.js';
+import { assessWhisperTranscript } from './whisper-quality.js';
 
-const BUILD_ID = '2026-09-08.interview-runtime-v41.14';
+const BUILD_ID = '2026-09-08.interview-runtime-v41.15';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -27,7 +28,7 @@ const ui = {
   captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'), micPreviewBtn: $('micPreviewBtn'), micMeterFill: $('micMeterFill'), micMeterState: $('micMeterState'), captureQuestionContext: $('captureQuestionContext'), captureQuestionStatus: $('captureQuestionStatus'), captureQuestionLabel: $('captureQuestionLabel'), moveCaptureBtn: $('moveCaptureBtn'), captureIntegrityAlert: $('captureIntegrityAlert'),
   answerText: $('answerText'), answerMeta: $('answerMeta'), composerSpeaker: $('composerSpeaker'), addTurnBtn: $('addTurnBtn'), clearComposerBtn: $('clearComposerBtn'),
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
-  interviewError: $('interviewError'), audioRecoveryBar: $('audioRecoveryBar'), audioRecoveryStatus: $('audioRecoveryStatus'), audioRecoveryBtn: $('audioRecoveryBtn'), simulateAudioFaultBtn: $('simulateAudioFaultBtn'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
+  interviewError: $('interviewError'), audioRecoveryBar: $('audioRecoveryBar'), audioRecoveryStatus: $('audioRecoveryStatus'), audioRecoveryBtn: $('audioRecoveryBtn'), simulateAudioFaultBtn: $('simulateAudioFaultBtn'), interviewDiagnosticPanel: $('interviewDiagnosticPanel'), interviewSimulateAudioFaultBtn: $('interviewSimulateAudioFaultBtn'), interviewAudioHealth: $('interviewAudioHealth'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
   doneSummary: $('doneSummary'), doneQuestionStat: $('doneQuestionStat'), doneTurnStat: $('doneTurnStat'), doneTimeStat: $('doneTimeStat'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), deleteAudioBtn: $('deleteAudioBtn'), newSessionBtn: $('newSessionBtn'),
   diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), diagStt: $('diagStt'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput'),
   copyAuthoringKitBtn: $('copyAuthoringKitBtn'), authoringKitStatus: $('authoringKitStatus')
@@ -70,6 +71,7 @@ let lastDeletedTurn = null;
 let completionInProgress = false;
 let pendingInterviewCompletion = false;
 let recordingAudioOffsetMs = 0;
+let recordingStopRequestedMs = 0;
 let audioContext = null;
 let audioAnalyser = null;
 let audioSourceNode = null;
@@ -140,6 +142,8 @@ function setAudioHealth(state, reason = '') {
   show(ui.audioRecoveryBar, next !== 'HEALTHY');
   if (ui.audioRecoveryStatus) ui.audioRecoveryStatus.textContent = next === 'RECOVERING' ? 'Réinitialisation audio…' : 'Audio dégradé · la session reste disponible.';
   if (ui.audioRecoveryBtn) ui.audioRecoveryBtn.disabled = next === 'RECOVERING';
+  if (ui.interviewAudioHealth) ui.interviewAudioHealth.textContent = next;
+  if (ui.interviewDiagnosticPanel && next === 'DEGRADED') ui.interviewDiagnosticPanel.open = true;
   if (changed && session) logRuntimeEvent(`audio_health_${next.toLowerCase()}`, { reason: why || undefined });
 }
 function markRecordingInvalid(recordingId, error, stage = 'decode') {
@@ -341,14 +345,14 @@ async function retranscribeTurnWithSystem(turn, button, reason = 'manual') {
   const ref = turn?.audioRef;
   const audioKey = ref?.recordingId ? `${ref.recordingId}:${Math.round(ref.startMs || 0)}:${Math.round(ref.endMs || 0)}` : null;
   if (!audioKey) return;
-  const stable = turn.systemRetranscription;
-  if (stable?.audioKey === audioKey && stable.status === 'succeeded') { showError(ui.interviewError, 'Cette prise a déjà une retranscription stabilisée. Le texte reste modifiable manuellement.'); return; }
+  const previous = turn.systemRetranscription;
+  const attempt = (Number(previous?.attempt) || 0) + 1;
   if (activeSystemRetranscriptions.has(audioKey)) return;
   activeSystemRetranscriptions.add(audioKey);
   if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
   stopReplay();
   try {
-    logRuntimeEvent('manual_whisper_started', { turnId: turn.id, recordingId: ref.recordingId });
+    logRuntimeEvent('manual_whisper_started', { turnId: turn.id, recordingId: ref.recordingId, attempt });
     const { pcm } = await buildTurnWhisperPcm(turn);
     const model = await prepareModel();
     const run = typeof model === 'function' ? model : model?._call?.bind(model);
@@ -356,16 +360,28 @@ async function retranscribeTurnWithSystem(turn, button, reason = 'manual') {
     const result = await run(pcm, { language: 'french', task: 'transcribe' });
     const text = cleanText(result?.text || '');
     if (!text) throw new Error('Aucun texte reconnu dans cette fenêtre audio.');
-    turn.text = text; turn.rawTranscript = text; turn.source = 'whisper-local-retranscribed';
-    turn.systemRetranscription = { audioKey, status: 'succeeded', text, mode: 'whisper-local', at: nowIso() };
+    const quality = assessWhisperTranscript(text);
+    if (!quality.ok) {
+      turn.systemRetranscription = { audioKey, status: 'rejected', text, reason: quality.reason, mode: 'whisper-local', at: nowIso(), attempt };
+      turn.updatedAt = nowIso(); session.updatedAt = nowIso();
+      logRuntimeEvent('manual_whisper_rejected', { turnId: turn.id, recordingId: ref.recordingId, attempt, qualityReason: quality.reason });
+      showError(ui.interviewError, 'Retranscription rejetée : sortie répétitive ou manifestement dégénérée. Vous pouvez réessayer.');
+      persistSessionLater('manual-whisper-rejected');
+      return;
+    }
+    const humanProtected = Boolean(turn.humanEdited);
+    if (!humanProtected) { turn.text = text; turn.source = 'whisper-local-retranscribed'; }
+    turn.rawTranscript = text;
+    turn.systemRetranscription = { audioKey, status: 'succeeded', text, mode: 'whisper-local', at: nowIso(), attempt, humanProtected };
     turn.updatedAt = nowIso(); session.updatedAt = nowIso();
-    logRuntimeEvent('manual_whisper_succeeded', { turnId: turn.id, recordingId: ref.recordingId, stable: true, reason });
+    logRuntimeEvent('manual_whisper_succeeded', { turnId: turn.id, recordingId: ref.recordingId, stable: true, reason, attempt, humanProtected });
+    if (humanProtected) showError(ui.interviewError, 'Nouvelle retranscription disponible ; votre correction manuelle a été conservée.');
     persistSessionLater('manual-whisper-retranscription');
   } catch (error) {
     if (!String(error?.code || '').startsWith('AUDIO_')) {
-      turn.systemRetranscription = { audioKey, status: 'failed', error: String(error?.message || error), mode: 'whisper-local', at: nowIso() };
+      turn.systemRetranscription = { audioKey, status: 'failed', error: String(error?.message || error), mode: 'whisper-local', at: nowIso(), attempt };
     }
-    logRuntimeEvent('manual_whisper_failed', { turnId: turn.id, recordingId: ref.recordingId, code: error?.code || 'WHISPER_FAILED', error: String(error?.message || error) });
+    logRuntimeEvent('manual_whisper_failed', { turnId: turn.id, recordingId: ref.recordingId, attempt, code: error?.code || 'WHISPER_FAILED', error: String(error?.message || error) });
     if (String(error?.code || '').startsWith('AUDIO_')) showError(ui.interviewError, `Audio indisponible pour retranscription : ${error.message || error}`);
     else showError(ui.interviewError, `Retranscription locale impossible : ${error.message || error}`);
   } finally {
@@ -1084,6 +1100,7 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   const segmentStartMs = recordingAudioOffsetMs;
   const segmentEndMs = Math.max(segmentStartMs, recordingMasterStartedAt ? performance.now() - recordingMasterStartedAt : segmentStartMs);
   const durationSeconds = Math.max(0, (segmentEndMs - segmentStartMs) / 1000);
+  logRuntimeEvent('audio_boundary_observed', { recordingId, startMs: Math.round(segmentStartMs), endMs: Math.round(segmentEndMs), monotonicElapsedMs: Math.round(segmentEndMs) });
   const cut = systemSpeechSession.takeSegment();
   if (!cut) return false;
   recordingAudioOffsetMs = segmentEndMs;
@@ -1767,13 +1784,15 @@ function renderTurns() {
     retranscribe.className = 'ghost small turn-retranscribe-button';
     const trackSupported = true;
     const stableRetranscription = turn.systemRetranscription?.status;
-    const transcriptionGlyph = stableRetranscription === 'succeeded' ? '✓' : stableRetranscription === 'failed' ? '×' : '<svg class="audio-to-text-svg" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 9h2m2-4v8m3-11v14m3-9v4"/><path class="audio-to-text-arrow" d="M16 9h6m-2-2 2 2-2 2"/><path d="M25 5h7M25 9h7M25 13h5"/></svg>';
+    const transcriptionGlyph = stableRetranscription === 'succeeded' ? '✓' : stableRetranscription === 'rejected' ? '!' : stableRetranscription === 'failed' ? '×' : '<svg class="audio-to-text-svg" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 9h2m2-4v8m3-11v14m3-9v4"/><path class="audio-to-text-arrow" d="M16 9h6m-2-2 2 2-2 2"/><path d="M25 5h7M25 9h7M25 13h5"/></svg>';
     retranscribe.innerHTML = `<span class="audio-to-text-icon" aria-hidden="true">${transcriptionGlyph}</span>`;
-    retranscribe.disabled = !audioReady || stableRetranscription === 'succeeded';
+    retranscribe.disabled = !audioReady;
     retranscribe.title = stableRetranscription === 'succeeded'
-      ? 'Transcription de cet audio terminée'
-      : stableRetranscription === 'failed'
-        ? 'Aucun texte reconnu — réessayer'
+      ? 'Retranscrire cet audio'
+      : stableRetranscription === 'rejected'
+        ? 'Transcription rejetée — réessayer'
+        : stableRetranscription === 'failed'
+          ? 'Aucun texte reconnu — réessayer'
         : trackSupported
           ? 'Transcrire cet audio en texte'
           : 'Transcription depuis un audio enregistré non prise en charge sur ce navigateur';
@@ -1792,7 +1811,9 @@ function renderTurns() {
     };
     text.addEventListener('input', resizeTurnText);
     text.addEventListener('change', async () => {
-      turn.text = cleanText(text.value);
+      const nextText = cleanText(text.value);
+      if (nextText !== turn.text) { turn.humanEdited = true; turn.humanEditedAt = nowIso(); }
+      turn.text = nextText;
       turn.updatedAt = nowIso();
       text.value = turn.text;
       await persistSession();
@@ -2183,6 +2204,7 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     recordingQuestionId = questionId;
     recordingCaptureId = uuid('capture');
     recordingAudioOffsetMs = 0;
+    recordingStopRequestedMs = 0;
     recordingCompletionPromise = new Promise(resolve => { resolveRecordingCompletion = resolve; });
     await ensureMicrophoneStream();
     const mimeType = preferredMimeType();
@@ -2234,6 +2256,7 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
 function stopRecording() {
   if (!recorder || recorder.state === 'inactive') return;
   const masterEndMs = recordingMasterStartedAt ? Math.max(recordingAudioOffsetMs, performance.now() - recordingMasterStartedAt) : recordingAudioOffsetMs + Math.max(0, performance.now() - startedRecordingAt);
+  recordingStopRequestedMs = masterEndMs;
   composerDurationSeconds = Math.max(0, (masterEndMs - recordingAudioOffsetMs) / 1000);
   clearInterval(timerHandle);
   try { systemSpeechSession?.stop(); } catch {}
@@ -2272,8 +2295,10 @@ async function handleRecordingStopped() {
       await boundedWait(dbAudioPut({ id: captureId, sessionId: session.id, blob: masterBlob, mimeType: masterBlob.type || 'audio/webm', createdAt: nowIso() }), 5000, 'stockage audio');
       audioStored = true;
       try {
-        await validateStoredRecording(captureId);
+        const timeline = await validateStoredRecording(captureId);
         audioValid = true;
+        const logicalStopMs = Math.round(recordingStopRequestedMs || 0);
+        logRuntimeEvent('audio_timeline_measured', { recordingId: captureId, logicalStopMs, decodedDurationMs: timeline.durationMs, tailMs: timeline.durationMs - logicalStopMs, ratio: logicalStopMs > 0 ? Number((timeline.durationMs / logicalStopMs).toFixed(6)) : null });
       } catch (error) {
         logRuntimeEvent('audio_blob_invalid', { recordingId: captureId, stage: 'decode-probe', bytes: masterBlob.size, error: String(error?.message || error) });
       }
@@ -2597,6 +2622,7 @@ ui.copyDiagBtn.addEventListener('click', copyDiagnosticReport);
 ui.copyAuthoringKitBtn.addEventListener('click', copyAuthoringKit);
 ui.audioRecoveryBtn?.addEventListener('click', recoverAudioSubsystem);
 ui.simulateAudioFaultBtn?.addEventListener('click', simulateAudioFault);
+ui.interviewSimulateAudioFaultBtn?.addEventListener('click', simulateAudioFault);
 
 document.addEventListener('keydown', event => {
   if (ui.interviewView?.classList.contains('hidden')) return;
