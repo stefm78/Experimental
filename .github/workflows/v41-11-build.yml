@@ -17,7 +17,7 @@ jobs:
           node-version: 22
       - name: Apply V41.11 patch
         run: python .github/v41_11_direct_link.py
-      - name: Align runtime contract with intentional mic simplification
+      - name: Align runtime contract with intentional V41.11 changes
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -25,6 +25,7 @@ jobs:
           s=p.read_text()
           s=s.replace('assert.match(index, /id="micPreviewBtn"/);','assert.doesNotMatch(index, /id="micPreviewBtn"/);')
           s=s.replace('assert.match(css, /mic-preview-button\\[data-level-state=good\\]/);','assert.doesNotMatch(css, /mic-preview-button\\[data-level-state=good\\]/);')
+          s=s.replace("assert.match(app, /\\['succeeded', 'failed'\\]\\.includes\\(stableRetranscription\\)/);","assert.doesNotMatch(app, /\\['succeeded', 'failed'\\]\\.includes\\(stableRetranscription\\)/);")
           p.write_text(s)
           PY
       - name: Parse JavaScript
