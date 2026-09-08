@@ -17,6 +17,8 @@ jobs:
           node-version: 22
       - name: Apply V41.11 patch
         run: python .github/v41_11_direct_link.py
+      - name: Trim nonfunctional source comments
+        run: python -c "from pathlib import Path; import re; p=Path('offline-interview/app.js'); s=p.read_text(); s=re.sub(r'^\\s*//[^\\n]*\\n','',s,count=2,flags=re.M); p.write_text(s)"
       - name: Align runtime contract with intentional V41.11 changes
         run: |
           python - <<'PY'
