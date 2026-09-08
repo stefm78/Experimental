@@ -1,0 +1,867 @@
+{
+  "schema": "offline-interview.interview-result.v1",
+  "version": "1.0",
+  "exportedAt": "2026-09-08T14:06:54.266Z",
+  "provenance": {
+    "appBuild": "2026-09-08.interview-runtime-v41.15",
+    "inputSchema": "offline-interview.interview-spec.v1",
+    "transcriptionDefault": "system",
+    "transcriptionFallback": "whisper-local",
+    "speechHandoffCalibration": null,
+    "privacy": "Audio replay is stored locally in IndexedDB when captured and is never included in JSON/TXT exports or sent by this app. System speech recognition may be processed locally or remotely depending on the browser/OS."
+  },
+  "interview": {
+    "id": "free-interview-1788876022805",
+    "version": "1.0",
+    "title": "Entretien libre",
+    "estimatedDurationMinutes": 30,
+    "context": "Entretien démarré sans questionnaire chargé.",
+    "objective": "Capturer librement la conversation, avec transcription et audio local.",
+    "language": "fr-FR",
+    "tags": []
+  },
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer",
+      "active": true,
+      "removedAt": null
+    },
+    {
+      "id": "P2",
+      "name": "Interviewé",
+      "role": "interviewee",
+      "active": true,
+      "removedAt": null
+    }
+  ],
+  "session": {
+    "id": "6d6f15c9-0bbc-4f62-94ad-ea7c18d96e5c",
+    "startedAt": "2026-09-08T14:00:22.811Z",
+    "completedAt": "2026-09-08T14:06:52.641Z",
+    "completed": true,
+    "activeDurationSeconds": 361,
+    "questionDurationSeconds": {
+      "Q1": 361
+    },
+    "completion": {
+      "answeredQuestions": 1,
+      "totalQuestions": 1,
+      "unansweredQuestions": 0,
+      "followUpsUsed": 0
+    },
+    "runtimeEvents": [
+      {
+        "at": "2026-09-08T14:01:00.738Z",
+        "type": "system_boundary_live_missing",
+        "questionId": "Q1",
+        "speakerId": "P1",
+        "boundary": true
+      },
+      {
+        "at": "2026-09-08T14:01:03.116Z",
+        "type": "audio_boundary_observed",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "startMs": 2894,
+        "endMs": 5325,
+        "monotonicElapsedMs": 5325
+      },
+      {
+        "at": "2026-09-08T14:01:03.137Z",
+        "type": "system_boundary_live_committed",
+        "questionId": "Q1",
+        "speakerId": "P2",
+        "boundary": true,
+        "textLength": 29
+      },
+      {
+        "at": "2026-09-08T14:01:06.511Z",
+        "type": "audio_blob_finalized",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366,
+        "mime": "audio/webm;codecs=opus",
+        "chunkCount": 1
+      },
+      {
+        "at": "2026-09-08T14:01:06.525Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:01:06.576Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:01:06.576Z",
+        "type": "audio_blob_validated",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366,
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:01:06.577Z",
+        "type": "audio_timeline_measured",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "logicalStopMs": 8434,
+        "decodedDurationMs": 8700,
+        "tailMs": 266,
+        "ratio": 1.031539
+      },
+      {
+        "at": "2026-09-08T14:01:06.577Z",
+        "type": "system_transcription_missing",
+        "questionId": "Q1",
+        "speakerId": "P1",
+        "boundary": false,
+        "systemMode": "local"
+      },
+      {
+        "at": "2026-09-08T14:01:06.586Z",
+        "type": "boundary_audio_ready",
+        "captureId": "aefd3e96-3783-4a31-b48d-173da7974a11"
+      },
+      {
+        "at": "2026-09-08T14:01:08.327Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:01:08.350Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:01:08.351Z",
+        "type": "replay_started",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 2894
+      },
+      {
+        "at": "2026-09-08T14:01:11.864Z",
+        "type": "replay_ended",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11"
+      },
+      {
+        "at": "2026-09-08T14:01:13.141Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:01:13.167Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:01:13.168Z",
+        "type": "replay_started",
+        "turnId": "89f2a4a1-7582-4079-9b61-bbecd68d995b",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 2431
+      },
+      {
+        "at": "2026-09-08T14:01:16.218Z",
+        "type": "replay_ended",
+        "turnId": "89f2a4a1-7582-4079-9b61-bbecd68d995b",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11"
+      },
+      {
+        "at": "2026-09-08T14:01:18.156Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:01:18.179Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:01:18.179Z",
+        "type": "replay_started",
+        "turnId": "a69cb6d6-b702-4020-bc8a-8b3284defd47",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 3109
+      },
+      {
+        "at": "2026-09-08T14:01:21.904Z",
+        "type": "replay_ended",
+        "turnId": "a69cb6d6-b702-4020-bc8a-8b3284defd47",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11"
+      },
+      {
+        "at": "2026-09-08T14:02:24.385Z",
+        "type": "audio_health_degraded",
+        "reason": "diagnostic-injected"
+      },
+      {
+        "at": "2026-09-08T14:02:24.385Z",
+        "type": "audio_health_degraded",
+        "reason": "diagnostic-injected"
+      },
+      {
+        "at": "2026-09-08T14:02:27.001Z",
+        "type": "audio_health_recovering",
+        "reason": "manual-recovery"
+      },
+      {
+        "at": "2026-09-08T14:02:27.001Z",
+        "type": "audio_recovery_started"
+      },
+      {
+        "at": "2026-09-08T14:02:27.011Z",
+        "type": "audio_health_healthy"
+      },
+      {
+        "at": "2026-09-08T14:02:27.011Z",
+        "type": "audio_recovery_succeeded",
+        "recovered": 0,
+        "remaining": 0
+      },
+      {
+        "at": "2026-09-08T14:02:36.987Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:02:37.013Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:02:37.014Z",
+        "type": "replay_started",
+        "turnId": "a69cb6d6-b702-4020-bc8a-8b3284defd47",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 3109
+      },
+      {
+        "at": "2026-09-08T14:02:41.657Z",
+        "type": "replay_ended",
+        "turnId": "a69cb6d6-b702-4020-bc8a-8b3284defd47",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11"
+      },
+      {
+        "at": "2026-09-08T14:02:50.167Z",
+        "type": "audio_boundary_observed",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "startMs": 0,
+        "endMs": 8869,
+        "monotonicElapsedMs": 8869
+      },
+      {
+        "at": "2026-09-08T14:02:50.185Z",
+        "type": "system_boundary_live_committed",
+        "questionId": "Q1",
+        "speakerId": "P1",
+        "boundary": true,
+        "textLength": 67
+      },
+      {
+        "at": "2026-09-08T14:02:57.528Z",
+        "type": "audio_boundary_observed",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "startMs": 8869,
+        "endMs": 16230,
+        "monotonicElapsedMs": 16230
+      },
+      {
+        "at": "2026-09-08T14:02:57.547Z",
+        "type": "system_boundary_live_committed",
+        "questionId": "Q1",
+        "speakerId": "P2",
+        "boundary": true,
+        "textLength": 65
+      },
+      {
+        "at": "2026-09-08T14:02:58.960Z",
+        "type": "audio_blob_finalized",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "bytes": 281402,
+        "mime": "audio/webm;codecs=opus",
+        "chunkCount": 1
+      },
+      {
+        "at": "2026-09-08T14:02:58.968Z",
+        "type": "audio_decode_started",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "bytes": 281402
+      },
+      {
+        "at": "2026-09-08T14:02:59.050Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "durationMs": 17460
+      },
+      {
+        "at": "2026-09-08T14:02:59.051Z",
+        "type": "audio_blob_validated",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "bytes": 281402,
+        "durationMs": 17460
+      },
+      {
+        "at": "2026-09-08T14:02:59.051Z",
+        "type": "audio_timeline_measured",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "logicalStopMs": 17374,
+        "decodedDurationMs": 17460,
+        "tailMs": 86,
+        "ratio": 1.00495
+      },
+      {
+        "at": "2026-09-08T14:02:59.052Z",
+        "type": "system_transcription_missing",
+        "questionId": "Q1",
+        "speakerId": "P1",
+        "boundary": false,
+        "systemMode": "local"
+      },
+      {
+        "at": "2026-09-08T14:02:59.059Z",
+        "type": "boundary_audio_ready",
+        "captureId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad"
+      },
+      {
+        "at": "2026-09-08T14:03:03.822Z",
+        "type": "audio_decode_started",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "bytes": 281402
+      },
+      {
+        "at": "2026-09-08T14:03:03.858Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "durationMs": 17460
+      },
+      {
+        "at": "2026-09-08T14:03:03.859Z",
+        "type": "replay_started",
+        "turnId": "5a9bbfe3-bf80-4abb-912a-3d685ffe7703",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "durationMs": 1144
+      },
+      {
+        "at": "2026-09-08T14:03:05.660Z",
+        "type": "replay_ended",
+        "turnId": "5a9bbfe3-bf80-4abb-912a-3d685ffe7703",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad"
+      },
+      {
+        "at": "2026-09-08T14:03:08.167Z",
+        "type": "audio_decode_started",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "bytes": 281402
+      },
+      {
+        "at": "2026-09-08T14:03:08.219Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "durationMs": 17460
+      },
+      {
+        "at": "2026-09-08T14:03:08.220Z",
+        "type": "replay_started",
+        "turnId": "1038edb4-205b-4526-b151-9acc783893de",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "durationMs": 7361
+      },
+      {
+        "at": "2026-09-08T14:03:16.244Z",
+        "type": "replay_ended",
+        "turnId": "1038edb4-205b-4526-b151-9acc783893de",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad"
+      },
+      {
+        "at": "2026-09-08T14:03:49.082Z",
+        "type": "manual_whisper_started",
+        "turnId": "75ef9482-7e2c-4210-8222-5e399172149a",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "attempt": 1
+      },
+      {
+        "at": "2026-09-08T14:03:49.085Z",
+        "type": "audio_decode_started",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "bytes": 281402
+      },
+      {
+        "at": "2026-09-08T14:03:49.129Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "durationMs": 17460
+      },
+      {
+        "at": "2026-09-08T14:03:50.511Z",
+        "type": "manual_whisper_started",
+        "turnId": "1038edb4-205b-4526-b151-9acc783893de",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "attempt": 1
+      },
+      {
+        "at": "2026-09-08T14:03:50.535Z",
+        "type": "audio_decode_started",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "bytes": 281402
+      },
+      {
+        "at": "2026-09-08T14:03:52.380Z",
+        "type": "manual_whisper_started",
+        "turnId": "5a9bbfe3-bf80-4abb-912a-3d685ffe7703",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "attempt": 1
+      },
+      {
+        "at": "2026-09-08T14:03:52.386Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "durationMs": 17460
+      },
+      {
+        "at": "2026-09-08T14:03:52.390Z",
+        "type": "audio_decode_started",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "bytes": 281402
+      },
+      {
+        "at": "2026-09-08T14:03:52.661Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "durationMs": 17460
+      },
+      {
+        "at": "2026-09-08T14:04:01.352Z",
+        "type": "manual_whisper_succeeded",
+        "turnId": "75ef9482-7e2c-4210-8222-5e399172149a",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "stable": true,
+        "reason": "manual",
+        "attempt": 1,
+        "humanProtected": false
+      },
+      {
+        "at": "2026-09-08T14:04:22.728Z",
+        "type": "manual_whisper_rejected",
+        "turnId": "1038edb4-205b-4526-b151-9acc783893de",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "attempt": 1,
+        "qualityReason": "low-lexical-diversity"
+      },
+      {
+        "at": "2026-09-08T14:04:25.810Z",
+        "type": "manual_whisper_succeeded",
+        "turnId": "5a9bbfe3-bf80-4abb-912a-3d685ffe7703",
+        "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+        "stable": true,
+        "reason": "manual",
+        "attempt": 1,
+        "humanProtected": false
+      },
+      {
+        "at": "2026-09-08T14:04:25.826Z",
+        "type": "storage_warning",
+        "error": "manual-whisper-retranscription : délai dépassé"
+      },
+      {
+        "at": "2026-09-08T14:04:25.828Z",
+        "type": "storage_warning",
+        "error": "manual-whisper-rejected : délai dépassé"
+      },
+      {
+        "at": "2026-09-08T14:05:15.203Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:05:15.232Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:05:15.233Z",
+        "type": "replay_started",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 2894
+      },
+      {
+        "at": "2026-09-08T14:05:19.032Z",
+        "type": "replay_ended",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11"
+      },
+      {
+        "at": "2026-09-08T14:05:19.970Z",
+        "type": "manual_whisper_started",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "attempt": 1
+      },
+      {
+        "at": "2026-09-08T14:05:19.972Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:05:19.992Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:05:22.781Z",
+        "type": "manual_whisper_succeeded",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "stable": true,
+        "reason": "manual",
+        "attempt": 1,
+        "humanProtected": false
+      },
+      {
+        "at": "2026-09-08T14:05:25.291Z",
+        "type": "manual_whisper_started",
+        "turnId": "89f2a4a1-7582-4079-9b61-bbecd68d995b",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "attempt": 1
+      },
+      {
+        "at": "2026-09-08T14:05:25.296Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:05:25.321Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:05:28.004Z",
+        "type": "manual_whisper_succeeded",
+        "turnId": "89f2a4a1-7582-4079-9b61-bbecd68d995b",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "stable": true,
+        "reason": "manual",
+        "attempt": 1,
+        "humanProtected": false
+      },
+      {
+        "at": "2026-09-08T14:05:32.648Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:05:32.670Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:05:32.671Z",
+        "type": "replay_started",
+        "turnId": "a69cb6d6-b702-4020-bc8a-8b3284defd47",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 3109
+      },
+      {
+        "at": "2026-09-08T14:05:36.006Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:05:36.024Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:05:36.025Z",
+        "type": "replay_started",
+        "turnId": "a69cb6d6-b702-4020-bc8a-8b3284defd47",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 3109
+      },
+      {
+        "at": "2026-09-08T14:05:39.437Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:05:39.460Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:05:39.460Z",
+        "type": "replay_started",
+        "turnId": "89f2a4a1-7582-4079-9b61-bbecd68d995b",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 2431
+      },
+      {
+        "at": "2026-09-08T14:06:20.849Z",
+        "type": "manual_whisper_started",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "attempt": 2
+      },
+      {
+        "at": "2026-09-08T14:06:20.853Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:06:20.892Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:06:23.915Z",
+        "type": "manual_whisper_succeeded",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "stable": true,
+        "reason": "manual",
+        "attempt": 2,
+        "humanProtected": false
+      },
+      {
+        "at": "2026-09-08T14:06:27.017Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:06:27.043Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:06:27.044Z",
+        "type": "replay_started",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 2894
+      },
+      {
+        "at": "2026-09-08T14:06:30.883Z",
+        "type": "replay_ended",
+        "turnId": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11"
+      },
+      {
+        "at": "2026-09-08T14:06:33.180Z",
+        "type": "audio_decode_started",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "bytes": 140366
+      },
+      {
+        "at": "2026-09-08T14:06:33.208Z",
+        "type": "audio_decode_succeeded",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 8700
+      },
+      {
+        "at": "2026-09-08T14:06:33.208Z",
+        "type": "replay_started",
+        "turnId": "89f2a4a1-7582-4079-9b61-bbecd68d995b",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+        "durationMs": 2431
+      },
+      {
+        "at": "2026-09-08T14:06:36.254Z",
+        "type": "replay_ended",
+        "turnId": "89f2a4a1-7582-4079-9b61-bbecd68d995b",
+        "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11"
+      },
+      {
+        "at": "2026-09-08T14:06:52.640Z",
+        "type": "completion_requested",
+        "source": "sidebarFinishBtn",
+        "recording": false,
+        "captureFinalizing": false,
+        "viewportWidth": 1204
+      },
+      {
+        "at": "2026-09-08T14:06:52.641Z",
+        "type": "completion_succeeded",
+        "viewportWidth": 1204
+      }
+    ],
+    "captureGaps": []
+  },
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Entretien libre",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Conversation libre",
+          "text": "Entretien libre",
+          "intent": "Capturer la conversation sans questionnaire préparé.",
+          "estimatedMinutes": 30,
+          "required": false,
+          "audience": [
+            "P2"
+          ],
+          "plannedFollowUps": [],
+          "status": "answered",
+          "validatedAt": null,
+          "turns": [
+            {
+              "order": 1,
+              "id": "a5712dbd-618e-462e-8df9-e8ed61eb5589",
+              "type": "answer",
+              "speakerId": "P1",
+              "speakerName": "Interviewer",
+              "speakerRole": "interviewer",
+              "text": "Arrête, ça va être termin.",
+              "source": "whisper-local-retranscribed",
+              "rawTranscript": "Arrête, ça va être termin.",
+              "durationSeconds": 2.9,
+              "audioRef": {
+                "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+                "startMs": 0,
+                "endMs": 2894
+              },
+              "followUpId": null,
+              "followUpKind": null,
+              "createdAt": "2026-09-08T14:01:00.687Z",
+              "updatedAt": "2026-09-08T14:06:23.915Z"
+            },
+            {
+              "order": 2,
+              "id": "89f2a4a1-7582-4079-9b61-bbecd68d995b",
+              "type": "answer",
+              "speakerId": "P2",
+              "speakerName": "Interviewé",
+              "speakerRole": "interviewee",
+              "text": "Je ne suis pas malheureusement.",
+              "source": "whisper-local-retranscribed",
+              "rawTranscript": "Je ne suis pas malheureusement.",
+              "durationSeconds": 2.4,
+              "audioRef": {
+                "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+                "startMs": 2894,
+                "endMs": 5325
+              },
+              "followUpId": null,
+              "followUpKind": null,
+              "createdAt": "2026-09-08T14:01:03.120Z",
+              "updatedAt": "2026-09-08T14:05:28.004Z"
+            },
+            {
+              "order": 3,
+              "id": "a69cb6d6-b702-4020-bc8a-8b3284defd47",
+              "type": "answer",
+              "speakerId": "P1",
+              "speakerName": "Interviewer",
+              "speakerRole": "interviewer",
+              "text": "",
+              "source": "audio-system-pending",
+              "rawTranscript": null,
+              "durationSeconds": 3.1,
+              "audioRef": {
+                "recordingId": "aefd3e96-3783-4a31-b48d-173da7974a11",
+                "startMs": 5325,
+                "endMs": 8434
+              },
+              "followUpId": null,
+              "followUpKind": null,
+              "createdAt": "2026-09-08T14:01:06.578Z",
+              "updatedAt": "2026-09-08T14:01:06.578Z"
+            },
+            {
+              "order": 4,
+              "id": "75ef9482-7e2c-4210-8222-5e399172149a",
+              "type": "answer",
+              "speakerId": "P1",
+              "speakerName": "Interviewer",
+              "speakerRole": "interviewer",
+              "text": "Ok, ceci, c'est une demande de retranscription. Et maintenant, je vas suivre le tube sur un tabme, je vais stop.",
+              "source": "whisper-local-retranscribed",
+              "rawTranscript": "Ok, ceci, c'est une demande de retranscription. Et maintenant, je vas suivre le tube sur un tabme, je vais stop.",
+              "durationSeconds": 8.9,
+              "audioRef": {
+                "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+                "startMs": 0,
+                "endMs": 8869
+              },
+              "followUpId": null,
+              "followUpKind": null,
+              "createdAt": "2026-09-08T14:02:50.170Z",
+              "updatedAt": "2026-09-08T14:04:01.352Z"
+            },
+            {
+              "order": 5,
+              "id": "1038edb4-205b-4526-b151-9acc783893de",
+              "type": "answer",
+              "speakerId": "P2",
+              "speakerName": "Interviewé",
+              "speakerRole": "interviewee",
+              "text": "j'ai basculé sur interviewer et maintenant je rebascule sur Inter",
+              "source": "system-local-boundary-draft",
+              "rawTranscript": "j'ai basculé sur interviewer et maintenant je rebascule sur Inter",
+              "durationSeconds": 7.4,
+              "audioRef": {
+                "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+                "startMs": 8869,
+                "endMs": 16230
+              },
+              "followUpId": null,
+              "followUpKind": null,
+              "createdAt": "2026-09-08T14:02:57.530Z",
+              "updatedAt": "2026-09-08T14:04:22.728Z"
+            },
+            {
+              "order": 6,
+              "id": "5a9bbfe3-bf80-4abb-912a-3d685ffe7703",
+              "type": "answer",
+              "speakerId": "P1",
+              "speakerName": "Interviewer",
+              "speakerRole": "interviewer",
+              "text": "et bien.",
+              "source": "whisper-local-retranscribed",
+              "rawTranscript": "et bien.",
+              "durationSeconds": 1.1,
+              "audioRef": {
+                "recordingId": "88b94567-87f5-4b3a-8b0c-a1032ec146ad",
+                "startMs": 16230,
+                "endMs": 17374
+              },
+              "followUpId": null,
+              "followUpKind": null,
+              "createdAt": "2026-09-08T14:02:59.052Z",
+              "updatedAt": "2026-09-08T14:04:25.810Z"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
