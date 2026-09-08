@@ -1,0 +1,17 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+const js=fs.readFileSync(new URL('./lab.js',import.meta.url),'utf8');
+assert.match(html,/STT Engine Lab V1/);
+assert.match(html,/Frontière A\/B/);
+assert.match(js,/Retranscrire audio/);
+assert.match(js,/new MediaRecorder\(stream\)/);
+assert.match(js,/masterRecorder\.start\(\)/);
+assert.match(js,/segmentRecorder\.start\(\)/);
+assert.match(js,/rec\.start\(track\)/);
+assert.match(js,/processLocally/);
+assert.match(js,/saved_transcript_cleared/);
+assert.match(js,/segments\.length/);
+assert.doesNotMatch(js,/setInterval\(/);
+assert.doesNotMatch(js,/MutationObserver/);
+assert.doesNotMatch(js,/automatic/i);
+console.log(JSON.stringify({status:'PASS',contract:'offline-interview.stt-engine-lab.v1'}));
