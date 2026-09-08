@@ -17,6 +17,16 @@ jobs:
           node-version: 22
       - name: Apply V41.11 patch
         run: python .github/v41_11_direct_link.py
+      - name: Align runtime contract with intentional mic simplification
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('offline-interview/test-runtime-contract.mjs')
+          s=p.read_text()
+          s=s.replace('assert.match(index, /id="micPreviewBtn"/);','assert.doesNotMatch(index, /id="micPreviewBtn"/);')
+          s=s.replace('assert.match(css, /mic-preview-button\\[data-level-state=good\\]/);','assert.doesNotMatch(css, /mic-preview-button\\[data-level-state=good\\]/);')
+          p.write_text(s)
+          PY
       - name: Parse JavaScript
         run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/audio-window.js && node --check offline-interview/direct-interview-link.js
       - name: Direct-link contract
