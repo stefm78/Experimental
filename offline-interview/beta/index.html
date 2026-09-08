@@ -8,7 +8,7 @@
   <title>Interview locale structurée</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=41.13">
+  <link rel="stylesheet" href="./styles.css?v=41.14">
 </head>
 <body>
   <main class="shell">
@@ -200,6 +200,7 @@
           </details>
 
           <p id="interviewError" class="error hidden" role="alert"></p>
+          <div id="audioRecoveryBar" class="capture-integrity-alert hidden" role="status"><span id="audioRecoveryStatus">Audio dégradé · la session reste disponible.</span> <button id="audioRecoveryBtn" class="ghost small" type="button">Réinitialiser l’audio</button></div>
 
           <div class="actions interview-nav-actions">
             <button id="prevBtn" class="ghost">← Précédente</button>
@@ -274,11 +275,12 @@
           <div><dt>Transcription</dt><dd id="diagStt">Détection…</dd></div>
         </dl>
         <button id="copyDiagBtn" class="secondary">Copier le diagnostic</button>
+        <button id="simulateAudioFaultBtn" class="ghost small" type="button">Simuler panne audio</button>
         <p id="copyDiagStatus" class="hint" aria-live="polite"></p>
         <textarea id="diagnosticOutput" rows="12" readonly class="hidden" spellcheck="false"></textarea>
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=41.13"></script>
+  <script type="module" src="./app.js?v=41.14"></script>
 </body>
 </html>
