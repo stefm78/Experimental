@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: offline-interview-v41-11-direct-link
-          fetch-depth: 2
+          fetch-depth: 4
       - uses: actions/setup-node@v7
         with:
           node-version: '22'
@@ -25,10 +25,10 @@ jobs:
         run: |
           python - <<'PY'
           import pathlib, subprocess
-          text = subprocess.check_output(['git','show','HEAD^:.github/workflows/v41-14-audio-resilience.yml'], text=True)
+          text = subprocess.check_output(['git','show','f6f0beb177e23453de5fd15dc4c43e0dbf50aab8:.github/workflows/v41-14-audio-resilience.yml'], text=True)
           marker = "          python - <<'PY'\n"
           if marker not in text or "\n          PY" not in text:
-              raise SystemExit('previous embedded patch not found')
+              raise SystemExit('embedded V41.14 patch not found')
           body = text.split(marker, 1)[1].rsplit("\n          PY", 1)[0]
           lines = [line[10:] if line.startswith('          ') else line for line in body.splitlines()]
           pathlib.Path('/tmp/v41_14_patch.py').write_text('\n'.join(lines) + '\n')
@@ -42,9 +42,9 @@ jobs:
       - name: Direct-link regression
         run: node offline-interview/test-direct-interview-link.mjs
       - name: Semantic boundary regression
-        run: node offline-interview/test-semantic-boundary.mjs
+        run: node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs
       - name: Hard STT handoff regression
-        run: node offline-interview/test-hard-stt-handoff.mjs
+        run: node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
       - name: V41.13 deterministic-window regression
         run: node offline-interview/test-v41-13-field-repair.mjs
       - name: V41.14 audio resilience regression
