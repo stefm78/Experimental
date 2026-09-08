@@ -14,7 +14,7 @@ const audioWindow = read('audio-window.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.12/);
+assert.match(app, /interview-runtime-v41\.13/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -38,9 +38,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.12/);
-assert.match(index, /styles\.css\?v=41\.12/);
-assert.match(index, /app\.js\?v=41\.12/);
+assert.match(sw, /offline-interview-v41\.13/);
+assert.match(index, /styles\.css\?v=41\.13/);
+assert.match(index, /app\.js\?v=41\.13/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
@@ -98,24 +98,23 @@ assert.match(app, /boundedWait\(dbAudioPut\([\s\S]*5000, 'stockage audio'\)/);
 assert.match(app, /finishInterview\(\);\s+persistSessionLater\('completion'\)/);
 assert.match(app, /failedAudioCaptureIds\.has\(recordingId\) \? null/);
 
-// V41.11: automatic transcription is system-first/system-only; saved audio remains usable when text is absent.
-assert.doesNotMatch(app, /Aucun texte système · secours Whisper/);
-assert.doesNotMatch(app, /Transcription Whisper locale/);
+// V41.13: live transcription stays system-first; explicit saved-audio retranscription is local Whisper on the canonical window.
 assert.match(app, /appendAudioOnlyTurn\(/);
 assert.match(app, /audio-system-pending/);
 assert.match(app, /retranscribeTurnWithSystem\(turn, retranscribe\)/);
-assert.match(app, /supportsSystemAudioTrackRecognition\(\)/);
+assert.match(app, /buildTurnWhisperPcm\(turn\)/);
+assert.match(app, /turnAudioWindow\(turn, 'canonical'\)/);
+assert.match(app, /whisper-local-retranscribed/);
+assert.doesNotMatch(app, /supportsSystemAudioTrackRecognition/);
+assert.doesNotMatch(app, /transcribeSystemAudioTrack\(/);
 assert.match(systemStt, /export function transcribeSystemAudioTrack\(/);
-assert.match(systemStt, /recognition\.start\(audioTrack\)/);
-assert.match(systemStt, /Chrome\|Chromium\|Edg/);
-
 
 // V41.11 field stabilization: explicit capture ownership, gapless semantic boundaries, replay pause, idempotent retranscription.
 assert.match(app, /systemSpeechSession\?\.takeSegment/);
 assert.doesNotMatch(app.match(/async function rotateLiveSegment[\s\S]*?return true;\n\}/)?.[0] || '', /cutSegment\(/);
 assert.match(app, /L’enregistrement reste sur/);
 assert.match(app, /replayTurnAudio\(turn, replay\)/);
-assert.match(app, /activeReplayTurnId === turn.id/);
+assert.match(app, /activeReplayTurnId === turn\?\.id/);
 assert.match(app, /systemRetranscription = \{ audioKey, status: 'succeeded'/);
 assert.doesNotMatch(app, /\['succeeded', 'failed'\]\.includes\(stableRetranscription\)/);
 
@@ -161,7 +160,7 @@ assert.doesNotMatch(app, /await retranscribeTurnWithSystem\(turn, null, 'boundar
 // V41.11: direct-link and targeted field repair invariants.
 assert.match(app, /resolveDirectInterviewLink/);
 assert.match(app, /directLaunch\?\.view === 'interview'/);
-assert.match(app, /turnAudioWindow\(turn, 'recovery'\)/);
+assert.match(app, /turnAudioWindow\(turn, 'canonical'\)/);
 assert.doesNotMatch(app, /\['succeeded', 'failed'\]\.includes\(stableRetranscription\)/);
 assert.match(index, /class="mic-meter" role="meter"/);
 assert.doesNotMatch(index, />Micro<\/button>/);
@@ -173,9 +172,10 @@ assert.ok(bytes(css) <= 66_000, `styles.css budget exceeded: ${bytes(css)} bytes
 assert.ok(coreBytes <= 211_000, `core source budget exceeded: ${coreBytes} bytes`);
 
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
+await import('./test-v41-13-field-repair.mjs');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41.11',
+  contract: 'offline-interview.runtime-contract.v41.13',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes
