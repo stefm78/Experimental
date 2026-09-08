@@ -33,6 +33,7 @@ jobs:
           s=p.read_text()
           s=s.replace(r'41\.11', r'41\.12')
           s=s.replace('offline-interview.runtime-contract.v41.11', 'offline-interview.runtime-contract.v41.12')
+          s=s.replace("assert.match(app, /import \\{ turnAudioWindow \\} from '.\\/audio-window\\.js'/);", "assert.match(app, /import \\{ turnAudioWindow, sliceAudioBuffer \\} from '.\\/audio-window\\.js'/);")
           p.write_text(s)
           PY
       - name: Trim nonfunctional source whitespace
