@@ -31,8 +31,7 @@ jobs:
           from pathlib import Path
           p=Path('offline-interview/test-runtime-contract.mjs')
           s=p.read_text()
-          s=s.replace(r'interview-runtime-v41\.11', r'interview-runtime-v41\.12')
-          s=s.replace(r'offline-interview-v41\.11', r'offline-interview-v41\.12')
+          s=s.replace(r'41\.11', r'41\.12')
           s=s.replace('offline-interview.runtime-contract.v41.11', 'offline-interview.runtime-contract.v41.12')
           p.write_text(s)
           PY
