@@ -38,12 +38,12 @@ jobs:
               "const BUILD_ID = '2026-09-08.interview-runtime-v41.12';")
 
           old_track = """  let started = false;\n  return {\n    track,\n    durationMs: Math.ceil(durationSeconds * 1000),\n    start() { if (!started) { started = true; source.start(0, startSeconds, durationSeconds); } },\n    cleanup() { try { if (started) source.stop(); } catch {} try { track.stop(); } catch {} context.close().catch(() => {}); }\n  };"""
-          new_track = """  const trackDrainMs = 350;\n  let started = false;\n  let disposed = false;\n  let trackStopTimer = null;\n  let trackStopped = false;\n  const stopTrack = () => {\n    if (trackStopped) return;\n    trackStopped = true;\n    if (trackStopTimer) { clearTimeout(trackStopTimer); trackStopTimer = null; }\n    try { track.stop(); } catch {}\n  };\n  source.addEventListener('ended', () => {\n    if (disposed || trackStopped) return;\n    trackStopTimer = setTimeout(stopTrack, trackDrainMs);\n  }, { once: true });\n  return {\n    track,\n    durationMs: Math.ceil(durationSeconds * 1000),\n    drainMs: trackDrainMs,\n    start() { if (!started) { started = true; source.start(0, startSeconds, durationSeconds); } },\n    cleanup() {\n      disposed = true;\n      if (trackStopTimer) { clearTimeout(trackStopTimer); trackStopTimer = null; }\n      try { if (started) source.stop(); } catch {}\n      stopTrack();\n      context.close().catch(() => {});\n    }\n  };"""
+          new_track = """  let started = false, trackStopTimer = null;\n  return {\n    track,\n    durationMs: Math.ceil(durationSeconds * 1000),\n    start() {\n      if (started) return;\n      started = true;\n      source.start(0, startSeconds, durationSeconds);\n      trackStopTimer = setTimeout(() => { try { track.stop(); } catch {} }, Math.ceil(durationSeconds * 1000) + 350);\n    },\n    cleanup() {\n      if (trackStopTimer) clearTimeout(trackStopTimer);\n      try { if (started) source.stop(); } catch {}\n      try { track.stop(); } catch {}\n      context.close().catch(() => {});\n    }\n  };"""
           replace_once(root/'app.js', old_track, new_track)
 
           replace_once(root/'system-stt.js',
               "      stopTimer = setTimeout(() => { try { recognition.stop(); } catch { finish(); } }, Math.max(800, Number(durationMs) || 0) + 700);",
-              "      // The supplied track contains only the requested excerpt. Stop recognition close to\n      // that bound instead of leaving a long-lived silent track that Chromium may keep consuming.\n      stopTimer = setTimeout(() => { try { recognition.stop(); } catch { finish(); } }, Math.max(900, (Number(durationMs) || 0) + 450));")
+              "      stopTimer = setTimeout(() => { try { recognition.stop(); } catch { finish(); } }, Math.max(900, (Number(durationMs) || 0) + 450));")
 
           replace_once(root/'index.html', 'styles.css?v=41.11', 'styles.css?v=41.12')
           replace_once(root/'index.html', 'app.js?v=41.11', 'app.js?v=41.12')
@@ -81,9 +81,8 @@ jobs:
           const stt=fs.readFileSync(new URL('./system-stt.js',import.meta.url),'utf8');
           const css=fs.readFileSync(new URL('./styles.css',import.meta.url),'utf8');
           assert.match(app,/const BUILD_ID = '2026-09-08\.interview-runtime-v41\.12';/);
-          assert.match(app,/const trackDrainMs = 350;/);
-          assert.match(app,/source\.addEventListener\('ended',[\s\S]*setTimeout\(stopTrack, trackDrainMs\)/);
-          assert.match(app,/cleanup\(\)[\s\S]*stopTrack\(\)[\s\S]*context\.close/);
+          assert.match(app,/trackStopTimer = setTimeout\([\s\S]*track\.stop\(\)[\s\S]*Math\.ceil\(durationSeconds \* 1000\) \+ 350/);
+          assert.match(app,/if \(trackStopTimer\) clearTimeout\(trackStopTimer\)/);
           assert.match(stt,/Math\.max\(900, \(Number\(durationMs\) \|\| 0\) \+ 450\)/);
           assert.doesNotMatch(stt,/Math\.max\(800, Number\(durationMs\) \|\| 0\) \+ 700/);
           const replayBlock=app.slice(app.indexOf("const replay = document.createElement('button')"),app.indexOf("const retranscribe = document.createElement('button')"));
