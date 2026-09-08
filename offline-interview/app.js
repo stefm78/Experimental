@@ -1,7 +1,8 @@
 import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';
 import { turnAudioWindow } from './audio-window.js';
+import { resolveDirectInterviewLink } from './direct-interview-link.js';
 
-const BUILD_ID = '2026-09-08.interview-runtime-v41.10';
+const BUILD_ID = '2026-09-08.interview-runtime-v41.11';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -133,12 +134,9 @@ function updateMicMeter(level = 0, peak = 0) {
   else if (db >= -30) { state = 'Bon niveau'; key = 'good'; }
   else if (db >= -50) { state = 'Faible'; key = 'low'; }
   if (ui.micMeterFill) ui.micMeterFill.style.setProperty('--level', visual.toFixed(3));
-  if (ui.micMeterState) { ui.micMeterState.textContent = state === 'Bon niveau' ? 'Bon' : state; ui.micMeterState.dataset.levelState = key; }
-  if (ui.micPreviewBtn) {
-    ui.micPreviewBtn.dataset.levelState = key;
-    ui.micPreviewBtn.title = `Niveau micro : ${state}`;
-    ui.micPreviewBtn.setAttribute('aria-label', `Microphone — ${state}`);
-  }
+  if (ui.micMeterState) { ui.micMeterState.textContent = ''; ui.micMeterState.dataset.levelState = key; }
+  const meter = ui.micMeterFill?.parentElement;
+  if (meter) { meter.dataset.levelState = key; meter.title = `Niveau micro : ${state}`; meter.setAttribute('aria-valuetext', state); meter.setAttribute('aria-valuenow', String(Math.round(visual * 100))); }
 }
 
 async function startMicrophoneMeter(targetStream) {
@@ -179,7 +177,6 @@ async function ensureMicrophoneStream() {
   const reusable = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
   if (!reusable) stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
   if (!audioAnalyser) await startMicrophoneMeter(stream);
-  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = isRecording() ? 'Micro' : 'Micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'true'); }
   return stream;
 }
 
@@ -187,7 +184,6 @@ function releaseMicrophone() {
   stopMicrophoneMeter();
   stream?.getTracks().forEach(track => track.stop());
   stream = null;
-  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = 'Micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'false'); }
 }
 
 async function toggleMicrophonePreview() {
@@ -219,7 +215,7 @@ function stopReplay() {
 }
 
 async function replayTurnAudio(turn, button) {
-  const ref = turnAudioWindow(turn, 'canonical');
+  const ref = turnAudioWindow(turn, 'recovery');
   if (!ref?.recordingId) return;
   if (activeReplayTurnId === turn.id && activeReplayAudio) {
     if (activeReplayAudio.paused) {
@@ -247,7 +243,7 @@ async function replayTurnAudio(turn, button) {
 }
 
 async function buildTurnRecognitionTrack(turn) {
-  const ref = turnAudioWindow(turn, 'canonical');
+  const ref = turnAudioWindow(turn, 'recovery');
   if (!ref?.recordingId) throw new Error('Audio local absent pour cette prise.');
   const record = await dbAudioGet(ref.recordingId);
   if (!record?.blob) throw new Error('Audio local introuvable pour cette prise.');
@@ -281,10 +277,8 @@ async function retranscribeTurnWithSystem(turn, button, reason = 'manual') {
   const audioKey = ref?.recordingId ? `${ref.recordingId}:${Math.round(ref.startMs || 0)}:${Math.round(ref.endMs || 0)}` : null;
   if (!audioKey) return;
   const stable = turn.systemRetranscription;
-  if (stable?.audioKey === audioKey && ['succeeded', 'failed'].includes(stable.status)) {
-    showError(ui.interviewError, stable.status === 'succeeded'
-      ? 'Cette prise a déjà une retranscription système stabilisée. Le texte reste modifiable manuellement.'
-      : 'La tentative système de cette prise a déjà échoué. Le texte reste modifiable manuellement.');
+  if (stable?.audioKey === audioKey && stable.status === 'succeeded') {
+    showError(ui.interviewError, 'Cette prise a déjà une retranscription stabilisée. Le texte reste modifiable manuellement.');
     return;
   }
   if (activeSystemRetranscriptions.has(audioKey)) return;
@@ -1004,8 +998,6 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   if (!cut) return false;
   recordingAudioOffsetMs = segmentEndMs;
   recordingHadCuts = true;
-  // the fresh SpeechRecognition session is listening. This makes the semantic boundary
-  // real instead of guessing from late result indexes.
   recordingSpeakerId = nextSpeakerId;
   recordingQuestionId = nextQuestionId;
   session.activeSpeakerId = nextSpeakerId;
@@ -1685,11 +1677,11 @@ function renderTurns() {
     const stableRetranscription = turn.systemRetranscription?.status;
     const transcriptionGlyph = stableRetranscription === 'succeeded' ? '✓' : stableRetranscription === 'failed' ? '×' : '<svg class="audio-to-text-svg" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 9h2m2-4v8m3-11v14m3-9v4"/><path class="audio-to-text-arrow" d="M16 9h6m-2-2 2 2-2 2"/><path d="M25 5h7M25 9h7M25 13h5"/></svg>';
     retranscribe.innerHTML = `<span class="audio-to-text-icon" aria-hidden="true">${transcriptionGlyph}</span>`;
-    retranscribe.disabled = !audioReady || !trackSupported || systemSpeechCapability.mode === 'unavailable' || ['succeeded', 'failed'].includes(stableRetranscription);
+    retranscribe.disabled = !audioReady || !trackSupported || systemSpeechCapability.mode === 'unavailable' || stableRetranscription === 'succeeded';
     retranscribe.title = stableRetranscription === 'succeeded'
       ? 'Transcription de cet audio terminée'
       : stableRetranscription === 'failed'
-        ? 'Transcription terminée sans texte : correction manuelle disponible'
+        ? 'Aucun texte reconnu — réessayer'
         : trackSupported
           ? 'Transcrire cet audio en texte'
           : 'Transcription depuis un audio enregistré non prise en charge sur ce navigateur';
@@ -2413,6 +2405,17 @@ async function copyDiagnosticReport() {
   }
 }
 
+
+async function loadDirectInterviewFromLocation(){
+  const direct=await resolveDirectInterviewLink(window.location);
+  if(!direct)return null;
+  interview=normalizeSpec(direct.raw);
+  ensureInterviewParticipants();
+  await persistSpec();
+  session=null;
+  return direct;
+}
+
 async function init() {
   ui.diagBuild.textContent = BUILD_ID;
   if (ui.runtimeVersion) ui.runtimeVersion.textContent = BUILD_ID;
@@ -2421,8 +2424,11 @@ async function init() {
   window.addEventListener('offline', updateNetwork);
   await ensureDb();
 
+  let directLaunch = null;
+  try { directLaunch = await loadDirectInterviewFromLocation(); }
+  catch (error) { showError(ui.loadError, error.message || String(error)); }
   const [savedSpec, savedSession] = await Promise.all([dbGet(SPEC_KEY), dbGet(STATE_KEY)]);
-  if (savedSpec) {
+  if (!directLaunch && savedSpec) {
     try { interview = normalizeSpec(savedSpec); } catch { interview = null; }
   }
   if (!interview) {
@@ -2438,6 +2444,7 @@ async function init() {
 
   await Promise.allSettled([registerServiceWorker(), requestPersistentStorage(), detectRuntimeSystemSpeech()]);
   renderSetup();
+  if (directLaunch?.view === 'interview') await startInterview();
 }
 
 ui.interviewFile.addEventListener('change', () => {

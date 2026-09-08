@@ -1175,16 +1175,11 @@
 
 
 
-.mic-meter-row{display:flex;align-items:center;gap:6px;min-height:30px;align-self:center}
-.mic-preview-button{position:relative;padding:5px 8px 5px 20px!important;min-height:30px;border-radius:999px!important;font-size:.74rem!important;color:#52627a!important;background:#f8fafc!important}
-.mic-preview-button::before{content:"";position:absolute;left:9px;width:7px;height:7px;border-radius:50%;background:#94a3b8;transition:background .18s ease}
-.mic-preview-button[data-level-state=good]::before{background:#4f8f67}.mic-preview-button[data-level-state=low]::before,.mic-preview-button[data-level-state=silence]::before{background:#a7b0bd}.mic-preview-button[data-level-state=hot]::before{background:#b94747}
+.mic-meter-row{display:flex;align-items:center;justify-content:center;width:14px;min-width:14px;height:30px;align-self:center}
 .mic-meter{position:relative;width:5px;height:28px;border-radius:999px;background:#e5eaf0;overflow:hidden;flex:none}
 .mic-meter-fill{position:absolute;inset:auto 0 0 0;height:calc(var(--level,0)*100%);background:#70849a;transition:height .18s ease-out}
 .mic-meter-recommended{position:absolute;left:0;right:0;bottom:68%;height:1px;background:#334155;opacity:.35;z-index:2}
-.mic-meter-state{min-width:34px;font-size:.68rem;font-weight:650;color:#7a8699;line-height:1;text-align:left}
-.mic-meter-state[data-level-state=good]{color:#4f6f59}.mic-meter-state[data-level-state=hot]{color:#9f3f3f}
 .turn-retranscribe-button{display:inline-grid;place-items:center;width:34px;height:34px;min-width:34px;padding:0!important;border-radius:9px!important}
 .audio-to-text-icon{display:grid;place-items:center;width:18px;height:18px;font-size:.78rem;font-weight:900;line-height:1}.audio-to-text-icon.is-busy{letter-spacing:1px}.audio-to-text-svg{width:23px;height:14px;fill:none;stroke:currentColor;stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round}.audio-to-text-arrow{stroke-width:1.35}
 .audio-only-turn{padding-block:6px;background:#fbfcfd}.audio-only-turn .turn-head{margin-bottom:0}
-@media(max-width:560px){.mic-meter-row{gap:5px}.mic-meter{width:5px;height:26px}.mic-meter-state{min-width:30px}}
+@media(max-width:560px){.mic-meter-row{width:12px;min-width:12px}.mic-meter{width:5px;height:26px}}
