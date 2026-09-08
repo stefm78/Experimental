@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const app=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
+const stt=fs.readFileSync(new URL('./system-stt.js',import.meta.url),'utf8');
+const css=fs.readFileSync(new URL('./styles.css',import.meta.url),'utf8');
+assert.match(app,/const BUILD_ID = '2026-09-08\.interview-runtime-v41\.12';/);
+assert.match(app,/setTimeout\(\(\) => track\.stop\(\), Math\.ceil\(durationSeconds \* 1000\) \+ 350\)/);
+assert.match(stt,/Math\.max\(900, \(Number\(durationMs\) \|\| 0\) \+ 450\)/);
+assert.doesNotMatch(stt,/Math\.max\(800, Number\(durationMs\) \|\| 0\) \+ 700/);
+const replayBlock=app.slice(app.indexOf("const replay = document.createElement('button')"),app.indexOf("const retranscribe = document.createElement('button')"));
+assert.match(replayBlock,/const audioReady = Boolean\(turn\.audioRef\?\.recordingId\) && !isRecording\(\) && !captureFinalizing;/);
+assert.match(replayBlock,/replay\.disabled = !audioReady;/);
+assert.doesNotMatch(replayBlock,/systemRetranscription|stableRetranscription/);
+assert.match(css,/@media\(max-width:979px\)[\s\S]*\.question-sidebar\{display:none!important\}[\s\S]*\.mobile-only-metrics,\.question-progress-mobile\{display:none!important\}/);
+console.log('PASS V41.12 bounded-track + replay independence + intermediate UX');
