@@ -14,7 +14,7 @@ const audioWindow = read('audio-window.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.13/);
+assert.match(app, /interview-runtime-v41\.14/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -38,9 +38,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.13/);
-assert.match(index, /styles\.css\?v=41\.13/);
-assert.match(index, /app\.js\?v=41\.13/);
+assert.match(sw, /offline-interview-v41\.14/);
+assert.match(index, /styles\.css\?v=41\.14/);
+assert.match(index, /app\.js\?v=41\.14/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
@@ -65,7 +65,7 @@ assert.match(app, /masterAudioChunks = \[\]/);
 assert.match(app, /masterAudioChunks\.push\(event\.data\)/);
 assert.match(app, /blob: masterBlob/);
 assert.match(app, /const recordingId = recordingCaptureId/);
-assert.match(app, /const audioRef = failedAudioCaptureIds\.has\(recordingId\) \? null : \{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \}/);
+assert.match(app, /const audioRef = \{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \}/);
 assert.match(app, /replayTurnAudio\(turn, replay\)/);
 assert.match(app, /AudioContext \|\| window\.webkitAudioContext/);
 assert.match(app, /getFloatTimeDomainData/);
@@ -96,7 +96,7 @@ assert.ok(selectBody.indexOf('renderSpeakerButtons();') >= 0 && selectBody.index
 assert.doesNotMatch(selectBody, /await persistSession\(\)/);
 assert.match(app, /boundedWait\(dbAudioPut\([\s\S]*5000, 'stockage audio'\)/);
 assert.match(app, /finishInterview\(\);\s+persistSessionLater\('completion'\)/);
-assert.match(app, /failedAudioCaptureIds\.has\(recordingId\) \? null/);
+assert.doesNotMatch(app, /failedAudioCaptureIds/);
 
 // V41.13: live transcription stays system-first; explicit saved-audio retranscription is local Whisper on the canonical window.
 assert.match(app, /appendAudioOnlyTurn\(/);
@@ -122,7 +122,7 @@ assert.doesNotMatch(app, /\['succeeded', 'failed'\]\.includes\(stableRetranscrip
 assert.match(app, /let recordingMasterStartedAt = 0/);
 assert.match(app, /performance\.now\(\) - recordingMasterStartedAt/);
 assert.match(app, /audio-system-boundary-pending/);
-assert.match(app, /const audioReady = Boolean\(turn\.audioRef\?\.recordingId\) && !isRecording\(\) && !captureFinalizing/);
+assert.match(app, /const audioReady = Boolean\(turn\.audioRef\?\.recordingId\) && recordingAudioUsable\(turn\.audioRef\.recordingId\)/);
 
 // V41.11: live system text is committed immediately; saved-audio retranscription is recovery, never a critical-path prerequisite.
 assert.match(app, /system-boundary-draft/);
@@ -167,15 +167,17 @@ assert.doesNotMatch(index, />Micro<\/button>/);
 assert.doesNotMatch(index, />Silence<\/span>/);
 // Explicit anti-growth budgets. Raising one requires a conscious code-review decision.
 const coreBytes = bytes(app) + bytes(css) + bytes(systemStt) + bytes(index) + bytes(sw);
-assert.ok(bytes(app) <= 110_000, `app.js budget exceeded: ${bytes(app)} bytes`);
+// V41.14 adds bounded validation/recovery because field evidence showed decode failures could poison the audio lifecycle.
+assert.ok(bytes(app) <= 119_000, `app.js V41.14 resilience budget exceeded: ${bytes(app)} bytes`);
 assert.ok(bytes(css) <= 66_000, `styles.css budget exceeded: ${bytes(css)} bytes`);
-assert.ok(coreBytes <= 211_000, `core source budget exceeded: ${coreBytes} bytes`);
+assert.ok(coreBytes <= 220_000, `core source V41.14 resilience budget exceeded: ${coreBytes} bytes`);
 
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
 await import('./test-v41-13-field-repair.mjs');
+await import('./test-v41-14-audio-resilience.mjs');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41.13',
+  contract: 'offline-interview.runtime-contract.v41.14',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes
