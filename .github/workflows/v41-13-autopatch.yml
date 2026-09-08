@@ -1,0 +1,224 @@
+name: Build V41.13 deterministic audio-window candidate
+
+on:
+  push:
+    branches: [offline-interview-v41-11-direct-link]
+    paths:
+      - '.github/workflows/v41-13-autopatch.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-qualify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: offline-interview-v41-11-direct-link
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Apply V41.13 deterministic window repair
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path('offline-interview')
+          app_path = root/'app.js'
+          app = app_path.read_text()
+
+          def replace_function(text, name, replacement):
+              marker = f"function {name}("
+              starts = [m.start() for m in re.finditer(r'(?m)^(?:async )?function '+re.escape(name)+r'\(', text)]
+              if len(starts) != 1:
+                  raise SystemExit(f'{name}: expected one function, found {len(starts)}')
+              start = starts[0]
+              nxt = re.search(r'(?m)^(?:async )?function [A-Za-z_$][\w$]*\(', text[start+1:])
+              if not nxt:
+                  raise SystemExit(f'{name}: next top-level function not found')
+              end = start + 1 + nxt.start()
+              return text[:start] + replacement.rstrip() + '\n\n' + text[end:]
+
+          app = app.replace(
+              "import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';",
+              "import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';",
+              1)
+          if "const BUILD_ID = '2026-09-08.interview-runtime-v41.12';" not in app:
+              raise SystemExit('V41.12 BUILD_ID anchor missing')
+          app = app.replace("const BUILD_ID = '2026-09-08.interview-runtime-v41.12';", "const BUILD_ID = '2026-09-08.interview-runtime-v41.13';", 1)
+          app = app.replace('let activeReplayUrl = null;', 'let activeReplayContext = null;', 1)
+
+          app = replace_function(app, 'updateReplayButton', r'''function updateReplayButton(button, playing) {
+            if (!button) return;
+            button.textContent = playing ? '■' : '▶';
+            button.title = playing ? 'Arrêter cette prise de parole' : 'Réécouter cette prise de parole';
+            button.setAttribute('aria-label', button.title);
+            button.setAttribute('aria-pressed', playing ? 'true' : 'false');
+          }''')
+
+          app = replace_function(app, 'stopReplay', r'''function stopReplay(expectedSource = null) {
+            if (expectedSource && activeReplayAudio !== expectedSource) return;
+            const source = activeReplayAudio, context = activeReplayContext;
+            activeReplayAudio = null; activeReplayContext = null; activeReplayButton = null; activeReplayTurnId = null;
+            updateReplayButton(activeReplayButton, false);
+            try { source?.stop(); } catch {}
+            if (context?.state !== 'closed') context?.close().catch(() => {});
+          }''')
+
+          app = replace_function(app, 'replayTurnAudio', r'''async function replayTurnAudio(turn, button) {
+            if (activeReplayTurnId === turn?.id && activeReplayAudio) { stopReplay(); return; }
+            stopReplay();
+            try {
+              const { context, buffer } = await loadTurnAudioWindow(turn);
+              const source = context.createBufferSource();
+              source.buffer = buffer; source.connect(context.destination);
+              activeReplayAudio = source; activeReplayContext = context; activeReplayTurnId = turn.id; activeReplayButton = button || null;
+              source.onended = () => stopReplay(source);
+              source.start();
+              updateReplayButton(activeReplayButton, true);
+            } catch (error) { stopReplay(); showError(ui.interviewError, `Replay impossible : ${error.message || error}`); }
+          }''')
+
+          app = replace_function(app, 'buildTurnRecognitionTrack', r'''async function loadTurnAudioWindow(turn) {
+            const ref = turnAudioWindow(turn, 'canonical');
+            if (!ref?.recordingId) throw new Error('Audio local absent pour cette prise.');
+            const record = await dbAudioGet(ref.recordingId);
+            if (!record?.blob) throw new Error('Audio local introuvable pour cette prise.');
+            const Context = window.AudioContext || window.webkitAudioContext;
+            if (!Context) throw new Error('Web Audio indisponible.');
+            const context = new Context();
+            const decoded = await context.decodeAudioData((await record.blob.arrayBuffer()).slice(0));
+            const start = Math.max(0, Math.floor(ref.startMs * decoded.sampleRate / 1000));
+            const end = Math.min(decoded.length, Math.max(start + 1, Math.ceil(ref.endMs * decoded.sampleRate / 1000)));
+            const buffer = context.createBuffer(decoded.numberOfChannels, end - start, decoded.sampleRate);
+            for (let c = 0; c < decoded.numberOfChannels; c += 1) buffer.copyToChannel(decoded.getChannelData(c).subarray(start, end), c);
+            return { ref, context, buffer };
+          }
+
+          async function buildTurnWhisperPcm(turn) {
+            const { ref, context, buffer } = await loadTurnAudioWindow(turn);
+            const rate = 16000, frames = Math.max(1, Math.ceil(buffer.duration * rate));
+            const offline = new OfflineAudioContext(1, frames, rate);
+            const source = offline.createBufferSource(); source.buffer = buffer; source.connect(offline.destination); source.start();
+            const rendered = await offline.startRendering();
+            await context.close().catch(() => {});
+            return { ref, durationMs: Math.round(rendered.duration * 1000), pcm: rendered.getChannelData(0).slice() };
+          }''')
+
+          app = replace_function(app, 'retranscribeTurnWithSystem', r'''async function retranscribeTurnWithSystem(turn, button, reason = 'manual') {
+            showError(ui.interviewError, '');
+            const ref = turn?.audioRef;
+            const audioKey = ref?.recordingId ? `${ref.recordingId}:${Math.round(ref.startMs || 0)}:${Math.round(ref.endMs || 0)}` : null;
+            if (!audioKey) return;
+            const stable = turn.systemRetranscription;
+            if (stable?.audioKey === audioKey && stable.status === 'succeeded') { showError(ui.interviewError, 'Cette prise a déjà une retranscription stabilisée. Le texte reste modifiable manuellement.'); return; }
+            if (activeSystemRetranscriptions.has(audioKey)) return;
+            activeSystemRetranscriptions.add(audioKey);
+            if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
+            stopReplay();
+            try {
+              const model = await prepareModel();
+              const { pcm } = await buildTurnWhisperPcm(turn);
+              const run = typeof model === 'function' ? model : model?._call?.bind(model);
+              if (!run) throw new Error('Pipeline Whisper non exécutable.');
+              const result = await run(pcm, { language: 'french', task: 'transcribe' });
+              const text = cleanText(result?.text || '');
+              if (!text) throw new Error('Aucun texte reconnu dans cette fenêtre audio.');
+              turn.text = text; turn.rawTranscript = text; turn.source = 'whisper-local-retranscribed';
+              turn.systemRetranscription = { audioKey, status: 'succeeded', text, mode: 'whisper-local', at: nowIso() };
+              turn.updatedAt = nowIso(); session.updatedAt = nowIso();
+              logRuntimeEvent('system_retranscription_succeeded', { turnId: turn.id, mode: 'whisper-local', stable: true, reason });
+              persistSessionLater('manual-whisper-retranscription');
+            } catch (error) {
+              turn.systemRetranscription = { audioKey, status: 'failed', error: String(error?.message || error), mode: 'whisper-local', at: nowIso() };
+              recordRuntimeWarning('manual_whisper_retranscription_error', error);
+              showError(ui.interviewError, `Retranscription locale impossible : ${error.message || error}`);
+            } finally {
+              activeSystemRetranscriptions.delete(audioKey);
+              if (button) { button.disabled = false; button.removeAttribute('aria-busy'); }
+              renderTurns();
+            }
+          }''')
+
+          app = app.replace('const trackSupported = supportsSystemAudioTrackRecognition();', 'const trackSupported = true;', 1)
+          app = app.replace("retranscribe.disabled = !audioReady || !trackSupported || systemSpeechCapability.mode === 'unavailable' || stableRetranscription === 'succeeded';", "retranscribe.disabled = !audioReady || stableRetranscription === 'succeeded';", 1)
+          if 'supportsSystemAudioTrackRecognition' in app or 'transcribeSystemAudioTrack(' in app or 'buildTurnRecognitionTrack(' in app:
+              raise SystemExit('obsolete saved-audio system STT path still referenced')
+          app_path.write_text(app)
+
+          index = root/'index.html'
+          t = index.read_text().replace('styles.css?v=41.12','styles.css?v=41.13').replace('app.js?v=41.12','app.js?v=41.13')
+          index.write_text(t)
+          sw = root/'sw.js'
+          t = sw.read_text()
+          if '41.12' not in t: raise SystemExit('V41.12 service-worker cache anchor missing')
+          sw.write_text(t.replace('41.12','41.13'))
+
+          contract = root/'test-runtime-contract.mjs'
+          t = contract.read_text().replace(r'41\.12', r'41\.13')
+          start = t.index('// V41.11: automatic transcription is system-first/system-only;')
+          end = t.index('// V41.11 field stabilization:', start)
+          new_block = r'''// V41.13: live transcription stays system-first; explicit saved-audio retranscription is local Whisper on the canonical window.
+          assert.match(app, /appendAudioOnlyTurn\(/);
+          assert.match(app, /audio-system-pending/);
+          assert.match(app, /retranscribeTurnWithSystem\(turn, retranscribe\)/);
+          assert.match(app, /buildTurnWhisperPcm\(turn\)/);
+          assert.match(app, /turnAudioWindow\(turn, 'canonical'\)/);
+          assert.match(app, /whisper-local-retranscribed/);
+          assert.doesNotMatch(app, /supportsSystemAudioTrackRecognition/);
+          assert.doesNotMatch(app, /transcribeSystemAudioTrack\(/);
+          assert.match(systemStt, /export function transcribeSystemAudioTrack\(/);
+
+          '''
+          t = t[:start] + new_block + t[end:]
+          t = t.replace("assert.match(app, /turnAudioWindow\\(turn, 'recovery'\\)/);", "assert.match(app, /turnAudioWindow\\(turn, 'canonical'\\)/);")
+          t = t.replace("assert.match(app, /activeReplayTurnId === turn.id/);", "assert.match(app, /activeReplayTurnId === turn\\?\\.id/);")
+          t = t.replace("contract: 'offline-interview.runtime-contract.v41.11'", "contract: 'offline-interview.runtime-contract.v41.13'")
+          if "await import('./test-v41-13-field-repair.mjs');" not in t:
+              t = t.replace("assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');", "assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');\nawait import('./test-v41-13-field-repair.mjs');")
+          contract.write_text(t)
+
+          regression = r'''import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import { turnAudioWindow } from './audio-window.js';
+          const app = fs.readFileSync(new URL('./app.js', import.meta.url), 'utf8');
+          const bounds = [[0,3404],[3404,7210],[7210,10332],[10332,13551],[13551,16640]];
+          for (const [startMs,endMs] of bounds) {
+            const w = turnAudioWindow({audioRef:{recordingId:'field',startMs,endMs}}, 'canonical');
+            assert.deepEqual([w.startMs,w.endMs],[startMs,endMs]);
+          }
+          assert.match(app,/async function loadTurnAudioWindow\(turn\)[\s\S]*turnAudioWindow\(turn, 'canonical'\)/);
+          assert.match(app,/const buffer = context\.createBuffer\([\s\S]*copyToChannel/);
+          assert.match(app,/async function replayTurnAudio\(turn, button\)[\s\S]*source\.buffer = buffer[\s\S]*source\.start\(\)/);
+          assert.doesNotMatch(app,/replayTurnAudio[\s\S]{0,1200}new Audio\(/);
+          assert.match(app,/async function buildTurnWhisperPcm\(turn\)[\s\S]*OfflineAudioContext\(1, frames, rate\)/);
+          assert.match(app,/await run\(pcm, \{ language: 'french', task: 'transcribe' \}\)/);
+          assert.match(app,/mode: 'whisper-local'/);
+          assert.doesNotMatch(app,/buildTurnRecognitionTrack\(/);
+          assert.doesNotMatch(app,/transcribeSystemAudioTrack\(/);
+          console.log('PASS V41.13 canonical replay + manual Whisper isolation contract');
+          '''
+          (root/'test-v41-13-field-repair.mjs').write_text(regression)
+          PY
+      - name: Parse JavaScript
+        run: node --check offline-interview/app.js && node --check offline-interview/system-stt.js && node --check offline-interview/sw.js
+      - name: Direct-link regression
+        run: node offline-interview/test-direct-interview-link.mjs
+      - name: Semantic boundary regression
+        run: node --experimental-default-type=module offline-interview/test-system-stt-boundary.mjs
+      - name: Hard STT handoff regression
+        run: node --experimental-default-type=module offline-interview/test-system-stt-hard-cut.mjs
+      - name: V41.13 deterministic window regression
+        run: node offline-interview/test-v41-13-field-repair.mjs
+      - name: Runtime contract
+        run: node offline-interview/test-runtime-contract.mjs
+      - name: Commit qualified candidate
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add offline-interview
+          git commit -m 'Build V41.13 deterministic audio-window field repair'
+          git push origin HEAD:offline-interview-v41-11-direct-link
