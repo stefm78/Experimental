@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+const js=fs.readFileSync(new URL('./app.js',import.meta.url),'utf8');
+const mustHtml=['Démarrer','Arrêter','Démarrer LIVE','Transcrire l’enregistrement','Effacer et recommencer','Détails'];
+for(const token of mustHtml) if(!html.includes(token)) throw new Error(`missing UI token: ${token}`);
+const mustJs=['getUserMedia','MediaRecorder','SpeechRecognition','webkitSpeechRecognition','r.start(track)','decodeAudioData'];
+for(const token of mustJs) if(!js.includes(token)) throw new Error(`missing behavior token: ${token}`);
+const forbidden=['serviceWorker','setInterval(','idempotency','STALE','queue'];
+for(const token of forbidden) if(js.includes(token)) throw new Error(`forbidden complexity token: ${token}`);
+console.log('Simple STT Lab contract PASS');
