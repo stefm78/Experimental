@@ -5,7 +5,7 @@
   const fail = (el, msg, err) => { el.textContent = msg; el.className='bad'; if (err) log('error',{message:String(err?.message||err),name:err?.name||''}); };
   const ok = (el, msg) => { el.textContent = msg; el.className='ok'; };
 
-  let mediaStream=null, recorder=null, chunks=[], blob=null, liveRec=null, savedRec=null, savedCtx=null, savedSource=null;
+  let mediaStream=null, recorder=null, chunks=[], blob=null, liveRec=null, savedRec=null, savedMedia=null, savedUrl=null;
 
   async function startRecording(){
     try{
@@ -44,26 +44,53 @@
     if(!SR){ fail($('savedStatus'),'SpeechRecognition indisponible.'); return; }
     $('savedText').value=''; $('savedTranscribe').disabled=true; ok($('savedStatus'),'Transcription en cours…');
     try{
-      const ctx = new AudioContext(); savedCtx=ctx;
-      const buf = await ctx.decodeAudioData(await blob.arrayBuffer());
-      const dest = ctx.createMediaStreamDestination();
-      const source = ctx.createBufferSource(); savedSource=source; source.buffer=buf; source.connect(dest);
-      const track=dest.stream.getAudioTracks()[0];
+      if(savedUrl) URL.revokeObjectURL(savedUrl);
+      savedUrl = URL.createObjectURL(blob);
+      const media = new Audio(savedUrl); savedMedia=media; media.preload='auto';
+      await new Promise((resolve,reject)=>{
+        media.oncanplay=resolve;
+        media.onerror=()=>reject(media.error || new Error('audio media load failed'));
+        media.load();
+      });
+      if(typeof media.captureStream !== 'function') throw new Error('HTMLMediaElement.captureStream indisponible');
+      const stream = media.captureStream();
+      const track = stream.getAudioTracks()[0];
+      if(!track) throw new Error('captureStream ne fournit aucune piste audio');
+
       const r = new SR(); savedRec=r; r.lang='fr-FR'; r.continuous=true; r.interimResults=false;
-      let text='', started=false, ended=false;
+      let text='', recognitionEnded=false, mediaEnded=false;
       const startedAt=performance.now();
-      r.onstart=()=>{ started=true; source.start(); log('saved_start',{durationMs:Math.round(buf.duration*1000)}); };
+      r.onstart=()=>log('saved_recognition_start',{trackReadyState:track.readyState});
       r.onresult=e=>{ for(let i=e.resultIndex;i<e.results.length;i++) if(e.results[i].isFinal) text += (e.results[i][0]?.transcript||'')+' '; $('savedText').value=text.trim(); };
       r.onerror=e=>{ fail($('savedStatus'),`Erreur retranscription : ${e.error||'inconnue'}`); log('saved_error',{error:e.error,message:e.message||''}); };
-      r.onend=()=>{ ended=true; const out=text.trim(); if(out) ok($('savedStatus'),'Transcription terminée.'); else if(!$('savedStatus').classList.contains('bad')) fail($('savedStatus'),'Aucun texte obtenu.'); $('savedTranscribe').disabled=false; log('saved_end',{latencyMs:Math.round(performance.now()-startedAt),text:out}); try{ctx.close();}catch{} };
-      source.onended=()=>{ if(started&&!ended){ try{r.stop();}catch{} } };
-      try{ r.start(track); }catch(e){ $('savedTranscribe').disabled=false; fail($('savedStatus'),'Ce navigateur refuse la retranscription de cet audio.',e); try{ctx.close();}catch{} }
+      r.onend=()=>{
+        recognitionEnded=true;
+        const out=text.trim();
+        if(out) ok($('savedStatus'),'Transcription terminée.'); else if(!$('savedStatus').classList.contains('bad')) fail($('savedStatus'),'Aucun texte obtenu.');
+        $('savedTranscribe').disabled=false;
+        log('saved_end',{latencyMs:Math.round(performance.now()-startedAt),text:out,recognitionEndedBeforeMedia:!mediaEnded});
+        try{media.pause();}catch{}
+      };
+      media.onended=()=>{
+        mediaEnded=true;
+        log('saved_media_end',{currentTimeMs:Math.round(media.currentTime*1000),durationMs:Math.round(media.duration*1000)});
+        if(!recognitionEnded){ try{r.stop();}catch{} }
+      };
+
+      log('saved_start',{durationMs:Math.round(media.duration*1000),delivery:'HTMLMediaElement.captureStream'});
+      await media.play();
+      try{ r.start(track); }catch(e){
+        $('savedTranscribe').disabled=false;
+        fail($('savedStatus'),'Ce navigateur refuse la retranscription de cet audio.',e);
+        try{media.pause();}catch{}
+      }
     }catch(e){ $('savedTranscribe').disabled=false; fail($('savedStatus'),'Échec de préparation de l’audio.',e); }
   }
 
   function reset(){
-    try{recorder?.stop();}catch{} try{liveRec?.abort();}catch{} try{savedRec?.abort();}catch{} try{savedSource?.stop();}catch{} try{savedCtx?.close();}catch{}
+    try{recorder?.stop();}catch{} try{liveRec?.abort();}catch{} try{savedRec?.abort();}catch{} try{savedMedia?.pause();}catch{}
     mediaStream?.getTracks().forEach(t=>t.stop()); mediaStream=null; recorder=null; blob=null; chunks=[];
+    if(savedUrl){ URL.revokeObjectURL(savedUrl); savedUrl=null; }
     if($('player').src) URL.revokeObjectURL($('player').src); $('player').removeAttribute('src'); $('player').load();
     $('liveText').value=''; $('savedText').value=''; $('details').textContent='';
     $('audioStatus').textContent='Pas d’enregistrement.'; $('audioStatus').className='';
@@ -73,5 +100,5 @@
   }
 
   $('recStart').onclick=startRecording; $('recStop').onclick=stopRecording; $('liveStart').onclick=startLive; $('liveStop').onclick=stopLive; $('savedTranscribe').onclick=transcribeSaved; $('reset').onclick=reset;
-  log('capabilities',{secureContext:isSecureContext,speechRecognition:Boolean(SR),userAgent:navigator.userAgent});
+  log('capabilities',{secureContext:isSecureContext,speechRecognition:Boolean(SR),captureStream:Boolean(HTMLMediaElement.prototype.captureStream),userAgent:navigator.userAgent});
 })();
