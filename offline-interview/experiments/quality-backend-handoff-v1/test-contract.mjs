@@ -1,0 +1,11 @@
+import fs from 'node:fs';import assert from 'node:assert/strict';
+const html=fs.readFileSync(new URL('./index.html',import.meta.url),'utf8');
+const js=fs.readFileSync(new URL('./handoff.js',import.meta.url),'utf8');
+assert.match(html,/QUALITY Backend Handoff Lab V1/);
+assert.match(js,/crypto\.subtle\.digest\('SHA-256'/);
+assert.match(js,/idempotencyKey/);
+assert.match(js,/QUEUED/);assert.match(js,/RUNNING/);assert.match(js,/SUCCEEDED/);assert.match(js,/FAILED/);assert.match(js,/STALE/);
+assert.match(js,/REJECT_STALE/);assert.match(js,/HUMAN_PROTECTED/);assert.match(js,/APPLIED/);
+assert.match(js,/sourceRevision/);assert.match(js,/sourceHash/);
+assert.doesNotMatch(js,/fetch\(/);assert.doesNotMatch(js,/SpeechRecognition/);assert.doesNotMatch(js,/setInterval\(/);assert.doesNotMatch(js,/serviceWorker/);
+console.log(JSON.stringify({status:'PASS',contract:'offline-interview.quality-backend-handoff.v1'}));
