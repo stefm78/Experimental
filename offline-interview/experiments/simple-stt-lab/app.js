@@ -6,6 +6,7 @@
   const ok = (el, msg) => { el.textContent = msg; el.className='ok'; };
 
   let mediaStream=null, recorder=null, chunks=[], blob=null, liveRec=null, savedRec=null, savedMedia=null, savedUrl=null;
+  window.simpleSttLab = { getBlob: () => blob, log };
 
   async function startRecording(){
     try{
@@ -17,6 +18,7 @@
         blob = new Blob(chunks,{type:recorder.mimeType||'audio/webm'});
         $('player').src = URL.createObjectURL(blob);
         $('savedTranscribe').disabled=false;
+        window.dispatchEvent(new Event('simple-stt-recording-ready'));
         ok($('audioStatus'),`Audio prêt · ${(blob.size/1024).toFixed(0)} Ko`);
         log('recording_ready',{bytes:blob.size,mime:blob.type});
         mediaStream?.getTracks().forEach(t=>t.stop()); mediaStream=null;
@@ -42,7 +44,7 @@
   async function transcribeSaved(){
     if(!blob){ fail($('savedStatus'),'Aucun audio à transcrire.'); return; }
     if(!SR){ fail($('savedStatus'),'SpeechRecognition indisponible.'); return; }
-    $('savedText').value=''; $('savedTranscribe').disabled=true; ok($('savedStatus'),'Transcription en cours…');
+    $('savedText').value=''; $('savedTranscribe').disabled=true; ok($('savedStatus'),'Transcription navigateur en cours…');
     try{
       if(savedUrl) URL.revokeObjectURL(savedUrl);
       savedUrl = URL.createObjectURL(blob);
@@ -66,7 +68,7 @@
       r.onend=()=>{
         recognitionEnded=true;
         const out=text.trim();
-        if(out) ok($('savedStatus'),'Transcription terminée.'); else if(!$('savedStatus').classList.contains('bad')) fail($('savedStatus'),'Aucun texte obtenu.');
+        if(out) ok($('savedStatus'),'Transcription navigateur terminée.'); else if(!$('savedStatus').classList.contains('bad')) fail($('savedStatus'),'Aucun texte obtenu.');
         $('savedTranscribe').disabled=false;
         log('saved_end',{latencyMs:Math.round(performance.now()-startedAt),text:out,recognitionEndedBeforeMedia:!mediaEnded});
         try{media.pause();}catch{}
@@ -97,8 +99,9 @@
     $('liveStatus').textContent='Inactif.'; $('liveStatus').className='';
     $('savedStatus').textContent='En attente d’un enregistrement.'; $('savedStatus').className='';
     $('recStart').disabled=false; $('recStop').disabled=true; $('liveStart').disabled=false; $('liveStop').disabled=true; $('savedTranscribe').disabled=true;
+    window.dispatchEvent(new Event('simple-stt-reset'));
   }
 
   $('recStart').onclick=startRecording; $('recStop').onclick=stopRecording; $('liveStart').onclick=startLive; $('liveStop').onclick=stopLive; $('savedTranscribe').onclick=transcribeSaved; $('reset').onclick=reset;
-  log('capabilities',{secureContext:isSecureContext,speechRecognition:Boolean(SR),captureStream:Boolean(HTMLMediaElement.prototype.captureStream),userAgent:navigator.userAgent});
+  log('capabilities',{secureContext:isSecureContext,speechRecognition:Boolean(SR),captureStream:Boolean(HTMLMediaElement.prototype.captureStream),webgpu:Boolean(navigator.gpu),userAgent:navigator.userAgent});
 })();
