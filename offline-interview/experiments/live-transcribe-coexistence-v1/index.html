@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Offline Interview — Live Transcribe coexistence V1</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:20px;line-height:1.45}button{padding:12px 16px;margin:6px 4px 6px 0}textarea{width:100%;min-height:110px}code,pre{white-space:pre-wrap;word-break:break-word;background:#f3f3f3;padding:8px;border-radius:6px}.card{border:1px solid #ccc;border-radius:10px;padding:14px;margin:12px 0}.ok{font-weight:700}.warn{font-weight:700}</style>
+</head>
+<body>
+<h1>Live Transcribe + master recorder — coexistence V1</h1>
+<p>But: vérifier si <strong>Transcription instantanée</strong> peut transcrire pendant que cette page garde un <strong>master audio continu</strong>.</p>
+<div class="card"><strong>Important</strong><ol><li>Ouvre Transcription instantanée via le raccourci Android.</li><li>Reviens sur cette page.</li><li>Démarre l’enregistrement.</li><li>Pendant 30–60 s, parle normalement et vérifie que Transcription instantanée continue réellement à afficher du texte.</li><li>Reviens ici, arrête, réécoute et renseigne les confirmations humaines.</li></ol></div>
+<div class="card">
+<button id="start">Démarrer le master audio</button>
+<button id="mark">Marquer « Live Transcribe transcrit maintenant »</button>
+<button id="stop" disabled>Arrêter</button>
+<p>État recorder: <strong id="state">inactive</strong></p>
+<p>Durée: <span id="duration">0.0</span> s — octets: <span id="bytes">0</span></p>
+</div>
+<div class="card">
+<audio id="audio" controls></audio>
+<label><input type="checkbox" id="ltUsed"> Transcription instantanée a réellement affiché du texte pendant l’enregistrement.</label><br>
+<label><input type="checkbox" id="audioOk"> L’audio final est audible et continu sur toute la séquence.</label><br>
+<label><input type="checkbox" id="speechAround"> J’ai parlé avant, pendant et après la période où Transcription instantanée affichait du texte.</label>
+</div>
+<div class="card">
+<button id="verdict">Calculer le verdict</button>
+<button id="copy">Copier le JSON</button>
+<p id="verdictText"></p>
+<textarea id="out" readonly></textarea>
+</div>
+<script src="experiment.js"></script>
+</body>
+</html>
