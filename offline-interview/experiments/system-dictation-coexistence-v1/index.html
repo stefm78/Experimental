@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>System Dictation × Continuous Audio — fail fast</title>
+<style>
+body{font-family:system-ui,sans-serif;max-width:760px;margin:auto;padding:20px;line-height:1.45;background:#f7f7f8;color:#171717}h1{font-size:1.5rem}section{background:white;border:1px solid #ddd;border-radius:14px;padding:16px;margin:14px 0}button{font:inherit;padding:12px 14px;margin:5px 4px 5px 0;border-radius:10px;border:1px solid #aaa;background:#fff}button:disabled{opacity:.45}textarea{box-sizing:border-box;width:100%;min-height:140px;font:inherit;padding:12px;border:1px solid #aaa;border-radius:10px}.status{font-weight:700}.pass{color:#087b38}.fail{color:#b42318}.warn{color:#9a6700}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#111;color:#eee;padding:12px;border-radius:10px;font-size:.8rem}audio{width:100%;margin-top:10px}.meter{height:12px;background:#eee;border-radius:8px;overflow:hidden}.meter>div{height:100%;width:0%;background:currentColor}.small{font-size:.9rem;color:#555}
+</style>
+</head>
+<body>
+<h1>Dictée système + enregistrement audio continu</h1>
+<p>Expérience isolée Android / iPhone. Elle vérifie si le micro du clavier système peut dicter du texte sans casser l’enregistrement audio continu du navigateur.</p>
+<section>
+<h2>1 — Démarrer l’audio maître</h2>
+<button id="start">Démarrer l’enregistrement</button><button id="stop" disabled>Arrêter</button>
+<p>État : <span id="captureState" class="status">prêt</span></p>
+<div class="meter"><div id="meter"></div></div>
+</section>
+<section>
+<h2>2 — Tester la dictée système</h2>
+<p class="small">Pendant que l’enregistrement tourne : parle quelques secondes, puis touche « Marquer début dictée ». Le champ sera focalisé. Utilise ensuite le micro de ton clavier (Gboard / Dictée iPhone), dicte une phrase distinctive, arrête la dictée, puis touche « Marquer fin dictée ».</p>
+<button id="markStart" disabled>Marquer début dictée</button><button id="markEnd" disabled>Marquer fin dictée</button>
+<textarea id="dictated" placeholder="Le texte dicté par le clavier système doit apparaître ici."></textarea>
+</section>
+<section>
+<h2>3 — Vérifier</h2>
+<p id="verdict" class="status">Pas encore de résultat.</p>
+<audio id="playback" controls></audio>
+<p class="small">Le verdict technique ne suffit pas : écoute l’audio et vérifie qu’on t’entend avant, pendant et après la dictée.</p>
+<button id="copy" disabled>Copier le résultat JSON</button>
+</section>
+<section><h2>Journal</h2><pre id="log"></pre></section>
+<script src="./experiment.js?v=1"></script>
+</body>
+</html>
