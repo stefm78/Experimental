@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Offline Interview — Voice Access Android</title>
+<style>
+:root{font-family:system-ui,-apple-system,sans-serif;color-scheme:light dark}body{max-width:780px;margin:auto;padding:18px;line-height:1.45}h1{font-size:1.55rem}.card{border:1px solid #8886;border-radius:14px;padding:16px;margin:16px 0}button,textarea{font:inherit}button{min-height:48px;padding:10px 14px;margin:5px 4px 5px 0;border-radius:10px}textarea{width:100%;min-height:130px;box-sizing:border-box;padding:12px;font-size:1.05rem}.status{font-weight:700;padding:8px 0}.pass{color:#16803a}.fail{color:#c12822}.warn{color:#ad7200}.meter{height:16px;background:#8883;border-radius:8px;overflow:hidden}.meter>div{height:100%;width:0;background:currentColor}.small{font-size:.92rem;opacity:.82}pre{white-space:pre-wrap;word-break:break-word;background:#8882;padding:12px;border-radius:10px}audio{width:100%}.step{font-weight:700}label.check{display:block;padding:10px 0}code{font-size:.9em}</style>
+</head>
+<body>
+<h1>Prototype Android — Voice Access + audio maître</h1>
+<p>Objectif : vérifier que <strong>Voice Access peut écrire une réponse</strong> pendant qu’Offline Interview conserve un <strong>enregistrement audio continu et audible</strong>.</p>
+<div class="card">
+<h2>0 — Préparer Android</h2>
+<p>Dans Android : <strong>Paramètres → Accessibilité → Voice Access</strong>. Active Voice Access puis reviens ici. Le français est pris en charge.</p>
+<p class="small">Ce prototype ne lance pas lui-même Voice Access : l’activation reste volontaire et contrôlée par l’utilisateur.</p>
+</div>
+<div class="card">
+<h2>A — Baseline Voice Access, sans enregistrement</h2>
+<p><span class="step">1.</span> Appuie sur « Démarrer A ». <span class="step">2.</span> Avec Voice Access, sélectionne le champ <strong>Réponse A</strong>, dis « Commencer la modification », puis dicte : <strong>« alpha bravo test voice access »</strong>. <span class="step">3.</span> Appuie sur « Terminer A ».</p>
+<label for="aText">Réponse A</label>
+<textarea id="aText" aria-label="Réponse A" placeholder="Le texte saisi par Voice Access doit apparaître ici"></textarea>
+<button id="aStart">Démarrer A</button><button id="aEnd" disabled>Terminer A</button>
+<div id="aStatus" class="status">Non testé</div>
+</div>
+<div class="card">
+<h2>B — Voice Access pendant l’enregistrement maître</h2>
+<p><span class="step">1.</span> Démarre B et parle normalement 5 secondes. <span class="step">2.</span> Appuie sur « Début Voice Access », sélectionne <strong>Réponse B</strong>, dis « Commencer la modification », puis dicte une réponse pendant 10–15 secondes. <span class="step">3.</span> Appuie sur « Fin Voice Access », reparle 5 secondes, puis arrête B.</p>
+<div class="meter" aria-label="Niveau audio"><div id="meterBar"></div></div>
+<div id="liveLevel" class="small">Niveau audio : —</div>
+<label for="bText">Réponse B</label>
+<textarea id="bText" aria-label="Réponse B" placeholder="Voice Access doit écrire ici pendant que l’audio maître continue"></textarea>
+<button id="bRecord">Démarrer B</button><button id="bVoiceStart" disabled>Début Voice Access</button><button id="bVoiceEnd" disabled>Fin Voice Access</button><button id="bStop" disabled>Arrêter B</button>
+<div id="bStatus" class="status">Non testé</div>
+<audio id="audio" controls></audio>
+<label class="check"><input id="audioOk" type="checkbox"> J’ai réécouté : ma voix est intelligible avant, pendant et après la fenêtre Voice Access.</label>
+<label class="check"><input id="voiceActuallyUsed" type="checkbox"> Je confirme que le texte de B a été dicté avec Voice Access, et non tapé au clavier.</label>
+<button id="finalize">Calculer le verdict</button>
+<div id="verdict" class="status">En attente</div>
+</div>
+<div class="card">
+<h2>Diagnostic</h2>
+<button id="copy">Copier le JSON</button>
+<pre id="log"></pre>
+</div>
+<script src="./prototype.js?v=1"></script>
+</body>
+</html>
