@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Dictée système mobile — test A/B</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:760px;margin:auto;padding:20px;line-height:1.45}button,textarea{font:inherit}button{padding:12px 14px;margin:4px 4px 4px 0}textarea{width:100%;min-height:120px;box-sizing:border-box}section{border:1px solid #9995;border-radius:12px;padding:16px;margin:16px 0}.status{font-weight:700}.pass{color:#087830}.fail{color:#b42318}.warn{color:#9a6700}pre{white-space:pre-wrap;word-break:break-word;background:#0001;padding:12px;border-radius:8px}audio{width:100%}</style>
+</head>
+<body>
+<h1>Dictée système mobile — fail fast A/B</h1>
+<p>But : distinguer un problème de dictée/clavier d’un conflit entre dictée système et enregistrement audio maître.</p>
+<section>
+<h2>A — Dictée seule, enregistrement OFF</h2>
+<p>1. Touche le champ. 2. Active le micro du clavier. 3. Dicte : <strong>« essai dictée système alpha bravo »</strong>. 4. Arrête la dictée.</p>
+<textarea id="aText" placeholder="Le texte dicté doit apparaître ici"></textarea>
+<button id="aStart">Démarrer observation A</button><button id="aEnd" disabled>Terminer A</button>
+<div id="aStatus" class="status">Non testé</div>
+</section>
+<section>
+<h2>B — Enregistrement maître + dictée système</h2>
+<p>1. Démarre l’enregistrement. 2. Parle normalement quelques secondes. 3. Active la fenêtre dictée puis le micro du clavier dans le champ. 4. Dicte <strong>« essai coexistence charlie delta »</strong>. 5. Termine la fenêtre, reparle quelques secondes, puis arrête l’enregistrement.</p>
+<textarea id="bText" placeholder="Le texte dicté doit apparaître ici pendant que l’enregistrement continue"></textarea>
+<button id="bRecord">Démarrer enregistrement B</button><button id="bDictStart" disabled>Début dictée</button><button id="bDictEnd" disabled>Fin dictée</button><button id="bStop" disabled>Arrêter enregistrement</button>
+<div id="bStatus" class="status">Non testé</div>
+<audio id="audio" controls></audio>
+<p><label><input id="audioOk" type="checkbox"> J’ai écouté : ma voix est audible avant, pendant et après la dictée.</label></p>
+<button id="finalize">Calculer le verdict</button>
+<div id="verdict" class="status">En attente</div>
+</section>
+<section>
+<h2>Diagnostic</h2>
+<button id="copy">Copier JSON</button>
+<pre id="log"></pre>
+</section>
+<script src="./experiment.js?v=2"></script>
+</body>
+</html>
