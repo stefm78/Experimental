@@ -1,0 +1,14 @@
+{
+  "browser": "Edge",
+  "speechRecognitionError": "network",
+  "captureGaps": [],
+  "audioIntegrity": "valid",
+  "questionStatus": "answered",
+  "turns": [
+    {"type":"answer","text":"","audioRef":{"recordingId":"r1","startMs":0,"endMs":5529}},
+    {"type":"answer","text":"","audioRef":{"recordingId":"r1","startMs":5529,"endMs":14312}},
+    {"type":"answer","text":"","audioRef":{"recordingId":"r1","startMs":14312,"endMs":18413}}
+  ],
+  "expectedAnsweredQuestions": 1,
+  "expectedUnansweredQuestions": 0
+}
