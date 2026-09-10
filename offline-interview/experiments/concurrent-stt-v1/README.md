@@ -20,3 +20,11 @@ FAIL_FAST when starting the background lane aborts/errors the live lane, the bac
 INCONCLUSIVE when the browser does not support SpeechRecognition.start(audioTrack).
 
 No result from this page promotes an application change by itself. It only decides whether true concurrent STT deserves a controlled integration candidate.
+
+## Android field result — 2026-09-10
+
+The tested Android environment produced a discriminating FAIL_FAST result: LIVE started successfully, the BACKGROUND start was requested, then LIVE emitted `error: aborted` and `end` about 3 ms later; BACKGROUND subsequently started and transcribed the saved clip.
+
+Conclusion for this platform: **do not integrate two simultaneous browser SpeechRecognition instances.** See `ANDROID_RESULT_2026-09-10.md` for the field evidence and next architecture discriminator.
+
+The harness has also been hardened so a premature LIVE error/end after BACKGROUND launch is now classified immediately as FAIL_FAST, and the saved audio source starts only after the BACKGROUND recognizer reports `onstart`, eliminating an avoidable source-start race.
