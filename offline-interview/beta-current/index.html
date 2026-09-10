@@ -1,0 +1,11 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Offline Interview Beta</title>
+<script>
+  const target = new URL('../beta-v41-23/', window.location.href);
+  target.search = window.location.search;
+  target.hash = window.location.hash;
+  window.location.replace(target.href);
+</script>
+<noscript><a href="../beta-v41-23/">Ouvrir la beta Offline Interview</a></noscript>
