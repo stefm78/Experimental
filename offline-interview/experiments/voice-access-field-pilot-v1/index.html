@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Offline Interview — Voice Access field pilot</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:820px;margin:auto;padding:20px;line-height:1.45}button,textarea{font:inherit}button{padding:12px 14px;margin:4px 4px 4px 0}textarea{width:100%;min-height:130px;box-sizing:border-box}section{border:1px solid #9995;border-radius:12px;padding:16px;margin:16px 0}.status{font-weight:700}.pass{color:#087830}.fail{color:#b42318}.warn{color:#9a6700}pre{white-space:pre-wrap;word-break:break-word;background:#0001;padding:12px;border-radius:8px}audio{width:100%}.q{font-size:1.15rem;font-weight:700}.meta{opacity:.75}.important{font-weight:700}</style>
+</head>
+<body>
+<h1>Offline Interview — Voice Access field pilot v1</h1>
+<p>But : tester un mini-entretien multi-question réaliste avec <strong>un seul enregistrement audio maître continu</strong> et Voice Access comme saisie texte système. Aucun audio n’est envoyé.</p>
+<section id="setup">
+<h2>Préparation</h2>
+<p>Active Voice Access sur Android. Laisse-le actif pendant toute la session. L’application ne contrôle pas Voice Access : elle se contente de focaliser le champ de réponse et d’observer les insertions.</p>
+<button id="startSession">Démarrer l’entretien pilote</button>
+<div id="sessionStatus" class="status">Prêt</div>
+</section>
+<section id="interview" hidden>
+<div class="meta">Question <span id="qIndex">1</span>/3 — Locuteur : <span id="speaker">Participant</span></div>
+<p id="question" class="q"></p>
+<p class="important">Dicte ta réponse avec Voice Access. Attends que le texte apparaisse avant de passer à la question suivante.</p>
+<textarea id="answer" aria-label="Réponse en cours" placeholder="La transcription Voice Access apparaît ici"></textarea>
+<div>
+<button id="markVoice">Marquer début Voice Access</button>
+<button id="next">Valider et question suivante</button>
+<button id="stopSession">Terminer l’entretien</button>
+</div>
+<div id="turnStatus" class="status">En attente de réponse</div>
+</section>
+<section id="result" hidden>
+<h2>Résultat</h2>
+<audio id="audio" controls></audio>
+<p><label><input type="checkbox" id="audioOk"> J’ai réécouté : l’audio est continu et intelligible sur toute la session.</label></p>
+<p><label><input type="checkbox" id="routingOk"> Les réponses sont restées associées à la bonne question, sans perte ni écrasement visible.</label></p>
+<button id="finalize">Calculer le verdict</button>
+<div id="verdict" class="status">En attente</div>
+<h3>Diagnostic</h3>
+<button id="copy">Copier JSON</button>
+<pre id="log"></pre>
+</section>
+<script src="./app.js?v=1"></script>
+</body>
+</html>
