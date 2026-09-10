@@ -1,0 +1,22 @@
+{
+  "schema": "offline-interview.voice-access-coexistence.v2",
+  "A": {
+    "text": "",
+    "firstInputAt": null
+  },
+  "B": {
+    "recordingStartedAt": null,
+    "voiceStartAt": null,
+    "voiceEndAt": null,
+    "textSeenAt": null,
+    "recordingStoppedAt": null,
+    "text": "",
+    "firstNonEmptyInputAt": null,
+    "recorderStateAtFirstNonEmptyInput": null
+  },
+  "human": {
+    "voiceAccessActuallyUsed": false,
+    "audioAudibleBeforeDuringAfter": false
+  },
+  "verdict": null
+}
