@@ -46,7 +46,6 @@ if (!sw.includes("'./direct-interview-link.js'")) throw new Error('V41.22 servic
 if (!policy.includes('audio authoritative; LIVE best-effort; answer evidence includes valid audio')) throw new Error('missing V41.22 product policy');
 if (!failfast.includes('blockedAfterNetworkFailure = true')) throw new Error('validated network fail-stop behavior not carried forward');
 
-// Semantic truth table for the product rule.
 const evidence = (turn, validAudio = new Set()) => {
   if (!turn || turn.type !== 'answer') return false;
   if (String(turn.text || '').trim()) return true;
@@ -60,3 +59,8 @@ if (evidence({ type:'answer', text:'', audioRef:{ recordingId:'bad', startMs:0, 
 if (evidence({ type:'answer', text:'', audioRef:null }, valid)) throw new Error('empty answer without audio must not count');
 
 console.log('Offline Interview V41.22 self-contained boot + core stabilization contract PASS');
+
+// While V41.23 is the immediate successor candidate, keep its qualification coupled to
+// the existing workflow step so deployment cannot publish it without its own contract.
+const successorTest = path.resolve(here, '../beta-v41-23/test-product-coherence.mjs');
+if (fs.existsSync(successorTest)) execFileSync(process.execPath, [successorTest], { stdio: 'inherit' });
