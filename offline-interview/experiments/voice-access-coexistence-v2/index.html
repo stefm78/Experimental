@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Voice Access Android — coexistence v2</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:780px;margin:auto;padding:20px;line-height:1.45}button,textarea{font:inherit}button{padding:12px 14px;margin:4px 4px 4px 0}textarea{width:100%;min-height:120px;box-sizing:border-box}section{border:1px solid #9995;border-radius:12px;padding:16px;margin:16px 0}.status{font-weight:700}.pass{color:#087830}.fail{color:#b42318}.warn{color:#9a6700}pre{white-space:pre-wrap;word-break:break-word;background:#0001;padding:12px;border-radius:8px}audio{width:100%}.important{font-weight:700}</style>
+</head>
+<body>
+<h1>Voice Access Android — test v2</h1>
+<p>Objectif : vérifier non seulement que Voice Access et l’enregistrement audio maître coexistent, mais aussi que le texte est <strong>inséré pendant que l’enregistrement reste actif</strong>.</p>
+<section>
+<h2>A — Voice Access seul</h2>
+<p>Active Voice Access. Lance A, place le focus dans le champ et dicte : <strong>« Voice Access alpha bravo, texte de référence »</strong>.</p>
+<textarea id="aText" aria-label="Réponse de référence Voice Access" placeholder="Le texte Voice Access doit apparaître ici"></textarea>
+<button id="aStart">Démarrer A</button><button id="aEnd" disabled>Terminer A</button>
+<div id="aStatus" class="status">Non testé</div>
+</section>
+<section>
+<h2>B — Enregistrement maître + Voice Access</h2>
+<p>Démarre l’enregistrement et parle quelques secondes. Lance ensuite la fenêtre Voice Access et dicte : <strong>« Voice Access charlie delta, le texte apparaît pendant l’enregistrement »</strong>.</p>
+<p class="important">Ne coupe surtout pas l’enregistrement quand tu as fini de parler. Attends que le texte soit visible dans le champ. Dès qu’il apparaît, appuie sur « Texte apparu ». Continue ensuite à parler quelques secondes, puis arrête l’enregistrement.</p>
+<textarea id="bText" aria-label="Réponse Voice Access pendant enregistrement" placeholder="Le texte Voice Access doit apparaître ici pendant que l’enregistrement continue"></textarea>
+<button id="bRecord">Démarrer enregistrement B</button>
+<button id="bVoiceStart" disabled>Début Voice Access</button>
+<button id="bTextSeen" disabled>Texte apparu</button>
+<button id="bVoiceEnd" disabled>Fin Voice Access</button>
+<button id="bStop" disabled>Arrêter enregistrement</button>
+<div id="bStatus" class="status">Non testé</div>
+<audio id="audio" controls></audio>
+<p><label><input id="voiceUsed" type="checkbox"> J’ai bien utilisé Voice Access pour saisir le texte B.</label></p>
+<p><label><input id="audioOk" type="checkbox"> J’ai réécouté : ma voix est audible avant, pendant et après Voice Access.</label></p>
+<button id="finalize">Calculer le verdict</button>
+<div id="verdict" class="status">En attente</div>
+</section>
+<section>
+<h2>Diagnostic</h2>
+<button id="copy">Copier JSON</button>
+<pre id="log"></pre>
+</section>
+<script src="./experiment.js?v=2"></script>
+</body>
+</html>
