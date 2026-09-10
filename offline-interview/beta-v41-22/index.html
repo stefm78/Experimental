@@ -6,27 +6,34 @@
   <meta name="theme-color" content="#172554">
   <meta name="description" content="Beta V41.22 : runtime produit stabilisé, audio authoritative, LIVE best-effort et réponses audio correctement comptées.">
   <title>Offline Interview — Beta V41.22</title>
-  <link rel="manifest" href="../beta/manifest.webmanifest">
-  <link rel="icon" href="../beta/icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="../beta/styles.css?v=41.15">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./styles.css?v=41.22">
 </head>
 <body>
   <div id="bootStatus" style="padding:18px;font-family:system-ui,sans-serif">Chargement de V41.22…</div>
   <script type="module">
     const boot=document.getElementById('bootStatus');
     try {
-      const response=await fetch('../beta/index.html',{cache:'no-store'});
-      if(!response.ok) throw new Error(`beta index ${response.status}`);
+      const response=await fetch('./shell.html',{cache:'no-store'});
+      if(!response.ok) throw new Error(`shell ${response.status}`);
       const parsed=new DOMParser().parseFromString(await response.text(),'text/html');
       const shell=parsed.querySelector('main.shell');
-      if(!shell) throw new Error('shell beta introuvable');
+      if(!shell) throw new Error('shell V41.22 introuvable');
       boot.replaceWith(document.importNode(shell,true));
-      for(const link of document.querySelectorAll('a[href^="./"]')) link.href='../beta/'+link.getAttribute('href').slice(2);
       await import('./speech-network-failfast.js?v=41.22');
       await import('./app.js?v=41.22');
       await import('./product-policy.js?v=41.22');
     } catch(error) {
-      boot.textContent=`V41.22 indisponible : ${error?.message||error}`;
+      const current=document.getElementById('bootStatus');
+      if(current) current.textContent=`V41.22 indisponible : ${error?.message||error}`;
+      else {
+        const alert=document.createElement('div');
+        alert.style.cssText='margin:18px;padding:14px;border:1px solid #fca5a5;border-radius:10px;background:#fef2f2;color:#991b1b;font-family:system-ui,sans-serif';
+        alert.textContent=`V41.22 indisponible : ${error?.message||error}`;
+        document.body.prepend(alert);
+      }
+      console.error('[Offline Interview V41.22 boot]', error);
     }
   </script>
 </body>
