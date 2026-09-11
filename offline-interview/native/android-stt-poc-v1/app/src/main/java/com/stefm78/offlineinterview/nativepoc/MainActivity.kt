@@ -359,8 +359,6 @@ class MainActivity : Activity() {
         wavFile = File(dir, "offline-interview-native-${System.currentTimeMillis()}.wav")
         wavRaf = RandomAccessFile(wavFile, "rw").apply { write(ByteArray(44)) }
 
-        // H2 invariant: start the authoritative audio path before the first recognizer,
-        // matching the steady-state order used by subsequent turns.
         try {
             audioRecord?.startRecording()
             captureThread = Thread { captureLoop() }.also { it.start() }
@@ -387,7 +385,7 @@ class MainActivity : Activity() {
         lockButton.isEnabled = true
         stopButton.isEnabled = true
         saveButton.isEnabled = false
-        status.text = "RUNNING H2 — WAV maître continu; STT dédié ${questions[0].id}."
+        status.text = "RUNNING H3 — WAV maître continu; STT dédié ${questions[0].id}."
     }
 
     private fun createTurnSttSession(turn: Int, startAtMs: Long, attempt: Int = 0): TurnSttSession? {
@@ -460,35 +458,30 @@ class MainActivity : Activity() {
         val oldTurn = currentTurn
         val newTurn = currentTurn + 1
         val boundaryAt = elapsedMs()
-        val newSession = createTurnSttSession(newTurn, boundaryAt, 0)
 
+        // H3: never overlap two SpeechRecognizer instances. The H2 field run proved that
+        // starting Q02 while Q01 was still alive can produce ERROR_RECOGNIZER_BUSY (8).
+        // The authoritative AudioRecord/WAV path remains uninterrupted during this handoff.
+        snapshotPartialAtClose(oldTurn)
+        closeTurnSession(oldTurn, boundaryAt, "turn_boundary", clearActive = true)
+        retireRecognizer(sttSessions[oldTurn])
+
+        currentTurn = newTurn
+        boundaries += Boundary(newTurn, boundaryAt)
+        val newSession = createTurnSttSession(newTurn, boundaryAt, 0)
         if (newSession == null) {
-            snapshotPartialAtClose(oldTurn)
-            closeTurnSession(oldTurn, boundaryAt, "turn_boundary_stt_degraded", clearActive = true)
-            currentTurn = newTurn
-            boundaries += Boundary(newTurn, boundaryAt)
             sttDegraded = true
             renderInterviewHeader()
             renderCurrentTurn()
+            status.text = "STT_DEGRADED ${questions[newTurn].id}: session non créée — WAV continu."
             if (newTurn == questions.lastIndex) nextButton.isEnabled = false
             return
         }
 
-        val oldSink: FileOutputStream?
-        synchronized(sttSinkLock) {
-            oldSink = activeSttSink
-            activeSttSink = newSession.sink
-            activeSttTurn = newTurn
-        }
-
-        snapshotPartialAtClose(oldTurn)
-        closeTurnSession(oldTurn, boundaryAt, "turn_boundary", clearActive = false, sinkOverride = oldSink)
-
-        currentTurn = newTurn
-        boundaries += Boundary(newTurn, boundaryAt)
+        activateSession(newSession)
         renderInterviewHeader()
         renderCurrentTurn()
-        status.text = "RUNNING H2 — WAV continu; STT basculé vers ${questions[newTurn].id}."
+        status.text = "RUNNING H3 — WAV continu; STT sérialisé vers ${questions[newTurn].id}."
         if (newTurn == questions.lastIndex) nextButton.isEnabled = false
     }
 
@@ -507,6 +500,13 @@ class MainActivity : Activity() {
         try { sink.flush() } catch (_: Exception) {}
         try { sink.close() } catch (_: Exception) {}
         try { session.recognizer.stopListening() } catch (_: Exception) {}
+    }
+
+    private fun retireRecognizer(session: TurnSttSession?) {
+        if (session == null) return
+        try { session.recognizer.cancel() } catch (_: Exception) {}
+        try { session.readFd.close() } catch (_: Exception) {}
+        try { session.recognizer.destroy() } catch (_: Exception) {}
     }
 
     private fun closeTurnSession(
@@ -550,8 +550,7 @@ class MainActivity : Activity() {
             }
         }
         closeSessionResources(session)
-        try { session.readFd.close() } catch (_: Exception) {}
-        try { session.recognizer.destroy() } catch (_: Exception) {}
+        retireRecognizer(session)
 
         val replacement = createTurnSttSession(session.turn, now, session.attempt + 1)
         if (replacement == null) {
@@ -576,7 +575,7 @@ class MainActivity : Activity() {
 
     private fun stopSession() {
         if (!recording.compareAndSet(true, false)) return
-        status.text = "Finalisation H2…"
+        status.text = "Finalisation H3…"
         nextButton.isEnabled = false
         lockButton.isEnabled = false
         stopButton.isEnabled = false
@@ -713,18 +712,26 @@ class MainActivity : Activity() {
         override fun onEndOfSpeech() {}
 
         override fun onError(error: Int) {
-            session.providerError = error
             if (session.closed) session.lateEventCount++
             val expected = expectedTeardownError(session, error)
             val recoverableNoMatch = !expected && error == SpeechRecognizer.ERROR_NO_MATCH &&
                 session.turn == currentTurn && recording.get() && session.attempt < MAX_NO_MATCH_REARMS &&
                 latestPartialByTurn[session.turn].orEmpty().isBlank() && durableDraftByTurn[session.turn].orEmpty().isBlank()
-
-            session.providerErrorClass = when {
+            val errorClass = when {
                 expected -> "expected_teardown_error"
                 recoverableNoMatch -> "recoverable_no_match"
                 else -> "unexpected_provider_error"
             }
+
+            // Preserve the first material provider error. A later teardown ERROR_CLIENT must
+            // not overwrite the causal error (H2 field evidence showed error=8 becoming hidden by 5).
+            if (session.providerError == null || !expected) {
+                if (session.providerError == null || session.providerErrorClass == "expected_teardown_error") {
+                    session.providerError = error
+                    session.providerErrorClass = errorClass
+                }
+            }
+
             appendEvent(
                 TranscriptEvent(
                     elapsedMs(), null, session.turn,
@@ -898,10 +905,10 @@ class MainActivity : Activity() {
             })
             put("sections", sectionResults)
             put("nativeCapture", JSONObject().apply {
-                put("schema", "offline-interview.android-native-runtime.v4.1")
+                put("schema", "offline-interview.android-native-runtime.v4.2")
                 put("appVersion", BuildConfig.VERSION_NAME)
                 put("audioAuthority", "single_AudioRecord_PCM_to_WAV")
-                put("sttProvider", "Android SpeechRecognizer on-device via per-question EXTRA_AUDIO_SOURCE")
+                put("sttProvider", "Android SpeechRecognizer on-device via serialized per-question EXTRA_AUDIO_SOURCE")
                 put("routingAuthority", "stt_session_identity")
                 put("wavPath", wavFile?.absolutePath ?: "")
                 put("pcmBytes", bytesWritten)

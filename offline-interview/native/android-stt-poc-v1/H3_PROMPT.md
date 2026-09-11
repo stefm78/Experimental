@@ -1,0 +1,3 @@
+# Autonomous continuation prompt — H3
+
+Revalidate the current branch/PR head and CI before any mutation. Treat `FIELD_RESULT_H2_2026-09-11.md` as the physical failure evidence and `H3_RETEST_PROTOCOL.md` as the next human gate. Do not reopen the audio architecture. Do not merge H3 before the physical five-question retest passes. If CI fails, repair only the first newly proven CI defect. If CI passes, expose the exact tactical APK artifact and stop at the physical gate. After the human returns the H3 result JSON, classify it PASS / HOLD / FAIL against the explicit H3 gate before any merge or promotion.

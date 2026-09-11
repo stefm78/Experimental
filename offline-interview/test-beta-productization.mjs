@@ -24,13 +24,21 @@ for (const [name, spec] of [['web', webSpec], ['beta', betaSpec], ['android', an
 }
 
 assert.match(manifest, /android:label="00 Offline Interview Native"/);
-assert.match(gradle, /versionCode\s*=\s*7/);
-assert.match(gradle, /versionName\s*=\s*"0\.4\.1-h2-tactical"/);
-assert.match(main, /offline-interview\.android-native-runtime\.v4\.1/);
+assert.match(gradle, /versionCode\s*=\s*8/);
+assert.match(gradle, /versionName\s*=\s*"0\.4\.2-h3-tactical"/);
+assert.match(main, /offline-interview\.android-native-runtime\.v4\.2/);
 assert.match(main, /BuildConfig\.VERSION_NAME/);
 assert.match(main, /single_AudioRecord_PCM_to_WAV/);
 assert.match(main, /stt_session_identity/);
 assert.match(main, /recoverable_no_match/);
+assert.match(main, /ERROR_RECOGNIZER_BUSY \(8\)/);
+assert.match(main, /retireRecognizer\(sttSessions\[oldTurn\]\)/);
+assert.match(main, /Preserve the first material provider error/);
+
+const nextTurnBody = main.slice(main.indexOf('private fun nextTurn()'), main.indexOf('private fun snapshotPartialAtClose'));
+assert.ok(nextTurnBody.indexOf('closeTurnSession(oldTurn') < nextTurnBody.indexOf('createTurnSttSession(newTurn'), 'H3 must close the previous STT session before creating the next one');
+assert.ok(nextTurnBody.indexOf('retireRecognizer(sttSessions[oldTurn])') < nextTurnBody.indexOf('createTurnSttSession(newTurn'), 'H3 must destroy the previous recognizer before creating the next one');
+
 assert.match(workflow, /offline-interview-android-native-TACTICAL-REINSTALL-ONLY/);
 assert.match(workflow, /INSTALL_MODE=UNINSTALL_THEN_REINSTALL/);
 assert.match(workflow, /offline-interview-android-native-durable-debug/);
@@ -39,4 +47,4 @@ assert.match(directLink, /URLSearchParams|searchParams/);
 const androidQuestionIds = androidSpec.sections.flatMap(s => (s.questions || []).map(q => q.id));
 assert.deepEqual(androidQuestionIds.slice(0, 5), ['Q01', 'Q02', 'Q03', 'Q04', 'Q05']);
 
-console.log('PASS beta productization contract: web/beta/android schemas, H2 identity, routing invariants, direct-link and distribution policy.');
+console.log('PASS beta productization contract: web/beta/android schemas, H3 serialized STT handoff, routing invariants, direct-link and distribution policy.');

@@ -1,6 +1,6 @@
 {
   "schema": "offline-interview.beta-status.v1",
-  "generatedFrom": "f0a47f583f8acabe9d94602682904d5dc0dbea3c",
+  "generatedFrom": "h3-serialized-stt-handoff",
   "web": {
     "channel": "beta",
     "latestLine": "v41-23",
@@ -11,9 +11,9 @@
     "label": "00 Offline Interview Native",
     "diagnosticLabel": "00 Offline Interview Diagnostic",
     "applicationId": "com.stefm78.offlineinterview.nativepoc",
-    "versionName": "0.4.1-h2-tactical",
-    "versionCode": 7,
-    "runtimeSchema": "offline-interview.android-native-runtime.v4.1",
+    "versionName": "0.4.2-h3-tactical",
+    "versionCode": 8,
+    "runtimeSchema": "offline-interview.android-native-runtime.v4.2",
     "diagnosticBundleSchema": "offline-interview.android-diagnostic-bundle.v1",
     "diagnosticExportWithoutAdb": true,
     "installMode": "UNINSTALL_THEN_REINSTALL",
@@ -21,10 +21,11 @@
     "durableSigning": false
   },
   "gates": {
-    "code": "PASS",
-    "ci": "PASS",
+    "code": "PASS_LOCAL_REPAIR",
+    "ci": "PENDING",
     "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
-    "physicalH2": "HOLD_PHYSICAL_H2_NO_MATCH_RECOVERY",
+    "physicalH2": "FAIL_ERROR_RECOGNIZER_BUSY_Q02",
+    "physicalH3": "HOLD_PHYSICAL_SERIALIZED_STT_HANDOFF",
     "durableSigning": "HOLD_DURABLE_SIGNING"
   }
 }
