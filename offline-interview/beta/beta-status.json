@@ -1,0 +1,30 @@
+{
+  "schema": "offline-interview.beta-status.v1",
+  "generatedFrom": "f0a47f583f8acabe9d94602682904d5dc0dbea3c",
+  "web": {
+    "channel": "beta",
+    "latestLine": "v41-23",
+    "directInterviewLinks": true,
+    "contractSchema": "offline-interview.interview-spec.v1"
+  },
+  "android": {
+    "label": "00 Offline Interview Native",
+    "diagnosticLabel": "00 Offline Interview Diagnostic",
+    "applicationId": "com.stefm78.offlineinterview.nativepoc",
+    "versionName": "0.4.1-h2-tactical",
+    "versionCode": 7,
+    "runtimeSchema": "offline-interview.android-native-runtime.v4.1",
+    "diagnosticBundleSchema": "offline-interview.android-diagnostic-bundle.v1",
+    "diagnosticExportWithoutAdb": true,
+    "installMode": "UNINSTALL_THEN_REINSTALL",
+    "artifact": "offline-interview-android-native-TACTICAL-REINSTALL-ONLY",
+    "durableSigning": false
+  },
+  "gates": {
+    "code": "PASS",
+    "ci": "PASS",
+    "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
+    "physicalH2": "HOLD_PHYSICAL_H2_NO_MATCH_RECOVERY",
+    "durableSigning": "HOLD_DURABLE_SIGNING"
+  }
+}

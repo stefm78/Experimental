@@ -21,5 +21,15 @@
                 <data android:mimeType="application/json" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".DiagnosticExportActivity"
+            android:exported="true"
+            android:label="00 Offline Interview Diagnostic"
+            android:screenOrientation="portrait">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
     </application>
 </manifest>

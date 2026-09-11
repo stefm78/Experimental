@@ -1,0 +1,38 @@
+name: Offline Interview Beta Productization
+
+on:
+  pull_request:
+    paths:
+      - 'offline-interview/**'
+      - '.github/workflows/android-native-stt-poc.yml'
+      - '.github/workflows/offline-interview-beta-productization.yml'
+  push:
+    branches:
+      - offline-interview-beta-productization
+    paths:
+      - 'offline-interview/**'
+      - '.github/workflows/android-native-stt-poc.yml'
+      - '.github/workflows/offline-interview-beta-productization.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Product runtime contract
+        run: node offline-interview/test-runtime-contract.mjs
+      - name: Direct interview link contract
+        run: node offline-interview/beta/test-direct-interview-link.mjs
+      - name: Latest web beta coherence
+        run: node offline-interview/beta-v41-23/test-product-coherence.mjs
+      - name: Cross-platform beta productization contract
+        run: node offline-interview/test-beta-productization.mjs
+      - name: Android diagnostic export contract
+        run: node offline-interview/test-android-diagnostic-export.mjs
