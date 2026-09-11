@@ -2,6 +2,7 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
     <application
+        android:name=".RuntimeHealthApplication"
         android:allowBackup="false"
         android:label="Offline Interview Native"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
