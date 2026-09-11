@@ -11,4 +11,6 @@ Expected improvements versus v0.1.0:
 5. Human validation remains canonical and survives later STT.
 6. The export reports `timedPartEvents`, `fallbackSegmentEvents`, and `crossBoundaryWordCount` so routing behavior is auditable.
 
+Build gate: the Android workflow must compile this exact PR head and publish a fresh debug APK artifact before the physical retest.
+
 Return the full JSON export after the run.
