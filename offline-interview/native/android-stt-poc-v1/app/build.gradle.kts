@@ -22,8 +22,8 @@ android {
         applicationId = "com.stefm78.offlineinterview.nativepoc"
         minSdk = 33
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.4.0-h1-tactical"
+        versionCode = 7
+        versionName = "0.4.1-h2-tactical"
     }
 
     if (durableSigningAvailable) {
