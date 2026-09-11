@@ -11,13 +11,14 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.os.ParcelFileDescriptor
+import android.os.Parcelable
 import android.os.SystemClock
 import android.speech.RecognitionListener
+import android.speech.RecognitionPart
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -63,12 +64,26 @@ class MainActivity : Activity(), RecognitionListener {
     private var recognizerStarted = false
 
     private data class Boundary(val turn: Int, val atMs: Long)
-    private data class TranscriptEvent(val atMs: Long, val text: String, val kind: String)
+    private data class TranscriptEvent(
+        val callbackAtMs: Long,
+        val audioAtMs: Long?,
+        val turn: Int,
+        val text: String,
+        val kind: String,
+        val routing: String
+    )
 
     private val boundaries = mutableListOf<Boundary>()
     private val transcriptEvents = mutableListOf<TranscriptEvent>()
     private val canonicalText = mutableMapOf<Int, String>()
-    private val latestDraftByTurn = mutableMapOf<Int, String>()
+    private val committedSegmentsByTurn = mutableMapOf<Int, MutableList<String>>()
+    private val latestPartialByTurn = mutableMapOf<Int, String>()
+
+    private var utteranceStartAtMs: Long? = null
+    private var utteranceStartTurn: Int? = null
+    private var timedPartEvents = 0
+    private var fallbackSegmentEvents = 0
+    private var crossBoundaryWordCount = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -90,6 +105,7 @@ class MainActivity : Activity(), RecognitionListener {
         liveTranscript = TextView(this).apply {
             text = "La transcription apparaîtra ici. Aucun champ éditable : aucun clavier logiciel."
             setPadding(0, 24, 0, 24)
+            setTextIsSelectable(true)
         }
         startButton = Button(this).apply { text = "Démarrer capture + STT" }
         nextButton = Button(this).apply { text = "Question suivante"; isEnabled = false }
@@ -130,14 +146,12 @@ class MainActivity : Activity(), RecognitionListener {
         speechRecognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(this).also {
             it.setRecognitionListener(this)
         }
-        val supportIntent = baseRecognizerIntent(includeAudioSource = false)
         speechRecognizer?.checkRecognitionSupport(
-            supportIntent,
+            baseRecognizerIntent(includeAudioSource = false),
             mainExecutor,
             object : RecognitionSupportCallback {
                 override fun onSupportResult(recognitionSupport: RecognitionSupport) {
-                    val installed = recognitionSupport.installedOnDeviceLanguages
-                    status.text = "Recognizer on-device disponible. Langues locales installées: ${installed.joinToString()}"
+                    status.text = "Recognizer on-device disponible. Langues locales installées: ${recognitionSupport.installedOnDeviceLanguages.joinToString()}"
                 }
                 override fun onError(error: Int) {
                     status.text = "Recognizer on-device disponible; support détaillé non vérifiable (code $error)."
@@ -177,7 +191,13 @@ class MainActivity : Activity(), RecognitionListener {
         boundaries.clear()
         transcriptEvents.clear()
         canonicalText.clear()
-        latestDraftByTurn.clear()
+        committedSegmentsByTurn.clear()
+        latestPartialByTurn.clear()
+        utteranceStartAtMs = null
+        utteranceStartTurn = null
+        timedPartEvents = 0
+        fallbackSegmentEvents = 0
+        crossBoundaryWordCount = 0
         bytesWritten = 0L
         boundaries += Boundary(0, 0L)
 
@@ -224,7 +244,7 @@ class MainActivity : Activity(), RecognitionListener {
         nextButton.isEnabled = true
         lockButton.isEnabled = true
         stopButton.isEnabled = true
-        status.text = "RUNNING — AudioRecord possède le micro; le même PCM alimente WAV + SpeechRecognizer."
+        status.text = "RUNNING — PCM unique vers WAV + STT; routage par temps audio quand disponible."
     }
 
     private fun captureLoop() {
@@ -248,9 +268,7 @@ class MainActivity : Activity(), RecognitionListener {
                     pipeOut?.flush()
                 } catch (_: IOException) {
                     pipeAlive = false
-                    runOnUiThread {
-                        status.text = "STT pipe fermé par le provider; master WAV continue."
-                    }
+                    runOnUiThread { status.text = "STT pipe fermé; master WAV continue." }
                 }
             }
         }
@@ -262,18 +280,19 @@ class MainActivity : Activity(), RecognitionListener {
         currentTurn += 1
         boundaries += Boundary(currentTurn, elapsedMs())
         question.text = questions[currentTurn]
-        liveTranscript.text = latestDraftByTurn[currentTurn] ?: "Écoute…"
+        renderCurrentTurn()
         if (currentTurn == questions.lastIndex) nextButton.isEnabled = false
     }
 
     private fun lockCurrentDraft() {
-        val draft = latestDraftByTurn[currentTurn].orEmpty().trim()
+        val draft = assembledDraft(currentTurn).trim()
         if (draft.isEmpty()) {
             status.text = "Aucun brouillon STT à valider pour cette question."
             return
         }
         canonicalText[currentTurn] = draft
-        status.text = "Texte humain validé pour T${currentTurn + 1}. Les résultats STT suivants restent brouillon et ne l’écrasent pas."
+        status.text = "Texte humain validé pour T${currentTurn + 1}; les STT ultérieurs ne l’écrasent pas."
+        renderCurrentTurn()
     }
 
     private fun stopSession() {
@@ -295,7 +314,7 @@ class MainActivity : Activity(), RecognitionListener {
             runOnUiThread {
                 startButton.isEnabled = true
                 renderExport()
-                status.text = "STOPPED — WAV maître finalisé; vérifier export et qualité de transcription."
+                status.text = "STOPPED — WAV maître finalisé; vérifier routage temporel + texte agrégé."
             }
         }
     }
@@ -327,27 +346,108 @@ class MainActivity : Activity(), RecognitionListener {
 
     private fun elapsedMs(): Long = SystemClock.elapsedRealtime() - sessionStartMs
 
-    private fun recordTranscript(text: String, kind: String) {
+    private fun turnForTimestamp(atMs: Long): Int =
+        boundaries.lastOrNull { it.atMs <= atMs }?.turn ?: 0
+
+    private fun appendCommitted(turn: Int, text: String) {
         val clean = text.trim()
         if (clean.isEmpty()) return
-        val at = elapsedMs()
-        transcriptEvents += TranscriptEvent(at, clean, kind)
-        val derivedTurn = turnForTimestamp(at)
-        latestDraftByTurn[derivedTurn] = clean
-        if (derivedTurn == currentTurn) liveTranscript.text = clean
+        val list = committedSegmentsByTurn.getOrPut(turn) { mutableListOf() }
+        if (list.lastOrNull() != clean) list += clean
+        latestPartialByTurn.remove(turn)
     }
 
-    private fun turnForTimestamp(atMs: Long): Int {
-        return boundaries.lastOrNull { it.atMs <= atMs }?.turn ?: 0
+    private fun assembledDraft(turn: Int): String {
+        val committed = committedSegmentsByTurn[turn].orEmpty().joinToString(" ").trim()
+        val partial = latestPartialByTurn[turn].orEmpty().trim()
+        return listOf(committed, partial).filter { it.isNotEmpty() }.joinToString(" ").trim()
+    }
+
+    private fun renderCurrentTurn() {
+        val canonical = canonicalText[currentTurn]
+        liveTranscript.text = canonical ?: assembledDraft(currentTurn).ifEmpty { "Écoute…" }
+    }
+
+    private fun recordPartial(text: String) {
+        val clean = text.trim()
+        if (clean.isEmpty()) return
+        val routedTurn = utteranceStartTurn ?: currentTurn
+        latestPartialByTurn[routedTurn] = clean
+        transcriptEvents += TranscriptEvent(
+            callbackAtMs = elapsedMs(),
+            audioAtMs = utteranceStartAtMs,
+            turn = routedTurn,
+            text = clean,
+            kind = "partial",
+            routing = "utterance_origin"
+        )
+        if (routedTurn == currentTurn && !canonicalText.containsKey(routedTurn)) renderCurrentTurn()
+    }
+
+    private fun recognitionParts(bundle: Bundle): List<RecognitionPart> {
+        if (Build.VERSION.SDK_INT < 34) return emptyList()
+        return try {
+            @Suppress("DEPRECATION")
+            bundle.getParcelableArrayList<Parcelable>(SpeechRecognizer.RECOGNITION_PARTS)
+                ?.filterIsInstance<RecognitionPart>()
+                .orEmpty()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun recordCommitted(bundle: Bundle?, text: String, kind: String) {
+        val clean = text.trim()
+        if (clean.isEmpty()) return
+        val callbackAt = elapsedMs()
+        val parts = if (bundle != null) recognitionParts(bundle) else emptyList()
+
+        if (parts.isNotEmpty() && parts.any { it.timestampMillis > 0L }) {
+            val grouped = linkedMapOf<Int, MutableList<String>>()
+            parts.forEach { part ->
+                val audioAt = part.timestampMillis
+                val turn = turnForTimestamp(audioAt)
+                grouped.getOrPut(turn) { mutableListOf() } += part.rawText
+                transcriptEvents += TranscriptEvent(
+                    callbackAtMs = callbackAt,
+                    audioAtMs = audioAt,
+                    turn = turn,
+                    text = part.rawText,
+                    kind = "word",
+                    routing = "recognition_part_timestamp"
+                )
+                timedPartEvents++
+            }
+            if (grouped.size > 1) crossBoundaryWordCount += grouped.values.sumOf { it.size }
+            grouped.forEach { (turn, words) -> appendCommitted(turn, words.joinToString(" ")) }
+        } else {
+            val turn = utteranceStartTurn ?: turnForTimestamp(callbackAt)
+            appendCommitted(turn, clean)
+            transcriptEvents += TranscriptEvent(
+                callbackAtMs = callbackAt,
+                audioAtMs = utteranceStartAtMs,
+                turn = turn,
+                text = clean,
+                kind = kind,
+                routing = "utterance_origin_fallback"
+            )
+            fallbackSegmentEvents++
+        }
+
+        utteranceStartAtMs = null
+        utteranceStartTurn = null
+        if (!canonicalText.containsKey(currentTurn)) renderCurrentTurn()
     }
 
     private fun renderExport() {
         val events = JSONArray().apply {
             transcriptEvents.forEach { e ->
                 put(JSONObject().apply {
-                    put("atMs", e.atMs)
-                    put("turnId", "T${turnForTimestamp(e.atMs) + 1}")
+                    put("callbackAtMs", e.callbackAtMs)
+                    put("audioAtMs", e.audioAtMs ?: JSONObject.NULL)
+                    put("turnId", "T${e.turn + 1}")
                     put("kind", e.kind)
+                    put("routing", e.routing)
                     put("text", e.text)
                 })
             }
@@ -357,18 +457,26 @@ class MainActivity : Activity(), RecognitionListener {
                 put(JSONObject().apply {
                     put("turnId", "T${i + 1}")
                     put("question", q)
-                    put("draft", latestDraftByTurn[i] ?: "")
+                    put("draft", assembledDraft(i))
+                    put("committedSegments", JSONArray(committedSegmentsByTurn[i].orEmpty()))
                     put("canonical", canonicalText[i] ?: JSONObject.NULL)
                     put("canonicalSource", if (canonicalText.containsKey(i)) "human_lock" else "draft_stt")
                 })
             }
         }
         val out = JSONObject().apply {
-            put("schema", "offline-interview.android-native-stt-poc.v1")
+            put("schema", "offline-interview.android-native-stt-poc.v2")
             put("audioAuthority", "single_AudioRecord_PCM_to_WAV")
             put("sttProvider", "Android SpeechRecognizer on-device via EXTRA_AUDIO_SOURCE")
             put("wavPath", wavFile?.absolutePath ?: "")
             put("pcmBytes", bytesWritten)
+            put("routing", JSONObject().apply {
+                put("primary", "RecognitionPart.timestampMillis when provided")
+                put("fallback", "utterance origin turn")
+                put("timedPartEvents", timedPartEvents)
+                put("fallbackSegmentEvents", fallbackSegmentEvents)
+                put("crossBoundaryWordCount", crossBoundaryWordCount)
+            })
             put("turnBoundaries", JSONArray().apply {
                 boundaries.forEach { b -> put(JSONObject().put("turnId", "T${b.turn + 1}").put("atMs", b.atMs)) }
             })
@@ -379,26 +487,39 @@ class MainActivity : Activity(), RecognitionListener {
     }
 
     override fun onReadyForSpeech(params: Bundle?) { status.text = "STT prêt — parle normalement." }
-    override fun onBeginningOfSpeech() {}
+
+    override fun onBeginningOfSpeech() {
+        utteranceStartAtMs = elapsedMs()
+        utteranceStartTurn = turnForTimestamp(utteranceStartAtMs!!)
+    }
+
     override fun onRmsChanged(rmsdB: Float) {}
     override fun onBufferReceived(buffer: ByteArray?) {}
     override fun onEndOfSpeech() {}
+
     override fun onError(error: Int) {
-        status.text = "STT error=$error — le master audio reste autoritaire et continue si la capture est active."
+        status.text = "STT error=$error — le master audio reste autoritaire."
+        utteranceStartAtMs = null
+        utteranceStartTurn = null
     }
+
     override fun onResults(results: Bundle?) {
         val text = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-        recordTranscript(text, "final")
+        recordCommitted(results, text, "final")
     }
+
     override fun onPartialResults(partialResults: Bundle?) {
         val text = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-        recordTranscript(text, "partial")
+        recordPartial(text)
     }
+
     override fun onEvent(eventType: Int, params: Bundle?) {}
+
     override fun onSegmentResults(segmentResults: Bundle) {
         val text = segmentResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull().orEmpty()
-        recordTranscript(text, "segment")
+        recordCommitted(segmentResults, text, "segment")
     }
+
     override fun onEndOfSegmentedSession() {
         status.text = "STT session segmentée terminée."
     }
@@ -419,17 +540,17 @@ class MainActivity : Activity(), RecognitionListener {
         private fun wavHeader(dataBytes: Long, sampleRate: Int, channels: Int, bitsPerSample: Int): ByteArray {
             val byteRate = sampleRate * channels * bitsPerSample / 8
             val blockAlign = channels * bitsPerSample / 8
-            val totalLen = dataBytes + 36
+            val totalDataLen = dataBytes + 36
             return ByteArray(44).also { h ->
                 fun ascii(offset: Int, s: String) = s.toByteArray(Charsets.US_ASCII).copyInto(h, offset)
                 fun le16(offset: Int, v: Int) {
-                    h[offset] = (v and 0xff).toByte(); h[offset + 1] = ((v shr 8) and 0xff).toByte()
+                    h[offset] = (v and 0xff).toByte(); h[offset + 1] = ((v ushr 8) and 0xff).toByte()
                 }
                 fun le32(offset: Int, v: Long) {
-                    h[offset] = (v and 0xff).toByte(); h[offset + 1] = ((v shr 8) and 0xff).toByte()
-                    h[offset + 2] = ((v shr 16) and 0xff).toByte(); h[offset + 3] = ((v shr 24) and 0xff).toByte()
+                    h[offset] = (v and 0xff).toByte(); h[offset + 1] = ((v ushr 8) and 0xff).toByte()
+                    h[offset + 2] = ((v ushr 16) and 0xff).toByte(); h[offset + 3] = ((v ushr 24) and 0xff).toByte()
                 }
-                ascii(0, "RIFF"); le32(4, totalLen); ascii(8, "WAVE"); ascii(12, "fmt ")
+                ascii(0, "RIFF"); le32(4, totalDataLen); ascii(8, "WAVE"); ascii(12, "fmt ")
                 le32(16, 16); le16(20, 1); le16(22, channels); le32(24, sampleRate.toLong())
                 le32(28, byteRate.toLong()); le16(32, blockAlign); le16(34, bitsPerSample)
                 ascii(36, "data"); le32(40, dataBytes)
