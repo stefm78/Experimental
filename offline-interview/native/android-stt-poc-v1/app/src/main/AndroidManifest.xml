@@ -4,7 +4,7 @@
     <application
         android:name=".RuntimeHealthApplication"
         android:allowBackup="false"
-        android:label="Offline Interview Native"
+        android:label="00 Offline Interview Native"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
