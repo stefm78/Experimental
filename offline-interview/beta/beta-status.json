@@ -1,6 +1,6 @@
 {
   "schema": "offline-interview.beta-status.v1",
-  "generatedFrom": "h4-nonblocking-stt-feed",
+  "generatedFrom": "h5-finalization-quality",
   "web": {
     "channel": "beta",
     "latestLine": "v41-23",
@@ -11,22 +11,32 @@
     "label": "00 Offline Interview Native",
     "diagnosticLabel": "00 Offline Interview Diagnostic",
     "applicationId": "com.stefm78.offlineinterview.nativepoc",
-    "versionName": "0.4.3-h4-tactical",
-    "versionCode": 9,
-    "runtimeSchema": "offline-interview.android-native-runtime.v4.3",
+    "stabilityBaseline": {
+      "versionName": "0.4.3-h4-tactical",
+      "versionCode": 9,
+      "runtimeSchema": "offline-interview.android-native-runtime.v4.3",
+      "physicalVerdict": "PASS"
+    },
+    "candidate": {
+      "versionName": "0.4.4-h5-tactical",
+      "versionCode": 10,
+      "runtimeSchema": "offline-interview.android-native-runtime.v5.0",
+      "change": "bounded_async_stt_finalization"
+    },
     "diagnosticBundleSchema": "offline-interview.android-diagnostic-bundle.v1",
     "diagnosticExportWithoutAdb": true,
     "installMode": "UNINSTALL_THEN_REINSTALL",
-    "artifact": "offline-interview-android-native-TACTICAL-REINSTALL-ONLY",
     "durableSigning": false
   },
   "gates": {
-    "code": "PASS_LOCAL_REPAIR",
-    "ci": "PENDING",
-    "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
     "physicalH2": "FAIL_ERROR_RECOGNIZER_BUSY_Q02",
     "physicalH3": "FAIL_ERROR_SERVER_DISCONNECTED_Q02_ANR",
-    "physicalH4": "HOLD_PHYSICAL_NONBLOCKING_STT_FEED",
+    "physicalH4Stability": "PASS_5_OF_5_NO_ANR_NO_PROVIDER_ERROR_NO_PCM_DROP",
+    "h4ProviderFinalization": "FAIL_ZERO_FINAL_RESULTS_5_OF_5_PARTIAL_SNAPSHOT_ONLY",
+    "transcriptionAccuracy": "HOLD_NO_GROUND_TRUTH_OR_WAV_AVAILABLE",
+    "h5Implementation": "IMPLEMENTED_PENDING_CI",
+    "h5PhysicalFinalization": "HOLD_PENDING_BUILD_AND_DEVICE_TEST",
+    "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
     "durableSigning": "HOLD_DURABLE_SIGNING"
   }
 }

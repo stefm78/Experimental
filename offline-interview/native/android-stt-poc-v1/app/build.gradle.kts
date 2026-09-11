@@ -22,8 +22,8 @@ android {
         applicationId = "com.stefm78.offlineinterview.nativepoc"
         minSdk = 33
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.4.3-h4-tactical"
+        versionCode = 10
+        versionName = "0.4.4-h5-tactical"
     }
 
     buildFeatures {
