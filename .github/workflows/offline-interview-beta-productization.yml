@@ -34,3 +34,5 @@ jobs:
         run: node offline-interview/beta-v41-23/test-product-coherence.mjs
       - name: Cross-platform beta productization contract
         run: node offline-interview/test-beta-productization.mjs
+      - name: Android diagnostic export contract
+        run: node offline-interview/test-android-diagnostic-export.mjs
