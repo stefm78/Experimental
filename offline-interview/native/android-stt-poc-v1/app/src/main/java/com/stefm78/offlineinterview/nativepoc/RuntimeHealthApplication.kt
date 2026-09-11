@@ -3,6 +3,7 @@ package com.stefm78.offlineinterview.nativepoc
 import android.app.Activity
 import android.app.ActivityManager
 import android.app.Application
+import android.app.ApplicationExitInfo
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -117,11 +118,11 @@ class RuntimeHealthApplication : Application() {
                 put("rssKb", latest.rss)
             }
             File(healthDir(), "previous-process-exit.json").writeText(payload.toString(2))
-            if (latest.reason == ActivityManager.ApplicationExitInfo.REASON_ANR ||
-                latest.reason == ActivityManager.ApplicationExitInfo.REASON_CRASH ||
-                latest.reason == ActivityManager.ApplicationExitInfo.REASON_CRASH_NATIVE ||
-                latest.reason == ActivityManager.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE ||
-                latest.reason == ActivityManager.ApplicationExitInfo.REASON_LOW_MEMORY
+            if (latest.reason == ApplicationExitInfo.REASON_ANR ||
+                latest.reason == ApplicationExitInfo.REASON_CRASH ||
+                latest.reason == ApplicationExitInfo.REASON_CRASH_NATIVE ||
+                latest.reason == ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE ||
+                latest.reason == ApplicationExitInfo.REASON_LOW_MEMORY
             ) {
                 previousExitSummary = "Dernier arrêt Android: ${reasonName(latest.reason)}"
             }
@@ -150,18 +151,18 @@ class RuntimeHealthApplication : Application() {
     }
 
     private fun reasonName(reason: Int): String = when (reason) {
-        ActivityManager.ApplicationExitInfo.REASON_ANR -> "ANR"
-        ActivityManager.ApplicationExitInfo.REASON_CRASH -> "CRASH"
-        ActivityManager.ApplicationExitInfo.REASON_CRASH_NATIVE -> "CRASH_NATIVE"
-        ActivityManager.ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
-        ActivityManager.ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCE_USAGE"
-        ActivityManager.ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INITIALIZATION_FAILURE"
-        ActivityManager.ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "PERMISSION_CHANGE"
-        ActivityManager.ApplicationExitInfo.REASON_PACKAGE_STATE_CHANGE -> "PACKAGE_STATE_CHANGE"
-        ActivityManager.ApplicationExitInfo.REASON_PACKAGE_UPDATED -> "PACKAGE_UPDATED"
-        ActivityManager.ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
-        ActivityManager.ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
-        ActivityManager.ApplicationExitInfo.REASON_FREEZER -> "FREEZER"
+        ApplicationExitInfo.REASON_ANR -> "ANR"
+        ApplicationExitInfo.REASON_CRASH -> "CRASH"
+        ApplicationExitInfo.REASON_CRASH_NATIVE -> "CRASH_NATIVE"
+        ApplicationExitInfo.REASON_LOW_MEMORY -> "LOW_MEMORY"
+        ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE -> "EXCESSIVE_RESOURCE_USAGE"
+        ApplicationExitInfo.REASON_INITIALIZATION_FAILURE -> "INITIALIZATION_FAILURE"
+        ApplicationExitInfo.REASON_PERMISSION_CHANGE -> "PERMISSION_CHANGE"
+        ApplicationExitInfo.REASON_PACKAGE_STATE_CHANGE -> "PACKAGE_STATE_CHANGE"
+        ApplicationExitInfo.REASON_PACKAGE_UPDATED -> "PACKAGE_UPDATED"
+        ApplicationExitInfo.REASON_SIGNALED -> "SIGNALED"
+        ApplicationExitInfo.REASON_USER_REQUESTED -> "USER_REQUESTED"
+        ApplicationExitInfo.REASON_FREEZER -> "FREEZER"
         else -> "OTHER"
     }
 
