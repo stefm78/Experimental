@@ -8,7 +8,7 @@
   <title>Interview locale structurée</title>
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="./styles.css?v=41.5">
+  <link rel="stylesheet" href="./styles.css?v=41.15">
 </head>
 <body>
   <main class="shell">
@@ -122,6 +122,13 @@
                 <strong>ON AIR</strong>
                 <span id="topOnAirSpeaker"></span>
               </div>
+              <div class="mic-meter-row">
+                <div class="mic-meter" role="meter" aria-label="Niveau du microphone" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-valuetext="Silence">
+                  <span class="mic-meter-recommended" aria-hidden="true"></span>
+                  <span id="micMeterFill" class="mic-meter-fill" style="--level:0" aria-hidden="true"></span>
+                </div>
+                <span id="micMeterState" class="mic-meter-state sr-only" data-level-state="silence"></span>
+              </div>
               <div class="interview-clock-copy">
                 <strong id="sessionClockText">00:00</strong>
                 <span aria-hidden="true">·</span>
@@ -193,6 +200,11 @@
           </details>
 
           <p id="interviewError" class="error hidden" role="alert"></p>
+          <div id="audioRecoveryBar" class="capture-integrity-alert hidden" role="status"><span id="audioRecoveryStatus">Audio dégradé · la session reste disponible.</span> <button id="audioRecoveryBtn" class="ghost small" type="button">Réinitialiser l’audio</button></div>
+          <details id="interviewDiagnosticPanel" class="manual-entry interview-diagnostics">
+            <summary>Diagnostic</summary>
+            <div class="actions compact-actions"><span>Audio <strong id="interviewAudioHealth">HEALTHY</strong></span><button id="interviewSimulateAudioFaultBtn" class="ghost small" type="button">Simuler panne audio</button></div>
+          </details>
 
           <div class="actions interview-nav-actions">
             <button id="prevBtn" class="ghost">← Précédente</button>
@@ -222,14 +234,6 @@
             <span id="timer" class="timer">00:00</span>
           </div>
 
-          <div class="mic-meter-row">
-            <button id="micPreviewBtn" class="ghost small mic-preview-button" type="button" aria-pressed="false">Tester le micro</button>
-            <div class="mic-meter" role="meter" aria-label="Niveau du microphone" aria-valuemin="0" aria-valuemax="100">
-              <span class="mic-meter-recommended" aria-hidden="true"></span>
-              <span id="micMeterFill" class="mic-meter-fill" style="--level:0" aria-hidden="true"></span>
-            </div>
-            <span id="micMeterState" class="mic-meter-state" data-level-state="silence">Silence</span>
-          </div>
 
           <div id="speakerButtons" class="speaker-buttons"></div>
 
@@ -275,11 +279,12 @@
           <div><dt>Transcription</dt><dd id="diagStt">Détection…</dd></div>
         </dl>
         <button id="copyDiagBtn" class="secondary">Copier le diagnostic</button>
+        <button id="simulateAudioFaultBtn" class="ghost small" type="button">Simuler panne audio</button>
         <p id="copyDiagStatus" class="hint" aria-live="polite"></p>
         <textarea id="diagnosticOutput" rows="12" readonly class="hidden" spellcheck="false"></textarea>
       </details>
     </section>
   </main>
-  <script type="module" src="./app.js?v=41.5"></script>
+  <script type="module" src="./app.js?v=41.15"></script>
 </body>
 </html>

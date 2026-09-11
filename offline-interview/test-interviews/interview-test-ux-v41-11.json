@@ -1,0 +1,91 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "version": "1.0",
+  "id": "test-ux-v41-11-direct-link",
+  "title": "Test V41.11 — audio + lien direct",
+  "context": "Qualification ciblée après V41.10.",
+  "objective": "Vérifier fin de segment, retry transcription, micro stable et accès direct.",
+  "language": "fr-FR",
+  "estimatedDurationMinutes": 5,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "V41.11",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Préflight",
+          "text": "Ouvrez Diagnostic. La version doit être exactement 2026-09-08.interview-runtime-v41.11. Sinon arrêtez le test.",
+          "intent": "Cible exacte.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Fin des prises",
+          "text": "Faites six changements rapides de personne en terminant chaque phrase par un mot net. Réécoutez deux prises et dites si le dernier mot est présent sans que le mot suivant soit attribué à la mauvaise personne.",
+          "intent": "Qualifier le post-roll de récupération.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P1",
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Réessayer transcription",
+          "text": "Sur une prise sans texte, lancez la transcription audio. Si elle échoue, vérifiez que vous pouvez réessayer manuellement sans recharger la page.",
+          "intent": "Échec non terminal.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Micro stable",
+          "text": "Parlez faible puis normal puis fort et redimensionnez la fenêtre. Vérifiez que seule la petite jauge bouge et que le bandeau ne change pas de largeur.",
+          "intent": "Micro discret et stable.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q5",
+          "label": "Liens directs",
+          "text": "Ouvrez le lien setup puis le lien interview fournis. Le premier doit montrer l’accueil avec cette interview déjà chargée ; le second doit ouvrir directement l’interview sans démarrer le micro. Revenez ensuite à l’accueil.",
+          "intent": "DIRECT_INTERVIEW_LINK.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

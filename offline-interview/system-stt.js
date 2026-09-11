@@ -515,7 +515,7 @@ export function transcribeSystemAudioTrack(audioTrack, {
     recognition.onstart = () => {
       try { onStart(); }
       catch (error) { finish(error instanceof Error ? error : new Error(String(error))); return; }
-      stopTimer = setTimeout(() => { try { recognition.stop(); } catch { finish(); } }, Math.max(800, Number(durationMs) || 0) + 700);
+      stopTimer = setTimeout(() => { try { recognition.stop(); } catch { finish(); } }, Math.max(900, (Number(durationMs) || 0) + 450));
     };
     hardTimer = setTimeout(() => finish(new Error('Délai de retranscription système dépassé')), Math.max(8000, (Number(durationMs) || 0) + 8000));
     try { recognition.start(audioTrack); }

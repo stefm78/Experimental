@@ -28,17 +28,17 @@ Ne mène pas l'interview. Ne réponds pas aux questions. Ne fais pas de synthès
 
 ## Réponse attendue
 
-La cible canonique de l’application est `https://stefm78.github.io/Experimental/`.
+La cible canonique de l’application est `https://stefm78.github.io/Experimental/beta/`.
 
 Construis d’abord en interne un JSON conforme à `offline-interview.interview-spec.v1`, puis transforme ce JSON UTF-8 en Base64URL sans padding et produis un lien direct conforme au contrat `DIRECT_INTERVIEW_LINK v1` :
 
-`https://stefm78.github.io/Experimental/#oi=1&view=setup&spec=<BASE64URL_JSON>`
+`https://stefm78.github.io/Experimental/beta/#oi=1&view=setup&spec=<BASE64URL_JSON>`
 
 Par défaut, retourne uniquement ce lien `view=setup`. Si l’utilisateur demande un démarrage direct, utilise `view=interview`. Ce mode ouvre directement l’interview mais ne doit jamais être interprété comme une autorisation de démarrer le microphone sans action utilisateur.
 
 Si le payload Base64URL dépasse environ 12000 caractères, préfère un JSON hébergé publiquement en HTTPS avec CORS puis utilise :
 
-`https://stefm78.github.io/Experimental/#oi=1&view=setup&url=<URL_HTTPS_ENCODEE>`
+`https://stefm78.github.io/Experimental/beta/#oi=1&view=setup&url=<URL_HTTPS_ENCODEE>`
 
 Si tu ne peux pas publier le JSON, retourne alors le JSON lui-même comme fallback explicite.
 
