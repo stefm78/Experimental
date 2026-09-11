@@ -10,10 +10,15 @@ on:
 permissions:
   contents: read
 
+env:
+  EXPECTED_ANDROID_SIGNING_CERT_SHA256: D7:C1:15:C8:D9:13:55:BF:E0:8C:B7:DE:7D:DF:CF:69:85:8A:5D:7A:9B:88:22:21:57:FA:4B:B7:3F:F0:41:85
+
 jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      HAS_DURABLE_SIGNING: ${{ secrets.ANDROID_SIGNING_KEYSTORE_B64 != '' && secrets.ANDROID_SIGNING_STORE_PASSWORD != '' && secrets.ANDROID_SIGNING_KEY_ALIAS != '' && secrets.ANDROID_SIGNING_KEY_PASSWORD != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -29,17 +34,64 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
-      - name: Build debug APK
+      - name: Restore durable Android signing key
+        if: env.HAS_DURABLE_SIGNING == 'true'
+        env:
+          ANDROID_SIGNING_KEYSTORE_B64: ${{ secrets.ANDROID_SIGNING_KEYSTORE_B64 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/offline-interview-signing"
+          printf '%s' "$ANDROID_SIGNING_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/offline-interview-signing/offline-interview-native.jks"
+          test -s "$RUNNER_TEMP/offline-interview-signing/offline-interview-native.jks"
+
+      - name: Verify durable signing identity
+        if: env.HAS_DURABLE_SIGNING == 'true'
+        env:
+          ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+        run: |
+          ACTUAL="$(keytool -list -v \
+            -keystore "$RUNNER_TEMP/offline-interview-signing/offline-interview-native.jks" \
+            -storepass "$ANDROID_SIGNING_STORE_PASSWORD" \
+            -alias "$ANDROID_SIGNING_KEY_ALIAS" | awk '/SHA256:/{print $2; exit}')"
+          echo "Durable signing certificate SHA256=$ACTUAL"
+          test "$ACTUAL" = "$EXPECTED_ANDROID_SIGNING_CERT_SHA256"
+
+      - name: Build APK
         working-directory: offline-interview/native/android-stt-poc-v1
+        env:
+          ANDROID_SIGNING_KEYSTORE_PATH: ${{ runner.temp }}/offline-interview-signing/offline-interview-native.jks
+          ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
+          ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
+          ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
       - name: Verify APK exists
         run: test -s offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload debug APK
+      - name: Upload compile-only APK
+        if: env.HAS_DURABLE_SIGNING != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-android-native-stt-poc-v1-debug
+          name: offline-interview-android-native-UNSTABLE-SIGNATURE-do-not-update
           path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
+
+      - name: Upload durable-signed APK
+        if: env.HAS_DURABLE_SIGNING == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: offline-interview-android-native-durable-debug
+          path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Signing status
+        run: |
+          if [ "$HAS_DURABLE_SIGNING" = "true" ]; then
+            echo "DISTRIBUTABLE_APK=true"
+            echo "SIGNING_CERT_SHA256=$EXPECTED_ANDROID_SIGNING_CERT_SHA256"
+          else
+            echo "DISTRIBUTABLE_APK=false"
+            echo "Reason: durable signing secrets are not configured. Artifact is compile-only and must not be used as an update."
+          fi
