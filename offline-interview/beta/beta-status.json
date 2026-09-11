@@ -1,6 +1,6 @@
 {
   "schema": "offline-interview.beta-status.v1",
-  "generatedFrom": "h5-finalization-quality",
+  "generatedFrom": "h6-eof-finalization",
   "web": {
     "channel": "beta",
     "latestLine": "v41-23",
@@ -17,11 +17,17 @@
       "runtimeSchema": "offline-interview.android-native-runtime.v4.3",
       "physicalVerdict": "PASS"
     },
-    "candidate": {
+    "previousCandidate": {
       "versionName": "0.4.4-h5-tactical",
       "versionCode": 10,
       "runtimeSchema": "offline-interview.android-native-runtime.v5.0",
-      "change": "bounded_async_stt_finalization"
+      "physicalVerdict": "FAIL_FINALIZATION_ERROR5_ALL_TURNS_AND_BOUNDARY_ERROR11_REARMS"
+    },
+    "candidate": {
+      "versionName": "0.4.5-h6-tactical",
+      "versionCode": 11,
+      "runtimeSchema": "offline-interview.android-native-runtime.v6.0",
+      "change": "pipe_eof_no_stopListening_plus_provider_cooldown"
     },
     "diagnosticBundleSchema": "offline-interview.android-diagnostic-bundle.v1",
     "diagnosticExportWithoutAdb": true,
@@ -33,9 +39,11 @@
     "physicalH3": "FAIL_ERROR_SERVER_DISCONNECTED_Q02_ANR",
     "physicalH4Stability": "PASS_5_OF_5_NO_ANR_NO_PROVIDER_ERROR_NO_PCM_DROP",
     "h4ProviderFinalization": "FAIL_ZERO_FINAL_RESULTS_5_OF_5_PARTIAL_SNAPSHOT_ONLY",
+    "physicalH5": "FAIL_5_OF_5_FINALIZATION_ERROR5_ZERO_FINALS_PLUS_BOUNDARY_ERROR11_REARMS",
+    "h5AudioStability": "PASS_5_OF_5_PCM_912640_NO_PCM_DROP_STT_NOT_DEGRADED",
     "transcriptionAccuracy": "HOLD_NO_GROUND_TRUTH_OR_WAV_AVAILABLE",
-    "h5Implementation": "IMPLEMENTED_PENDING_CI",
-    "h5PhysicalFinalization": "HOLD_PENDING_BUILD_AND_DEVICE_TEST",
+    "h6Implementation": "IMPLEMENTED_PENDING_CI",
+    "h6PhysicalFinalization": "HOLD_PENDING_BUILD_AND_DEVICE_TEST",
     "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
     "durableSigning": "HOLD_DURABLE_SIGNING"
   }
