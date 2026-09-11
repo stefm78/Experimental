@@ -1,0 +1,80 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "version": "1.0",
+  "id": "test-ux-v41-7-boundary-recovery",
+  "title": "Test V41.7 — frontières audio et récupération",
+  "context": "Qualification humaine exact-head avant toute promotion.",
+  "objective": "Vérifier que les changements de personne ne produisent plus d’attribution textuelle trompeuse et que l’audio exact reste la source de récupération.",
+  "language": "fr-FR",
+  "estimatedDurationMinutes": 7,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Qualification V41.7",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Préflight exact-head",
+          "text": "Avant tout test, ouvrez Diagnostic et vérifiez exactement 2026-09-07.interview-runtime-v41.7. Si une autre version apparaît, arrêtez immédiatement et répondez INVALID_TEST_TARGET.",
+          "intent": "Empêcher un test sur la mauvaise version.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Changements rapides de personne",
+          "text": "Dans une seule captation, alternez Testeur et Interviewer quatre fois. Dites lentement : alpha bravo charlie ; delta echo foxtrot ; golf hotel india ; juliet kilo lima. Après avoir arrêté l’enregistrement, vérifiez que chaque prise appartient à la bonne personne. Réécoutez chaque prise : elle ne doit pas commencer par un mot prononcé avant le clic de changement. Indiquez aussi si le texte apparaît automatiquement après l’arrêt ou reste à retranscrire.",
+          "intent": "Qualifier la frontière audio exacte et la récupération système depuis chaque segment sauvegardé.",
+          "estimatedMinutes": 3,
+          "required": true,
+          "audience": [
+            "P1",
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Pas de retranscription prématurée",
+          "text": "Pendant qu’un enregistrement est encore en cours, regardez une prise déjà créée dans ce même enregistrement. Vérifiez que la relecture et la retranscription de cet audio ne sont pas proposées comme disponibles avant la sauvegarde de l’audio. Après l’arrêt, vérifiez qu’elles deviennent utilisables quand le navigateur les prend en charge.",
+          "intent": "Éviter l’erreur Audio local introuvable pendant une captation active.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Téléphone fail-closed",
+          "text": "Sur téléphone, refaites au moins deux changements de personne. Vérifiez que l’audio reste réécoutable et correctement attribué. Si la retranscription d’un audio enregistré n’est pas prise en charge, elle doit rester indisponible sans lancer Whisper automatiquement. Un segment sans texte doit rester visible et réécoutable, pas disparaître.",
+          "intent": "Conserver l’intégrité sur mobile même sans retranscription système a posteriori.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P1",
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}
