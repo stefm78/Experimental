@@ -22,8 +22,8 @@ android {
         applicationId = "com.stefm78.offlineinterview.nativepoc"
         minSdk = 33
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.4.2-h3-tactical"
+        versionCode = 9
+        versionName = "0.4.3-h4-tactical"
     }
 
     buildFeatures {
@@ -46,15 +46,11 @@ android {
 
     buildTypes {
         debug {
-            if (durableSigningAvailable) {
-                signingConfig = signingConfigs.getByName("durable")
-            }
+            if (durableSigningAvailable) signingConfig = signingConfigs.getByName("durable")
         }
         release {
             isMinifyEnabled = false
-            if (durableSigningAvailable) {
-                signingConfig = signingConfigs.getByName("durable")
-            }
+            if (durableSigningAvailable) signingConfig = signingConfigs.getByName("durable")
         }
     }
 
