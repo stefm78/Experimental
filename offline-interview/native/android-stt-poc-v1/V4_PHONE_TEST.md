@@ -4,13 +4,28 @@
 
 Version: `0.4.0` (`versionCode 4`)
 
+## Prerequisite — durable signing migration
+
+Do **not** use an artifact named `UNSTABLE-SIGNATURE-do-not-update` for this phone test.
+
+The historical installed V3/V4 debug APK was signed by a runner-local debug key that was not retained. Android cannot update that installation with the new durable signing identity.
+
+Before testing V4 product behavior:
+
+1. configure the durable Android signing secrets described in `ANDROID_SIGNING_MIGRATION.md`;
+2. obtain `offline-interview-android-native-durable-debug` from a workflow reporting `DISTRIBUTABLE_APK=true`;
+3. uninstall the historical ephemeral-signed installation once;
+4. install the durable-signed V4 APK.
+
+Future builds signed with the same durable identity should then install as normal updates.
+
 ## Goal
 
 Validate only the new V4 product bridge. V3 audio/STT per-turn routing is already physically qualified.
 
 ## Test A — bundled real interview spec
 
-1. Install/open APK 0.4.0.
+1. Open durable-signed APK 0.4.0.
 2. Confirm the title is `Entretien de démonstration`.
 3. Confirm first question metadata contains `Contexte · Q01 · 1/5`.
 4. Start interview.
