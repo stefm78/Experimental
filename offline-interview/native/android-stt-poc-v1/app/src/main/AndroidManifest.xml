@@ -7,7 +7,7 @@
         android:label="00 Offline Interview Native"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".MainActivity"
+            android:name=".H4MainActivity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>

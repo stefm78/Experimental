@@ -9,7 +9,7 @@ const betaSpec = json('offline-interview/beta/interview.json');
 const androidSpec = json('offline-interview/native/android-stt-poc-v1/app/src/main/assets/interview.json');
 const manifest = read('offline-interview/native/android-stt-poc-v1/app/src/main/AndroidManifest.xml');
 const gradle = read('offline-interview/native/android-stt-poc-v1/app/build.gradle.kts');
-const main = read('offline-interview/native/android-stt-poc-v1/app/src/main/java/com/stefm78/offlineinterview/nativepoc/MainActivity.kt');
+const h4 = read('offline-interview/native/android-stt-poc-v1/app/src/main/java/com/stefm78/offlineinterview/nativepoc/H4MainActivity.kt');
 const workflow = read('.github/workflows/android-native-stt-poc.yml');
 const directLink = read('offline-interview/beta/direct-interview-link.js');
 
@@ -23,21 +23,31 @@ for (const [name, spec] of [['web', webSpec], ['beta', betaSpec], ['android', an
   assert.ok(ids.length >= 5, `${name}: expected multi-question product fixture`);
 }
 
+assert.match(manifest, /android:name="\.H4MainActivity"/);
 assert.match(manifest, /android:label="00 Offline Interview Native"/);
-assert.match(gradle, /versionCode\s*=\s*8/);
-assert.match(gradle, /versionName\s*=\s*"0\.4\.2-h3-tactical"/);
-assert.match(main, /offline-interview\.android-native-runtime\.v4\.2/);
-assert.match(main, /BuildConfig\.VERSION_NAME/);
-assert.match(main, /single_AudioRecord_PCM_to_WAV/);
-assert.match(main, /stt_session_identity/);
-assert.match(main, /recoverable_no_match/);
-assert.match(main, /ERROR_RECOGNIZER_BUSY \(8\)/);
-assert.match(main, /retireRecognizer\(sttSessions\[oldTurn\]\)/);
-assert.match(main, /Preserve the first material provider error/);
+assert.match(gradle, /versionCode\s*=\s*9/);
+assert.match(gradle, /versionName\s*=\s*"0\.4\.3-h4-tactical"/);
+assert.match(h4, /offline-interview\.android-native-runtime\.v4\.3/);
+assert.match(h4, /BuildConfig\.VERSION_NAME/);
+assert.match(h4, /single_AudioRecord_PCM_to_WAV/);
+assert.match(h4, /stt_session_identity/);
+assert.match(h4, /ArrayBlockingQueue/);
+assert.match(h4, /pcmQueue\.offer\(copy\)/);
+assert.match(h4, /private fun sttFeederLoop/);
+assert.match(h4, /ERROR_SERVER_DISCONNECTED/);
+assert.match(h4, /STT_HANDOFF_DELAY_MS/);
+assert.match(h4, /TRANSIENT_REARM_DELAY_MS/);
+assert.match(h4, /droppedSttPcmChunks/);
 
-const nextTurnBody = main.slice(main.indexOf('private fun nextTurn()'), main.indexOf('private fun snapshotPartialAtClose'));
-assert.ok(nextTurnBody.indexOf('closeTurnSession(oldTurn') < nextTurnBody.indexOf('createTurnSttSession(newTurn'), 'H3 must close the previous STT session before creating the next one');
-assert.ok(nextTurnBody.indexOf('retireRecognizer(sttSessions[oldTurn])') < nextTurnBody.indexOf('createTurnSttSession(newTurn'), 'H3 must destroy the previous recognizer before creating the next one');
+const capture = h4.slice(h4.indexOf('private fun captureLoop()'), h4.indexOf('private fun beginPendingWindow'));
+assert.doesNotMatch(capture, /sink\.write/,
+  'H4 master capture loop must never write synchronously into the SpeechRecognizer pipe');
+assert.match(capture, /wavRaf\?\.write/);
+assert.match(capture, /pcmQueue\.offer/);
+
+const feeder = h4.slice(h4.indexOf('private fun sttFeederLoop'), h4.indexOf('private fun captureLoop'));
+assert.match(feeder, /session\.sink\.write/,
+  'Only the disposable STT feeder thread may own the blocking pipe write');
 
 assert.match(workflow, /offline-interview-android-native-TACTICAL-REINSTALL-ONLY/);
 assert.match(workflow, /INSTALL_MODE=UNINSTALL_THEN_REINSTALL/);
@@ -47,4 +57,4 @@ assert.match(directLink, /URLSearchParams|searchParams/);
 const androidQuestionIds = androidSpec.sections.flatMap(s => (s.questions || []).map(q => q.id));
 assert.deepEqual(androidQuestionIds.slice(0, 5), ['Q01', 'Q02', 'Q03', 'Q04', 'Q05']);
 
-console.log('PASS beta productization contract: web/beta/android schemas, H3 serialized STT handoff, routing invariants, direct-link and distribution policy.');
+console.log('PASS beta productization contract: H4 nonblocking STT feed, transient provider recovery, WAV authority, routing, direct-link and distribution policy.');
