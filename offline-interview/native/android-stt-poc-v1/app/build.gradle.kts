@@ -26,6 +26,10 @@ android {
         versionName = "0.4.1-h2-tactical"
     }
 
+    buildFeatures {
+        buildConfig = true
+    }
+
     if (durableSigningAvailable) {
         signingConfigs {
             create("durable") {
