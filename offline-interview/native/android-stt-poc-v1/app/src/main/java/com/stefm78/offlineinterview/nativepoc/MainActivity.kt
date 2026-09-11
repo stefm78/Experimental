@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -28,24 +29,26 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.RandomAccessFile
+import java.time.Instant
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : Activity() {
-    private val questions = listOf(
-        "Présente-toi brièvement et explique le contexte de cet entretien.",
-        "Décris un problème concret que tu voudrais résoudre.",
-        "Quel serait pour toi un bon résultat à la fin de cet entretien ?"
-    )
+    private lateinit var interviewSpec: NativeInterviewSpec
 
     private lateinit var status: TextView
+    private lateinit var interviewTitle: TextView
+    private lateinit var questionMeta: TextView
     private lateinit var question: TextView
     private lateinit var liveTranscript: TextView
+    private lateinit var loadButton: Button
     private lateinit var startButton: Button
     private lateinit var nextButton: Button
     private lateinit var lockButton: Button
     private lateinit var stopButton: Button
+    private lateinit var saveButton: Button
     private lateinit var exportView: TextView
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -60,8 +63,12 @@ class MainActivity : Activity() {
     private var wavRaf: RandomAccessFile? = null
     private var bytesWritten = 0L
     private var sessionStartMs = 0L
+    private var sessionStartedAt: String? = null
+    private var sessionCompletedAt: String? = null
+    private var runtimeSessionId = ""
     private var currentTurn = 0
     private var sttDegraded = false
+    private var lastExportJson: String? = null
 
     private data class Boundary(val turn: Int, val atMs: Long)
 
@@ -88,6 +95,7 @@ class MainActivity : Activity() {
         var segmentCount: Int = 0,
         var timedPartCount: Int = 0,
         var providerError: Int? = null,
+        var providerErrorClass: String? = null,
         var lateEventCount: Int = 0,
         var closed: Boolean = false
     )
@@ -100,14 +108,26 @@ class MainActivity : Activity() {
     private val draftSourceByTurn = mutableMapOf<Int, String>()
     private val sttSessions = mutableMapOf<Int, TurnSttSession>()
 
+    private val questions: List<NativeQuestion>
+        get() = interviewSpec.questions
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        interviewSpec = loadBundledSpec()
+        handleIncomingSpec(intent, silent = true)
         buildUi()
+        renderInterviewHeader()
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 7)
         } else {
             verifyRecognizerSupport()
         }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent != null) handleIncomingSpec(intent, silent = false)
     }
 
     private fun buildUi() {
@@ -116,32 +136,121 @@ class MainActivity : Activity() {
             setPadding(32, 32, 32, 32)
         }
         status = TextView(this).apply { text = "Initialisation…" }
-        question = TextView(this).apply { textSize = 20f; text = questions[0] }
+        interviewTitle = TextView(this).apply { textSize = 22f }
+        questionMeta = TextView(this).apply { textSize = 14f; setPadding(0, 16, 0, 4) }
+        question = TextView(this).apply { textSize = 20f }
         liveTranscript = TextView(this).apply {
             text = "La transcription apparaîtra ici. Aucun champ éditable : aucun clavier logiciel."
             setPadding(0, 24, 0, 24)
             setTextIsSelectable(true)
         }
-        startButton = Button(this).apply { text = "Démarrer capture + STT" }
+        loadButton = Button(this).apply { text = "Charger un questionnaire JSON" }
+        startButton = Button(this).apply { text = "Démarrer l'entretien" }
         nextButton = Button(this).apply { text = "Question suivante"; isEnabled = false }
         lockButton = Button(this).apply { text = "Valider le texte humain"; isEnabled = false }
         stopButton = Button(this).apply { text = "Terminer"; isEnabled = false }
-        exportView = TextView(this).apply { setTextIsSelectable(true) }
+        saveButton = Button(this).apply { text = "Enregistrer le résultat JSON"; isEnabled = false }
+        exportView = TextView(this).apply { setTextIsSelectable(true); setPadding(0, 24, 0, 0) }
 
+        loadButton.setOnClickListener { chooseInterviewSpec() }
         startButton.setOnClickListener { startSession() }
         nextButton.setOnClickListener { nextTurn() }
         lockButton.setOnClickListener { lockCurrentDraft() }
         stopButton.setOnClickListener { stopSession() }
+        saveButton.setOnClickListener { saveResultJson() }
 
         root.addView(status)
+        root.addView(interviewTitle)
+        root.addView(questionMeta)
         root.addView(question)
         root.addView(liveTranscript)
+        root.addView(loadButton)
         root.addView(startButton)
         root.addView(nextButton)
         root.addView(lockButton)
         root.addView(stopButton)
+        root.addView(saveButton)
         root.addView(exportView)
         setContentView(ScrollView(this).apply { addView(root) })
+    }
+
+    private fun renderInterviewHeader() {
+        if (!::interviewTitle.isInitialized) return
+        interviewTitle.text = interviewSpec.title
+        currentTurn = currentTurn.coerceIn(0, questions.lastIndex)
+        val q = questions[currentTurn]
+        questionMeta.text = "${q.sectionTitle} · ${q.id} · ${currentTurn + 1}/${questions.size}${if (q.label.isNotBlank()) " · ${q.label}" else ""}"
+        question.text = q.text
+    }
+
+    private fun loadBundledSpec(): NativeInterviewSpec {
+        val text = assets.open("interview.json").bufferedReader().use { it.readText() }
+        return InterviewContract.parse(text)
+    }
+
+    private fun chooseInterviewSpec() {
+        if (recording.get()) {
+            status.text = "Termine l'entretien avant de changer de questionnaire."
+            return
+        }
+        startActivityForResult(
+            Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "application/json"
+            },
+            REQ_OPEN_SPEC
+        )
+    }
+
+    private fun handleIncomingSpec(intent: Intent, silent: Boolean) {
+        val uri = intent.data ?: return
+        if (recording.get()) return
+        try {
+            loadSpecFromUri(uri)
+            if (!silent && ::status.isInitialized) status.text = "Questionnaire chargé depuis le lien/fichier externe."
+        } catch (e: Exception) {
+            if (!silent && ::status.isInitialized) status.text = "Questionnaire refusé: ${e.message}"
+        }
+    }
+
+    private fun loadSpecFromUri(uri: Uri) {
+        val text = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+            ?: throw IllegalArgumentException("Impossible de lire le fichier JSON.")
+        interviewSpec = InterviewContract.parse(text)
+        currentTurn = 0
+        lastExportJson = null
+        if (::saveButton.isInitialized) saveButton.isEnabled = false
+        if (::exportView.isInitialized) exportView.text = ""
+        renderInterviewHeader()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode != RESULT_OK) return
+        when (requestCode) {
+            REQ_OPEN_SPEC -> {
+                val uri = data?.data ?: return
+                try {
+                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                } catch (_: Exception) {}
+                try {
+                    loadSpecFromUri(uri)
+                    status.text = "Questionnaire chargé: ${interviewSpec.title} (${questions.size} questions)."
+                } catch (e: Exception) {
+                    status.text = "Questionnaire refusé: ${e.message}"
+                }
+            }
+            REQ_SAVE_RESULT -> {
+                val uri = data?.data ?: return
+                val payload = lastExportJson ?: return
+                try {
+                    contentResolver.openOutputStream(uri, "wt")?.bufferedWriter()?.use { it.write(payload) }
+                    status.text = "Résultat JSON enregistré."
+                } catch (e: Exception) {
+                    status.text = "Échec export JSON: ${e.message}"
+                }
+            }
+        }
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -149,7 +258,7 @@ class MainActivity : Activity() {
         if (requestCode == 7 && grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
             verifyRecognizerSupport()
         } else {
-            status.text = "Permission micro refusée — POC bloqué."
+            status.text = "Permission micro refusée — runtime bloqué."
         }
     }
 
@@ -164,12 +273,12 @@ class MainActivity : Activity() {
             mainExecutor,
             object : RecognitionSupportCallback {
                 override fun onSupportResult(recognitionSupport: RecognitionSupport) {
-                    status.text = "Recognizer on-device disponible. Langues locales: ${recognitionSupport.installedOnDeviceLanguages.joinToString()}"
+                    status.text = "Prêt — ${questions.size} questions; STT on-device disponible."
                     probe.destroy()
                 }
 
                 override fun onError(error: Int) {
-                    status.text = "Recognizer on-device disponible; support détaillé non vérifiable (code $error)."
+                    status.text = "STT on-device disponible; support détaillé non vérifiable (code $error)."
                     probe.destroy()
                 }
             }
@@ -179,7 +288,7 @@ class MainActivity : Activity() {
     private fun baseRecognizerIntent(audioSource: ParcelFileDescriptor?): Intent =
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.FRANCE.toLanguageTag())
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, interviewSpec.language)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             if (Build.VERSION.SDK_INT >= 34) {
@@ -202,6 +311,9 @@ class MainActivity : Activity() {
         if (!recording.compareAndSet(false, true)) return
 
         sessionStartMs = SystemClock.elapsedRealtime()
+        sessionStartedAt = Instant.now().toString()
+        sessionCompletedAt = null
+        runtimeSessionId = UUID.randomUUID().toString()
         currentTurn = 0
         boundaries.clear()
         transcriptEvents.clear()
@@ -212,6 +324,7 @@ class MainActivity : Activity() {
         destroyAllSttSessions()
         sttDegraded = false
         bytesWritten = 0L
+        lastExportJson = null
         boundaries += Boundary(0, 0L)
 
         val minBuffer = AudioRecord.getMinBufferSize(
@@ -238,7 +351,7 @@ class MainActivity : Activity() {
 
         val firstSession = createTurnSttSession(0, 0L)
         if (firstSession == null) {
-            status.text = "FAIL: impossible d'initialiser STT T1; capture non démarrée."
+            status.text = "FAIL: impossible d'initialiser STT ${questions[0].id}; capture non démarrée."
             cleanupCaptureOnly()
             recording.set(false)
             return
@@ -251,13 +364,15 @@ class MainActivity : Activity() {
         audioRecord?.startRecording()
         captureThread = Thread { captureLoop() }.also { it.start() }
 
-        question.text = questions[0]
+        renderInterviewHeader()
         liveTranscript.text = "Écoute…"
+        loadButton.isEnabled = false
         startButton.isEnabled = false
-        nextButton.isEnabled = true
+        nextButton.isEnabled = questions.size > 1
         lockButton.isEnabled = true
         stopButton.isEnabled = true
-        status.text = "RUNNING V3 — AudioRecord/WAV continu; STT session dédiée T1."
+        saveButton.isEnabled = false
+        status.text = "RUNNING V4 — WAV maître continu; STT dédié ${questions[0].id}."
     }
 
     private fun createTurnSttSession(turn: Int, startAtMs: Long): TurnSttSession? {
@@ -268,7 +383,7 @@ class MainActivity : Activity() {
             val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(this)
             val session = TurnSttSession(
                 turn = turn,
-                sessionId = "T${turn + 1}-${SystemClock.elapsedRealtimeNanos()}",
+                sessionId = "${questions[turn].id}-${SystemClock.elapsedRealtimeNanos()}",
                 startAtMs = startAtMs,
                 recognizer = recognizer,
                 readFd = readFd,
@@ -279,7 +394,7 @@ class MainActivity : Activity() {
             sttSessions[turn] = session
             session
         } catch (e: Exception) {
-            status.text = "STT_DEGRADED: création session T${turn + 1}: ${e.message}"
+            status.text = "STT_DEGRADED: création session ${questions[turn].id}: ${e.message}"
             sttDegraded = true
             null
         }
@@ -308,7 +423,7 @@ class MainActivity : Activity() {
                     } catch (_: IOException) {
                         activeSttSink = null
                         sttDegraded = true
-                        runOnUiThread { status.text = "STT_DEGRADED: pipe T${(activeSttTurn ?: -1) + 1} fermé; WAV continue." }
+                        runOnUiThread { status.text = "STT_DEGRADED: pipe ${activeSttTurn?.let { questions[it].id } ?: "?"} fermé; WAV continue." }
                     }
                 }
             }
@@ -328,7 +443,7 @@ class MainActivity : Activity() {
             closeTurnSession(oldTurn, boundaryAt, "turn_boundary_stt_degraded", clearActive = true)
             currentTurn = newTurn
             boundaries += Boundary(newTurn, boundaryAt)
-            question.text = questions[newTurn]
+            renderInterviewHeader()
             renderCurrentTurn()
             if (newTurn == questions.lastIndex) nextButton.isEnabled = false
             return
@@ -346,9 +461,9 @@ class MainActivity : Activity() {
 
         currentTurn = newTurn
         boundaries += Boundary(newTurn, boundaryAt)
-        question.text = questions[newTurn]
+        renderInterviewHeader()
         renderCurrentTurn()
-        status.text = "RUNNING V3 — WAV continu; STT basculé vers T${newTurn + 1}."
+        status.text = "RUNNING V4 — WAV continu; STT basculé vers ${questions[newTurn].id}."
         if (newTurn == questions.lastIndex) nextButton.isEnabled = false
     }
 
@@ -396,13 +511,13 @@ class MainActivity : Activity() {
             return
         }
         canonicalText[currentTurn] = draft
-        status.text = "Texte humain validé pour T${currentTurn + 1}; human_lock reste prioritaire."
+        status.text = "Texte humain validé pour ${questions[currentTurn].id}; human_lock reste prioritaire."
         renderCurrentTurn()
     }
 
     private fun stopSession() {
         if (!recording.compareAndSet(true, false)) return
-        status.text = "Finalisation V3…"
+        status.text = "Finalisation V4…"
         nextButton.isEnabled = false
         lockButton.isEnabled = false
         stopButton.isEnabled = false
@@ -416,14 +531,17 @@ class MainActivity : Activity() {
             try { captureThread?.join(1500) } catch (_: Exception) {}
             finalizeWav()
             try { Thread.sleep(FINAL_CALLBACK_GRACE_MS) } catch (_: InterruptedException) {}
+            sessionCompletedAt = Instant.now().toString()
             runOnUiThread {
                 renderExport()
                 destroyAllSttSessions()
+                loadButton.isEnabled = true
                 startButton.isEnabled = true
+                saveButton.isEnabled = lastExportJson != null
                 status.text = if (sttDegraded) {
-                    "STOPPED — WAV maître finalisé; STT_DEGRADED observé, voir export."
+                    "STOPPED — résultat produit généré; vraie dégradation STT observée, voir diagnostic natif."
                 } else {
-                    "STOPPED — WAV maître finalisé; vérifier isolation T1/T2/T3."
+                    "STOPPED — résultat produit généré; WAV maître local finalisé."
                 }
             }
         }
@@ -432,6 +550,8 @@ class MainActivity : Activity() {
     private fun assembledDraft(turn: Int): String =
         durableDraftByTurn[turn]?.takeIf { it.isNotBlank() }
             ?: latestPartialByTurn[turn].orEmpty()
+
+    private fun finalText(turn: Int): String = canonicalText[turn] ?: assembledDraft(turn)
 
     private fun renderCurrentTurn() {
         val canonical = canonicalText[currentTurn]
@@ -502,10 +622,14 @@ class MainActivity : Activity() {
         if (session.turn == currentTurn && !canonicalText.containsKey(session.turn)) renderCurrentTurn()
     }
 
+    private fun expectedTeardownError(session: TurnSttSession, error: Int): Boolean =
+        session.closed && error == SpeechRecognizer.ERROR_CLIENT &&
+            (session.closeReason == "turn_boundary" || session.closeReason == "interview_stop")
+
     private inner class TurnRecognitionListener(private val session: TurnSttSession) : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
             if (session.turn == currentTurn && recording.get()) {
-                status.text = "STT T${session.turn + 1} prêt — parle normalement."
+                status.text = "STT ${questions[session.turn].id} prêt — parle normalement."
             }
         }
 
@@ -517,17 +641,19 @@ class MainActivity : Activity() {
         override fun onError(error: Int) {
             session.providerError = error
             if (session.closed) session.lateEventCount++
-            sttDegraded = true
+            val expected = expectedTeardownError(session, error)
+            session.providerErrorClass = if (expected) "expected_teardown_error" else "unexpected_provider_error"
+            if (!expected) sttDegraded = true
             transcriptEvents += TranscriptEvent(
                 callbackAtMs = elapsedMs(),
                 audioAtMs = null,
                 turn = session.turn,
-                kind = "error",
+                kind = if (expected) "teardown_error" else "error",
                 routing = "stt_session_identity",
                 text = "error=$error"
             )
-            if (session.turn == currentTurn && recording.get()) {
-                status.text = "STT_DEGRADED T${session.turn + 1}: error=$error — WAV continue."
+            if (!expected && session.turn == currentTurn && recording.get()) {
+                status.text = "STT_DEGRADED ${questions[session.turn].id}: error=$error — WAV continue."
             }
         }
 
@@ -552,12 +678,83 @@ class MainActivity : Activity() {
     }
 
     private fun renderExport() {
-        val durationMs = if (SAMPLE_RATE > 0) bytesWritten * 1000L / (SAMPLE_RATE * 2L) else 0L
+        val out = buildProductResult()
+        lastExportJson = out.toString(2)
+        exportView.text = lastExportJson
+    }
 
-        val sessionsJson = JSONArray().apply {
+    private fun buildProductResult(): JSONObject {
+        val durationMs = if (SAMPLE_RATE > 0) bytesWritten * 1000L / (SAMPLE_RATE * 2L) else 0L
+        val interviewee = interviewSpec.interviewee
+        val answered = questions.indices.count { finalText(it).isNotBlank() }
+
+        val participantJson = JSONArray().apply {
+            interviewSpec.participants.forEach { p ->
+                put(JSONObject().apply {
+                    put("id", p.id)
+                    put("name", p.name)
+                    put("role", p.role)
+                    put("active", true)
+                    put("removedAt", JSONObject.NULL)
+                })
+            }
+        }
+
+        val questionDurations = JSONObject().apply {
+            questions.forEachIndexed { index, q ->
+                val s = sttSessions[index]
+                val seconds = if (s?.endAtMs != null) ((s.endAtMs!! - s.startAtMs).coerceAtLeast(0L) / 1000L) else 0L
+                put(q.id, seconds)
+            }
+        }
+
+        val sectionResults = JSONArray().apply {
+            val sourceSections = interviewSpec.raw.optJSONArray("sections") ?: JSONArray()
+            for (sIndex in 0 until sourceSections.length()) {
+                val sourceSection = sourceSections.optJSONObject(sIndex) ?: continue
+                val sectionOut = InterviewContract.cloneJson(sourceSection)
+                val sourceQuestions = sourceSection.optJSONArray("questions") ?: JSONArray()
+                val questionsOut = JSONArray()
+                for (qIndex in 0 until sourceQuestions.length()) {
+                    val sourceQuestion = sourceQuestions.optJSONObject(qIndex) ?: continue
+                    val qOut = InterviewContract.cloneJson(sourceQuestion)
+                    val qId = sourceQuestion.optString("id")
+                    val flatIndex = questions.indexOfFirst { it.id == qId }
+                    val turns = JSONArray()
+                    if (flatIndex >= 0) {
+                        val text = finalText(flatIndex).trim()
+                        if (text.isNotEmpty()) {
+                            val s = sttSessions[flatIndex]
+                            turns.put(JSONObject().apply {
+                                put("id", "native-$runtimeSessionId-$qId")
+                                put("questionId", qId)
+                                put("speakerId", interviewee.id)
+                                put("speakerName", interviewee.name)
+                                put("speakerRole", interviewee.role)
+                                put("type", "answer")
+                                put("source", "speech")
+                                put("text", text)
+                                put("rawTranscript", assembledDraft(flatIndex))
+                                put("transcriptionSource", "android-on-device-per-turn")
+                                put("draftSource", draftSourceByTurn[flatIndex] ?: "live_partial")
+                                put("canonicalSource", if (canonicalText.containsKey(flatIndex)) "human_lock" else "draft_stt")
+                                put("audioStartMs", s?.startAtMs ?: JSONObject.NULL)
+                                put("audioEndMs", s?.endAtMs ?: JSONObject.NULL)
+                            })
+                        }
+                    }
+                    qOut.put("turns", turns)
+                    questionsOut.put(qOut)
+                }
+                sectionOut.put("questions", questionsOut)
+                put(sectionOut)
+            }
+        }
+
+        val nativeSessions = JSONArray().apply {
             sttSessions.toSortedMap().values.forEach { s ->
                 put(JSONObject().apply {
-                    put("turnId", "T${s.turn + 1}")
+                    put("questionId", questions[s.turn].id)
                     put("sessionId", s.sessionId)
                     put("startAtMs", s.startAtMs)
                     put("endAtMs", s.endAtMs ?: JSONObject.NULL)
@@ -567,17 +764,18 @@ class MainActivity : Activity() {
                     put("segmentCount", s.segmentCount)
                     put("timedPartCount", s.timedPartCount)
                     put("providerError", s.providerError ?: JSONObject.NULL)
+                    put("providerErrorClass", s.providerErrorClass ?: JSONObject.NULL)
                     put("lateEventCount", s.lateEventCount)
                 })
             }
         }
 
-        val eventsJson = JSONArray().apply {
+        val nativeEvents = JSONArray().apply {
             transcriptEvents.forEach { e ->
                 put(JSONObject().apply {
                     put("callbackAtMs", e.callbackAtMs)
                     put("audioAtMs", e.audioAtMs ?: JSONObject.NULL)
-                    put("turnId", "T${e.turn + 1}")
+                    put("questionId", questions[e.turn].id)
                     put("kind", e.kind)
                     put("routing", e.routing)
                     put("text", e.text)
@@ -585,39 +783,79 @@ class MainActivity : Activity() {
             }
         }
 
-        val turnsJson = JSONArray().apply {
-            questions.forEachIndexed { i, q ->
-                val canonical = canonicalText[i]
-                val draft = assembledDraft(i)
-                put(JSONObject().apply {
-                    put("turnId", "T${i + 1}")
-                    put("question", q)
-                    put("draft", draft)
-                    put("draftSource", draftSourceByTurn[i] ?: if (draft.isNotBlank()) "live_partial" else JSONObject.NULL)
-                    put("canonical", canonical ?: JSONObject.NULL)
-                    put("canonicalSource", if (canonical != null) "human_lock" else "draft_stt")
-                })
-            }
+        val interviewMeta = JSONObject().apply {
+            put("id", interviewSpec.id)
+            put("version", interviewSpec.version)
+            put("title", interviewSpec.title)
+            put("estimatedDurationMinutes", interviewSpec.estimatedDurationMinutes ?: JSONObject.NULL)
+            put("context", interviewSpec.context)
+            put("objective", interviewSpec.objective)
+            put("language", interviewSpec.language)
+            put("tags", interviewSpec.raw.optJSONArray("tags") ?: JSONArray())
         }
 
-        val out = JSONObject().apply {
-            put("schema", "offline-interview.android-native-stt-poc.v3")
-            put("appVersion", "0.3.0")
-            put("audioAuthority", "single_AudioRecord_PCM_to_WAV")
-            put("sttProvider", "Android SpeechRecognizer on-device via per-turn EXTRA_AUDIO_SOURCE")
-            put("routingAuthority", "stt_session_identity")
-            put("wavPath", wavFile?.absolutePath ?: "")
-            put("pcmBytes", bytesWritten)
-            put("audioDurationMs", durationMs)
-            put("sttDegraded", sttDegraded)
-            put("turnBoundaries", JSONArray().apply {
-                boundaries.forEach { b -> put(JSONObject().put("turnId", "T${b.turn + 1}").put("atMs", b.atMs)) }
+        return JSONObject().apply {
+            put("schema", InterviewContract.RESULT_SCHEMA)
+            put("version", "1.0")
+            put("exportedAt", Instant.now().toString())
+            put("provenance", JSONObject().apply {
+                put("appBuild", "android-native-0.4.0")
+                put("inputSchema", InterviewContract.SPEC_SCHEMA)
+                put("transcriptionDefault", "android-on-device-per-turn")
+                put("transcriptionFallback", JSONObject.NULL)
+                put("privacy", "Audio remains local in the app-specific Android files area and is never embedded in this JSON export.")
             })
-            put("sttSessions", sessionsJson)
-            put("transcriptEvents", eventsJson)
-            put("turns", turnsJson)
+            put("interview", interviewMeta)
+            put("participants", participantJson)
+            put("session", JSONObject().apply {
+                put("id", runtimeSessionId)
+                put("startedAt", sessionStartedAt ?: JSONObject.NULL)
+                put("completedAt", sessionCompletedAt ?: JSONObject.NULL)
+                put("completed", true)
+                put("activeDurationSeconds", durationMs / 1000L)
+                put("questionDurationSeconds", questionDurations)
+                put("completion", JSONObject().apply {
+                    put("answeredQuestions", answered)
+                    put("totalQuestions", questions.size)
+                    put("unansweredQuestions", questions.size - answered)
+                    put("followUpsUsed", 0)
+                })
+            })
+            put("sections", sectionResults)
+            put("nativeCapture", JSONObject().apply {
+                put("schema", "offline-interview.android-native-runtime.v4")
+                put("appVersion", "0.4.0")
+                put("audioAuthority", "single_AudioRecord_PCM_to_WAV")
+                put("sttProvider", "Android SpeechRecognizer on-device via per-question EXTRA_AUDIO_SOURCE")
+                put("routingAuthority", "stt_session_identity")
+                put("wavPath", wavFile?.absolutePath ?: "")
+                put("pcmBytes", bytesWritten)
+                put("audioDurationMs", durationMs)
+                put("sttDegraded", sttDegraded)
+                put("turnBoundaries", JSONArray().apply {
+                    boundaries.forEach { b -> put(JSONObject().put("questionId", questions[b.turn].id).put("atMs", b.atMs)) }
+                })
+                put("sttSessions", nativeSessions)
+                put("transcriptEvents", nativeEvents)
+            })
         }
-        exportView.text = out.toString(2)
+    }
+
+    private fun saveResultJson() {
+        val payload = lastExportJson
+        if (payload.isNullOrBlank()) {
+            status.text = "Aucun résultat à enregistrer."
+            return
+        }
+        val safeId = interviewSpec.id.replace(Regex("[^A-Za-z0-9._-]"), "-")
+        startActivityForResult(
+            Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "application/json"
+                putExtra(Intent.EXTRA_TITLE, "offline-interview-$safeId-$runtimeSessionId.json")
+            },
+            REQ_SAVE_RESULT
+        )
     }
 
     private fun cleanupCaptureOnly() {
@@ -674,6 +912,8 @@ class MainActivity : Activity() {
     companion object {
         private const val SAMPLE_RATE = 16000
         private const val FINAL_CALLBACK_GRACE_MS = 900L
+        private const val REQ_OPEN_SPEC = 41
+        private const val REQ_SAVE_RESULT = 42
 
         private fun wavHeader(dataBytes: Long, sampleRate: Int, channels: Int, bitsPerSample: Int): ByteArray {
             val byteRate = sampleRate * channels * bitsPerSample / 8
