@@ -40,13 +40,41 @@ V4 retains the raw provider error but classifies error 5 as `expected_teardown_e
 
 Such an event does **not** set `sttDegraded=true`. Any other provider error remains `unexpected_provider_error` and degrades STT while preserving the WAV master.
 
+## Android signing migration
+
+A physical V4 installation attempt exposed a separate distribution defect in the historical workflow: it built `assembleDebug` on fresh GitHub-hosted runners without a pinned signing key. The installed historical APK and later APK can therefore have the same package ID and increasing version codes but different signing certificates. Android recognizes the package as an update candidate, then rejects installation because the signing identity changed.
+
+The historical V3 private debug key was not persisted. It cannot be reconstructed from the installed APK certificate, so a signature-compatible in-place upgrade from that installed copy is not recoverable.
+
+A durable signing identity has now been generated outside the public repository. Certificate SHA-256:
+
+`D7:C1:15:C8:D9:13:55:BF:E0:8C:B7:DE:7D:DF:CF:69:85:8A:5D:7A:9B:88:22:21:57:FA:4B:B7:3F:F0:41:85`
+
+Gradle and CI now support this durable identity via GitHub Actions secrets. If those secrets are absent, CI may compile but labels the APK `UNSTABLE-SIGNATURE-do-not-update`; such an APK is compile-only and must not be distributed as an Android update.
+
+See `ANDROID_SIGNING_MIGRATION.md`.
+
 ## Qualification gates
 
 ### CI gate
 
 - Android debug APK compiles;
-- APK exists and is uploaded by the existing workflow;
-- existing Offline Interview regression workflow remains green.
+- APK exists;
+- existing Offline Interview regression workflow remains green;
+- an APK is distributable only when the durable signing secrets are present and the pinned certificate fingerprint matches.
+
+### Durable-signing bootstrap gate
+
+`HOLD_DURABLE_SIGNING_BOOTSTRAP`
+
+Lift only when:
+
+- the four durable signing secrets are configured;
+- CI restores the expected key and verifies the pinned SHA-256 fingerprint;
+- CI reports `DISTRIBUTABLE_APK=true`;
+- the produced APK is the one used for the migration install.
+
+Because the currently installed historical V3 is signed by a lost ephemeral key, one uninstall/reinstall is unavoidable when moving to the durable identity. This should be the last forced reinstall caused by signing identity; subsequent versions signed by the durable key can update normally subject to Android version-code rules.
 
 ### Physical V4 gate
 
