@@ -17,6 +17,12 @@
       "runtimeSchema": "offline-interview.android-native-runtime.v4.3",
       "physicalVerdict": "PASS"
     },
+    "candidate": {
+      "versionName": "0.4.4-h5-tactical",
+      "versionCode": 10,
+      "runtimeSchema": "offline-interview.android-native-runtime.v5.0",
+      "change": "bounded_async_stt_finalization"
+    },
     "diagnosticBundleSchema": "offline-interview.android-diagnostic-bundle.v1",
     "diagnosticExportWithoutAdb": true,
     "installMode": "UNINSTALL_THEN_REINSTALL",
@@ -28,7 +34,8 @@
     "physicalH4Stability": "PASS_5_OF_5_NO_ANR_NO_PROVIDER_ERROR_NO_PCM_DROP",
     "h4ProviderFinalization": "FAIL_ZERO_FINAL_RESULTS_5_OF_5_PARTIAL_SNAPSHOT_ONLY",
     "transcriptionAccuracy": "HOLD_NO_GROUND_TRUTH_OR_WAV_AVAILABLE",
-    "h5FinalizationQuality": "OPEN_CANDIDATE",
+    "h5Implementation": "IMPLEMENTED_PENDING_CI",
+    "h5PhysicalFinalization": "HOLD_PENDING_BUILD_AND_DEVICE_TEST",
     "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
     "durableSigning": "HOLD_DURABLE_SIGNING"
   }
