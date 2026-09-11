@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Offline Interview — Voice Access product integration v1</title>
+<style>
+body{font-family:system-ui,-apple-system,sans-serif;max-width:900px;margin:auto;padding:18px;line-height:1.4}button,textarea,select{font:inherit}button{padding:11px 13px;margin:4px 4px 4px 0}textarea{width:100%;min-height:130px;box-sizing:border-box}section{border:1px solid #9995;border-radius:12px;padding:15px;margin:14px 0}.status{font-weight:700}.pass{color:#087830}.fail{color:#b42318}.warn{color:#9a6700}.q{font-size:1.12rem;font-weight:700}.meta{opacity:.8}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.important{font-weight:700}pre{white-space:pre-wrap;word-break:break-word;background:#0001;padding:12px;border-radius:8px}audio{width:100%}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#0001}.locked{outline:2px solid #08783088}</style>
+</head>
+<body>
+<h1>Offline Interview — Voice Access product integration v1</h1>
+<p>But : vérifier une intégration produit réaliste de Voice Access avec <strong>un master audio unique et continu</strong>, plusieurs questions, deux locuteurs, navigation, correction humaine verrouillée, réponse audio seule et export cohérent.</p>
+<section id="setup">
+<h2>Préparation</h2>
+<p>Active Voice Access avant de commencer. Laisse l’écoute active. Réglages recommandés : <strong>Annuler au toucher désactivé</strong> et <strong>expiration après silence désactivée</strong>. L’application ne démarre ni n’arrête Voice Access.</p>
+<button id="start">Démarrer le test produit</button>
+<div id="setupStatus" class="status">Prêt</div>
+</section>
+<section id="interview" hidden>
+<div class="row meta"><span>Question <span id="qIndex"></span>/8</span><span class="pill">Turn <span id="turnId"></span></span><label>Locuteur <select id="speaker"><option>Participant A</option><option>Participant B</option></select></label></div>
+<p id="question" class="q"></p>
+<p id="instruction" class="important"></p>
+<textarea id="answer" aria-label="Réponse active" placeholder="Voice Access ou saisie clavier"></textarea>
+<div class="row">
+<button id="voiceMark">Marquer début Voice Access</button>
+<button id="humanLock">Confirmer correction humaine</button>
+<button id="audioOnly">Marquer réponse audio seule</button>
+</div>
+<div class="row">
+<button id="back">Question précédente</button>
+<button id="next">Question suivante</button>
+<button id="finish">Terminer l’entretien</button>
+</div>
+<div id="turnStatus" class="status">En attente</div>
+</section>
+<section id="result" hidden>
+<h2>Résultat</h2>
+<audio id="audio" controls></audio>
+<p><label><input type="checkbox" id="audioOk"> Master audio continu et intelligible du début à la fin.</label></p>
+<p><label><input type="checkbox" id="routingOk"> Chaque texte est resté associé à la bonne question / au bon locuteur.</label></p>
+<p><label><input type="checkbox" id="exportOk"> L’export affiché ci-dessous correspond bien à l’entretien réalisé.</label></p>
+<button id="finalize">Calculer le verdict</button>
+<button id="copy">Copier JSON</button>
+<div id="verdict" class="status">En attente</div>
+<h3>Export produit simulé</h3><pre id="export"></pre>
+<h3>Diagnostic</h3><pre id="log"></pre>
+</section>
+<script src="./app.js?v=1"></script>
+</body>
+</html>
