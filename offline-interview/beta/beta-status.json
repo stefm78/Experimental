@@ -27,7 +27,9 @@
       "versionName": "0.4.5-h6-tactical",
       "versionCode": 11,
       "runtimeSchema": "offline-interview.android-native-runtime.v6.0",
-      "change": "pipe_eof_no_stopListening_plus_provider_cooldown"
+      "change": "pipe_eof_no_stopListening_plus_provider_cooldown",
+      "ciHead": "136451efa12ed49b908c1c3789ca5eed2c1385c0",
+      "artifactSha256": "e5f77b2767e29930bf5d655046c97c736b8cd6f527224a0b15f1dff2c4b23551"
     },
     "diagnosticBundleSchema": "offline-interview.android-diagnostic-bundle.v1",
     "diagnosticExportWithoutAdb": true,
@@ -42,8 +44,9 @@
     "physicalH5": "FAIL_5_OF_5_FINALIZATION_ERROR5_ZERO_FINALS_PLUS_BOUNDARY_ERROR11_REARMS",
     "h5AudioStability": "PASS_5_OF_5_PCM_912640_NO_PCM_DROP_STT_NOT_DEGRADED",
     "transcriptionAccuracy": "HOLD_NO_GROUND_TRUTH_OR_WAV_AVAILABLE",
-    "h6Implementation": "IMPLEMENTED_PENDING_CI",
-    "h6PhysicalFinalization": "HOLD_PENDING_BUILD_AND_DEVICE_TEST",
+    "h6Implementation": "PASS_AUTOMATED",
+    "h6Ci": "PASS_PRODUCTIZATION_24_VALIDATE_269_ANDROID_BUILD_39",
+    "h6PhysicalFinalization": "HOLD_PENDING_DEVICE_TEST",
     "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
     "durableSigning": "HOLD_DURABLE_SIGNING"
   }
