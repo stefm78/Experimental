@@ -68,14 +68,14 @@ jobs:
       - name: Verify APK exists
         run: test -s offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
 
-      - name: Upload compile-only APK
+      - name: Upload tactical reinstall-only APK
         if: env.HAS_DURABLE_SIGNING != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-android-native-UNSTABLE-SIGNATURE-do-not-update
+          name: offline-interview-android-native-TACTICAL-REINSTALL-ONLY
           path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 3
+          retention-days: 7
 
       - name: Upload durable-signed APK
         if: env.HAS_DURABLE_SIGNING == 'true'
@@ -90,8 +90,10 @@ jobs:
         run: |
           if [ "$HAS_DURABLE_SIGNING" = "true" ]; then
             echo "DISTRIBUTABLE_APK=true"
+            echo "INSTALL_MODE=UPDATE_ALLOWED"
             echo "SIGNING_CERT_SHA256=$EXPECTED_ANDROID_SIGNING_CERT_SHA256"
           else
-            echo "DISTRIBUTABLE_APK=false"
-            echo "Reason: durable signing secrets are not configured. Artifact is compile-only and must not be used as an update."
+            echo "DISTRIBUTABLE_APK=TACTICAL_ONLY"
+            echo "INSTALL_MODE=UNINSTALL_THEN_REINSTALL"
+            echo "Reason: durable signing secrets are not configured yet."
           fi
