@@ -3,7 +3,7 @@
 
     <application
         android:allowBackup="false"
-        android:label="Offline Interview Native STT POC"
+        android:label="Offline Interview Native STT POC V2"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".MainActivity"
