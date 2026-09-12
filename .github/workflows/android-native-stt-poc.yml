@@ -17,8 +17,7 @@ env:
   SHERPA_AAR_URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
   SHERPA_AAR_SHA256: 633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96
   WHISPER_MODEL_URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2
-  # First CI run discovers the exact official archive digest. It is pinned in the next commit before any APK is delivered.
-  WHISPER_MODEL_SHA256: DISCOVER_FIRST_CI
+  WHISPER_MODEL_SHA256: c46116994e539aa165266d96b325252728429c12535eb9d8b6a2b10f129e66b1
 
 jobs:
   build:
@@ -63,20 +62,13 @@ jobs:
           curl --fail --location --retry 3 --retry-delay 2 "$SHERPA_AAR_URL" --output "$AAR"
           printf '%s  %s\n' "$SHERPA_AAR_SHA256" "$AAR" | sha256sum --check --strict
           test -s "$AAR"
-          echo "SHERPA_AAR_SHA256=$SHERPA_AAR_SHA256"
 
-      - name: Fetch Whisper tiny multilingual benchmark model
+      - name: Fetch pinned Whisper tiny multilingual benchmark model
         run: |
           set -euo pipefail
           ARCHIVE="$RUNNER_TEMP/sherpa-onnx-whisper-tiny.tar.bz2"
           curl --fail --location --retry 3 --retry-delay 2 "$WHISPER_MODEL_URL" --output "$ARCHIVE"
-          ACTUAL="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
-          echo "WHISPER_MODEL_SHA256_DISCOVERED=$ACTUAL"
-          if [ "$WHISPER_MODEL_SHA256" != "DISCOVER_FIRST_CI" ]; then
-            test "$ACTUAL" = "$WHISPER_MODEL_SHA256"
-          else
-            echo "DISCOVERY_ONLY_BUILD=true"
-          fi
+          printf '%s  %s\n' "$WHISPER_MODEL_SHA256" "$ARCHIVE" | sha256sum --check --strict
           TMP="$RUNNER_TEMP/whisper-model"
           rm -rf "$TMP" && mkdir -p "$TMP"
           tar -xjf "$ARCHIVE" -C "$TMP"
@@ -89,6 +81,7 @@ jobs:
           test -s "$ASSET/tiny-encoder.int8.onnx"
           test -s "$ASSET/tiny-decoder.int8.onnx"
           test -s "$ASSET/tiny-tokens.txt"
+          echo "WHISPER_MODEL_SHA256=$WHISPER_MODEL_SHA256"
 
       - name: Restore durable Android signing key
         if: env.HAS_DURABLE_SIGNING == 'true'
@@ -115,6 +108,7 @@ jobs:
       - name: Build APK
         working-directory: offline-interview/native/android-stt-poc-v1
         env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dfile.encoding=UTF-8
           ANDROID_SIGNING_KEYSTORE_PATH: ${{ runner.temp }}/offline-interview-signing/offline-interview-native.jks
           ANDROID_SIGNING_STORE_PASSWORD: ${{ secrets.ANDROID_SIGNING_STORE_PASSWORD }}
           ANDROID_SIGNING_KEY_ALIAS: ${{ secrets.ANDROID_SIGNING_KEY_ALIAS }}
@@ -125,7 +119,7 @@ jobs:
         run: test -s offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload tactical reinstall-only APK
-        if: env.HAS_DURABLE_SIGNING != 'true' && env.WHISPER_MODEL_SHA256 != 'DISCOVER_FIRST_CI'
+        if: env.HAS_DURABLE_SIGNING != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: offline-interview-android-embedded-asr-dual-benchmark-TACTICAL-REINSTALL-ONLY
@@ -134,7 +128,7 @@ jobs:
           retention-days: 7
 
       - name: Upload durable-signed APK
-        if: env.HAS_DURABLE_SIGNING == 'true' && env.WHISPER_MODEL_SHA256 != 'DISCOVER_FIRST_CI'
+        if: env.HAS_DURABLE_SIGNING == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: offline-interview-android-embedded-asr-dual-benchmark-durable-debug
@@ -144,10 +138,7 @@ jobs:
 
       - name: Signing and benchmark status
         run: |
-          if [ "$WHISPER_MODEL_SHA256" = "DISCOVER_FIRST_CI" ]; then
-            echo "DISTRIBUTABLE_APK=false"
-            echo "Reason: Whisper archive digest discovery run only; pin digest and rebuild."
-          elif [ "$HAS_DURABLE_SIGNING" = "true" ]; then
+          if [ "$HAS_DURABLE_SIGNING" = "true" ]; then
             echo "DISTRIBUTABLE_APK=true"
             echo "INSTALL_MODE=UPDATE_ALLOWED"
             echo "SIGNING_CERT_SHA256=$EXPECTED_ANDROID_SIGNING_CERT_SHA256"
