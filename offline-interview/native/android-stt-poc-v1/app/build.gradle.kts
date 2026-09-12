@@ -22,8 +22,8 @@ android {
         applicationId = "com.stefm78.offlineinterview.nativepoc"
         minSdk = 33
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.6.0-native-asr-benchmark-tactical"
+        versionCode = 16
+        versionName = "0.6.1-native-asr-benchmark-v2-tactical"
     }
 
     sourceSets {
