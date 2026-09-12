@@ -1,0 +1,108 @@
+{
+  "schema": "offline-interview.native-asr-benchmark-corpus.v1",
+  "id": "fr-FR-v1",
+  "language": "fr-FR",
+  "status": "FROZEN",
+  "purpose": "Product acceptance benchmark for native system speech recognition on Android and later iOS.",
+  "scoring": {
+    "primary": "normalized_WER",
+    "secondary": ["CER", "critical_entity_accuracy", "latency", "completion"],
+    "normalization": "lowercase, Unicode accent folding, punctuation removal, deterministic benchmark aliases",
+    "aliases": [
+      {"canonical": "17 septembre 2026", "variants": ["17 septembre 2026", "dix sept septembre deux mille vingt six"]},
+      {"canonical": "14 heures 35", "variants": ["14 heures 35", "14 h 35", "quatorze heures trente cinq"]},
+      {"canonical": "2480 euros", "variants": ["2 480 euros", "2480 euros", "deux mille quatre cent quatre vingt euros"]},
+      {"canonical": "20 pour cent", "variants": ["20 pour cent", "20 %", "vingt pour cent"]},
+      {"canonical": "9 heures 10", "variants": ["9 heures 10", "9 h 10", "neuf heures dix"]},
+      {"canonical": "4 1 23", "variants": ["4.1.23", "4 1 23", "quatre un vingt trois"]},
+      {"canonical": "crk 00244311019", "variants": ["CRK 00244311019", "crk 00244311019", "crk zéro zéro deux quatre quatre trois un un zéro un neuf"]},
+      {"canonical": "8443", "variants": ["8 443", "8443", "huit mille quatre cent quarante trois"]},
+      {"canonical": "http 503", "variants": ["HTTP 503", "http 503", "http cinq cent trois"]},
+      {"canonical": "128 gigaoctets", "variants": ["128 gigaoctets", "cent vingt huit gigaoctets"]}
+    ]
+  },
+  "passages": [
+    {
+      "id": "L1_EVERYDAY",
+      "level": 1,
+      "category": "french_everyday",
+      "title": "Français courant",
+      "reference": "Ce matin, je suis parti un peu plus tôt que prévu. Le ciel était clair et les rues étaient encore calmes. J’ai acheté du pain et du café, puis je suis rentré préparer le petit déjeuner avant de commencer ma journée. En arrivant chez moi, j’ai ouvert les fenêtres et répondu à deux messages.",
+      "entities": []
+    },
+    {
+      "id": "L2_NUMBERS",
+      "level": 2,
+      "category": "numbers_dates",
+      "title": "Nombres, heures et dates",
+      "reference": "Le rendez-vous est fixé au 17 septembre 2026 à 14 heures 35. Le devis s’élève à 2 480 euros, dont 20 pour cent de taxes. La livraison devrait avoir lieu dans les douze jours suivants, et le dossier porte la référence 7 416. Nous vérifierons le paiement à 9 heures 10 le lendemain.",
+      "entities": [
+        {"id": "date", "category": "dateTime", "canonical": "17 septembre 2026", "variants": ["17 septembre 2026", "dix sept septembre deux mille vingt six"]},
+        {"id": "time1", "category": "dateTime", "canonical": "14 heures 35", "variants": ["14 heures 35", "14 h 35", "quatorze heures trente cinq"]},
+        {"id": "amount", "category": "number", "canonical": "2480 euros", "variants": ["2 480 euros", "2480 euros", "deux mille quatre cent quatre vingt euros"]},
+        {"id": "percent", "category": "number", "canonical": "20 pour cent", "variants": ["20 pour cent", "20 %", "vingt pour cent"]},
+        {"id": "reference", "category": "number", "canonical": "7416", "variants": ["7 416", "7416", "sept mille quatre cent seize"]},
+        {"id": "time2", "category": "dateTime", "canonical": "9 heures 10", "variants": ["9 heures 10", "9 h 10", "neuf heures dix"]}
+      ]
+    },
+    {
+      "id": "L3_NAMES",
+      "level": 3,
+      "category": "proper_nouns",
+      "title": "Noms propres et lieux",
+      "reference": "La semaine prochaine, Claire Martin partira de Marly-le-Roi pour rejoindre Séville. Elle rencontrera une équipe de BNP Paribas, puis un spécialiste de Dell Technologies. Le lendemain, elle participera à une démonstration organisée avec OpenAI avant de revenir à Paris. Le programme prévoit aussi un échange avec Alejandro García et Sophie Bernard.",
+      "entities": [
+        {"id": "claire", "category": "properNoun", "canonical": "Claire Martin", "variants": ["Claire Martin"]},
+        {"id": "marly", "category": "properNoun", "canonical": "Marly-le-Roi", "variants": ["Marly-le-Roi", "Marly le Roi"]},
+        {"id": "seville", "category": "properNoun", "canonical": "Séville", "variants": ["Séville", "Seville"]},
+        {"id": "bnpp", "category": "properNoun", "canonical": "BNP Paribas", "variants": ["BNP Paribas"]},
+        {"id": "dell", "category": "properNoun", "canonical": "Dell Technologies", "variants": ["Dell Technologies", "Dell Technology"]},
+        {"id": "openai", "category": "properNoun", "canonical": "OpenAI", "variants": ["OpenAI", "Open AI"]},
+        {"id": "paris", "category": "properNoun", "canonical": "Paris", "variants": ["Paris"]},
+        {"id": "alejandro", "category": "properNoun", "canonical": "Alejandro García", "variants": ["Alejandro García", "Alejandro Garcia"]},
+        {"id": "sophie", "category": "properNoun", "canonical": "Sophie Bernard", "variants": ["Sophie Bernard"]}
+      ]
+    },
+    {
+      "id": "L4_TECH",
+      "level": 4,
+      "category": "technical_vocabulary",
+      "title": "Vocabulaire professionnel et technique",
+      "reference": "Dans notre environnement, VMware héberge encore plusieurs applications critiques, tandis qu’OpenShift exécute les nouveaux services. Les données principales sont stockées sur PowerMax et protégées par Cyber Recovery. Pour l’intelligence artificielle, nous évaluons des serveurs équipés de GPU NVIDIA H100. L’API de supervision doit rester disponible même si une zone cloud devient indisponible.",
+      "entities": [
+        {"id": "vmware", "category": "technicalTerm", "canonical": "VMware", "variants": ["VMware", "VM Ware"]},
+        {"id": "openshift", "category": "technicalTerm", "canonical": "OpenShift", "variants": ["OpenShift", "Open Shift"]},
+        {"id": "powermax", "category": "technicalTerm", "canonical": "PowerMax", "variants": ["PowerMax", "Power Max"]},
+        {"id": "cyber", "category": "technicalTerm", "canonical": "Cyber Recovery", "variants": ["Cyber Recovery"]},
+        {"id": "gpu", "category": "acronym", "canonical": "GPU", "variants": ["GPU", "G P U"]},
+        {"id": "nvidia", "category": "technicalTerm", "canonical": "NVIDIA H100", "variants": ["NVIDIA H100", "Nvidia H100", "Nvidia H cent"]},
+        {"id": "api", "category": "acronym", "canonical": "API", "variants": ["API", "A P I"]},
+        {"id": "cloud", "category": "technicalTerm", "canonical": "cloud", "variants": ["cloud"]}
+      ]
+    },
+    {
+      "id": "L5_COMPLEX",
+      "level": 5,
+      "category": "complex_speech",
+      "title": "Français conversationnel complexe",
+      "reference": "Lorsque le service redémarre après une interruption, il faut vérifier non seulement que les données sont accessibles, mais aussi que les utilisateurs retrouvent leur contexte. Si la reprise semble correcte alors qu’une dépendance distante reste indisponible, l’incident peut réapparaître quelques minutes plus tard. C’est pourquoi nous préférons une validation progressive, même lorsqu’elle paraît un peu plus lente.",
+      "entities": []
+    },
+    {
+      "id": "L6_PRODUCT_STRESS",
+      "level": 6,
+      "category": "product_stress",
+      "title": "Références et valeurs techniques",
+      "reference": "Le correctif concerne la version 4.1.23 du logiciel et le ticket CRK 00244311019. Le serveur écoute sur le port 8 443 et l’API renvoie un code HTTP 503 en cas d’indisponibilité. La machine de test utilise 128 gigaoctets de mémoire, deux GPU et une adresse de contrôle terminée par 78160. Le rapport final doit conserver ces valeurs exactement.",
+      "entities": [
+        {"id": "version", "category": "number", "canonical": "4.1.23", "variants": ["4.1.23", "4 1 23", "quatre un vingt trois"]},
+        {"id": "ticket", "category": "acronym", "canonical": "CRK 00244311019", "variants": ["CRK 00244311019", "crk 00244311019", "crk zéro zéro deux quatre quatre trois un un zéro un neuf"]},
+        {"id": "port", "category": "number", "canonical": "8443", "variants": ["8 443", "8443", "huit mille quatre cent quarante trois"]},
+        {"id": "http", "category": "acronym", "canonical": "HTTP 503", "variants": ["HTTP 503", "http 503", "http cinq cent trois"]},
+        {"id": "memory", "category": "number", "canonical": "128 gigaoctets", "variants": ["128 gigaoctets", "cent vingt huit gigaoctets"]},
+        {"id": "gpu2", "category": "acronym", "canonical": "GPU", "variants": ["GPU", "G P U"]},
+        {"id": "postal", "category": "number", "canonical": "78160", "variants": ["78160", "soixante dix huit mille cent soixante"]}
+      ]
+    }
+  ]
+}

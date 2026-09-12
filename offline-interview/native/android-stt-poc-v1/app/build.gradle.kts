@@ -22,8 +22,12 @@ android {
         applicationId = "com.stefm78.offlineinterview.nativepoc"
         minSdk = 33
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.4.3-h4-tactical"
+        versionCode = 15
+        versionName = "0.6.0-native-asr-benchmark-tactical"
+    }
+
+    sourceSets {
+        getByName("main").assets.srcDir("../../asr-benchmark")
     }
 
     buildFeatures {
@@ -58,6 +62,10 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    implementation("androidx.core:core-ktx:1.15.0")
 }
 
 kotlin {

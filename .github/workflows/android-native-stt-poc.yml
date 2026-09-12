@@ -1,9 +1,10 @@
-name: Build Android Native STT POC
+name: Build Android Native ASR Benchmark
 
 on:
   pull_request:
     paths:
       - 'offline-interview/native/android-stt-poc-v1/**'
+      - 'offline-interview/native/asr-benchmark/**'
       - '.github/workflows/android-native-stt-poc.yml'
   workflow_dispatch:
 
@@ -33,6 +34,11 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+
+      - name: Verify frozen corpus exists
+        run: |
+          test -s offline-interview/native/asr-benchmark/fr-FR-v1.json
+          node -e 'const c=require("./offline-interview/native/asr-benchmark/fr-FR-v1.json"); if(c.id!=="fr-FR-v1"||c.status!=="FROZEN"||c.passages.length!==6) process.exit(1)'
 
       - name: Restore durable Android signing key
         if: env.HAS_DURABLE_SIGNING == 'true'
@@ -65,14 +71,19 @@ jobs:
           ANDROID_SIGNING_KEY_PASSWORD: ${{ secrets.ANDROID_SIGNING_KEY_PASSWORD }}
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - name: Verify APK exists
-        run: test -s offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
+      - name: Verify lightweight APK
+        run: |
+          APK=offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          SIZE=$(stat -c%s "$APK")
+          echo "APK_SIZE_BYTES=$SIZE"
+          test "$SIZE" -lt 15000000
 
       - name: Upload tactical reinstall-only APK
         if: env.HAS_DURABLE_SIGNING != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-android-native-TACTICAL-REINSTALL-ONLY
+          name: offline-interview-android-native-asr-benchmark-TACTICAL-REINSTALL-ONLY
           path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
@@ -81,7 +92,7 @@ jobs:
         if: env.HAS_DURABLE_SIGNING == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-android-native-durable-debug
+          name: offline-interview-android-native-asr-benchmark-durable-debug
           path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30

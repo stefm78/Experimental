@@ -4,32 +4,21 @@
     <application
         android:name=".RuntimeHealthApplication"
         android:allowBackup="false"
-        android:label="00 Offline Interview Native"
+        android:label="00 Native ASR Benchmark"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".H4MainActivity"
+            android:name=".NativeAsrBenchmarkActivity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/json" />
             </intent-filter>
         </activity>
         <activity
             android:name=".DiagnosticExportActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="00 Offline Interview Diagnostic"
-            android:screenOrientation="portrait">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:screenOrientation="portrait" />
     </application>
 </manifest>
