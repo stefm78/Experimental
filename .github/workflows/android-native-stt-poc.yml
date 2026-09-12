@@ -14,11 +14,16 @@ env:
   EXPECTED_ANDROID_SIGNING_CERT_SHA256: D7:C1:15:C8:D9:13:55:BF:E0:8C:B7:DE:7D:DF:CF:69:85:8A:5D:7A:9B:88:22:21:57:FA:4B:B7:3F:F0:41:85
   VOSK_MODEL_URL: https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip
   VOSK_MODEL_SHA256: cabf6180e177eb9b3a9a9d43a437bd5e549f3a7d09525e5d69a3fed787be12ad
+  SHERPA_AAR_URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
+  SHERPA_AAR_SHA256: 633c9768d7a9519d840d8d8b6b528c6e6fede754e43f32fef3bf2e0acd069021
+  WHISPER_MODEL_URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2
+  # First CI run discovers the exact official archive digest. It is pinned in the next commit before any APK is delivered.
+  WHISPER_MODEL_SHA256: DISCOVER_FIRST_CI
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       HAS_DURABLE_SIGNING: ${{ secrets.ANDROID_SIGNING_KEYSTORE_B64 != '' && secrets.ANDROID_SIGNING_STORE_PASSWORD != '' && secrets.ANDROID_SIGNING_KEY_ALIAS != '' && secrets.ANDROID_SIGNING_KEY_PASSWORD != '' }}
     steps:
@@ -48,8 +53,42 @@ jobs:
           unzip -q "$MODEL_ZIP" -d "$ASSET_ROOT"
           test -s "$ASSET_ROOT/vosk-model-small-fr-0.22/am/final.mdl"
           test -s "$ASSET_ROOT/vosk-model-small-fr-0.22/conf/model.conf"
-          echo "VOSK_MODEL_BUNDLED=true"
-          echo "VOSK_MODEL_SHA256=$VOSK_MODEL_SHA256"
+
+      - name: Fetch pinned sherpa-onnx Android runtime
+        run: |
+          set -euo pipefail
+          AAR_DIR="offline-interview/native/android-stt-poc-v1/app/libs"
+          AAR="$AAR_DIR/sherpa-onnx-1.13.8.aar"
+          mkdir -p "$AAR_DIR"
+          curl --fail --location --retry 3 --retry-delay 2 "$SHERPA_AAR_URL" --output "$AAR"
+          printf '%s  %s\n' "$SHERPA_AAR_SHA256" "$AAR" | sha256sum --check --strict
+          test -s "$AAR"
+          echo "SHERPA_AAR_SHA256=$SHERPA_AAR_SHA256"
+
+      - name: Fetch Whisper tiny multilingual benchmark model
+        run: |
+          set -euo pipefail
+          ARCHIVE="$RUNNER_TEMP/sherpa-onnx-whisper-tiny.tar.bz2"
+          curl --fail --location --retry 3 --retry-delay 2 "$WHISPER_MODEL_URL" --output "$ARCHIVE"
+          ACTUAL="$(sha256sum "$ARCHIVE" | awk '{print $1}')"
+          echo "WHISPER_MODEL_SHA256_DISCOVERED=$ACTUAL"
+          if [ "$WHISPER_MODEL_SHA256" != "DISCOVER_FIRST_CI" ]; then
+            test "$ACTUAL" = "$WHISPER_MODEL_SHA256"
+          else
+            echo "DISCOVERY_ONLY_BUILD=true"
+          fi
+          TMP="$RUNNER_TEMP/whisper-model"
+          rm -rf "$TMP" && mkdir -p "$TMP"
+          tar -xjf "$ARCHIVE" -C "$TMP"
+          SRC="$TMP/sherpa-onnx-whisper-tiny"
+          ASSET="offline-interview/native/android-stt-poc-v1/app/src/main/assets/sherpa-onnx-whisper-tiny-int8"
+          rm -rf "$ASSET" && mkdir -p "$ASSET"
+          cp "$SRC/tiny-encoder.int8.onnx" "$ASSET/tiny-encoder.int8.onnx"
+          cp "$SRC/tiny-decoder.int8.onnx" "$ASSET/tiny-decoder.int8.onnx"
+          cp "$SRC/tiny-tokens.txt" "$ASSET/tiny-tokens.txt"
+          test -s "$ASSET/tiny-encoder.int8.onnx"
+          test -s "$ASSET/tiny-decoder.int8.onnx"
+          test -s "$ASSET/tiny-tokens.txt"
 
       - name: Restore durable Android signing key
         if: env.HAS_DURABLE_SIGNING == 'true'
@@ -86,31 +125,33 @@ jobs:
         run: test -s offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload tactical reinstall-only APK
-        if: env.HAS_DURABLE_SIGNING != 'true'
+        if: env.HAS_DURABLE_SIGNING != 'true' && env.WHISPER_MODEL_SHA256 != 'DISCOVER_FIRST_CI'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-android-embedded-asr-vosk-TACTICAL-REINSTALL-ONLY
+          name: offline-interview-android-embedded-asr-dual-benchmark-TACTICAL-REINSTALL-ONLY
           path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
 
       - name: Upload durable-signed APK
-        if: env.HAS_DURABLE_SIGNING == 'true'
+        if: env.HAS_DURABLE_SIGNING == 'true' && env.WHISPER_MODEL_SHA256 != 'DISCOVER_FIRST_CI'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-android-embedded-asr-vosk-durable-debug
+          name: offline-interview-android-embedded-asr-dual-benchmark-durable-debug
           path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
 
-      - name: Signing status
+      - name: Signing and benchmark status
         run: |
-          if [ "$HAS_DURABLE_SIGNING" = "true" ]; then
+          if [ "$WHISPER_MODEL_SHA256" = "DISCOVER_FIRST_CI" ]; then
+            echo "DISTRIBUTABLE_APK=false"
+            echo "Reason: Whisper archive digest discovery run only; pin digest and rebuild."
+          elif [ "$HAS_DURABLE_SIGNING" = "true" ]; then
             echo "DISTRIBUTABLE_APK=true"
             echo "INSTALL_MODE=UPDATE_ALLOWED"
             echo "SIGNING_CERT_SHA256=$EXPECTED_ANDROID_SIGNING_CERT_SHA256"
           else
             echo "DISTRIBUTABLE_APK=TACTICAL_ONLY"
             echo "INSTALL_MODE=UNINSTALL_THEN_REINSTALL"
-            echo "Reason: durable signing secrets are not configured yet."
           fi
