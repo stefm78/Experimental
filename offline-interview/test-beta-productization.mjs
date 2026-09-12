@@ -25,12 +25,10 @@ for (const [name, spec] of [['web', webSpec], ['beta', betaSpec], ['android', an
   assert.ok(ids.length >= 5, `${name}: expected multi-question product fixture`);
 }
 
-// Protected H4 stability baseline and the Vosk architecture proof remain present as historical evidence.
 assert.match(h4, /offline-interview\.android-native-runtime\.v4\.3/);
 assert.match(h4, /single_AudioRecord_PCM_to_WAV/);
 assert.match(voskLab, /offline-interview\.android-embedded-asr-lab\.v1/);
 
-// Dual benchmark identity: no provider is promoted.
 assert.match(manifest, /android:name="\.DualAsrBenchmarkActivity"/);
 assert.match(manifest, /android:label="00 Offline Interview ASR Benchmark"/);
 assert.match(gradle, /versionCode\s*=\s*14/);
@@ -53,14 +51,12 @@ assert.match(dual, /private fun transcribeWhisper/);
 assert.doesNotMatch(dual, /import\s+android\.speech\.|SpeechRecognizer\.|RecognizerIntent\./,
   'Dual benchmark must not invoke Android SpeechRecognizer APIs');
 
-// Authoritative capture is provider-blind.
 const capture = dual.slice(dual.indexOf('private fun captureLoop()'), dual.indexOf('private fun nextTurn()'));
 assert.match(capture, /wavRaf\?\.write/);
 assert.match(capture, /turnPcmChunks\[currentTurn\]\.add\(copy\)/);
 assert.doesNotMatch(capture, /Recognizer\(|OfflineRecognizer|acceptWaveForm|acceptWaveform|decode\(/,
   'AudioRecord capture must never run ASR inference');
 
-// Replayable qualification bundle is explicit user export, not hidden audio egress.
 assert.match(dual, /offline-interview\.asr-benchmark-bundle\.v1/);
 assert.match(dual, /ZipOutputStream/);
 assert.match(dual, /ZipEntry\("audio\/master\.wav"\)/);
@@ -70,12 +66,10 @@ assert.match(dual, /sha256File/);
 assert.match(dual, /replaySemantics/);
 assert.match(dual, /WAV leaves the device only if the user explicitly exports/);
 
-// CI assembles both offline providers. First run may discover the old Whisper archive digest;
-// the final deliverable must pin it before artifact upload.
 assert.match(workflow, /vosk-model-small-fr-0\.22\.zip/);
 assert.match(workflow, /cabf6180e177eb9b3a9a9d43a437bd5e549f3a7d09525e5d69a3fed787be12ad/);
 assert.match(workflow, /sherpa-onnx-1\.13\.8\.aar/);
-assert.match(workflow, /633c9768d7a9519d840d8d8b6b528c6e6fede754e43f32fef3bf2e0acd069021/);
+assert.match(workflow, /633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96/);
 assert.match(workflow, /sherpa-onnx-whisper-tiny\.tar\.bz2/);
 assert.match(workflow, /WHISPER_MODEL_SHA256_DISCOVERED/);
 assert.match(workflow, /tiny-encoder\.int8\.onnx/);
