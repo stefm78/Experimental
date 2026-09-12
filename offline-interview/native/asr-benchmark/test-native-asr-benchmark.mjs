@@ -81,6 +81,12 @@ assert.match(activity, /criticalMeaningContradicted/);
 assert.match(activity, /PIVOT_NATIVE_ENGINE/);
 assert.match(activity, /sessions/);
 assert.match(activity, /totalRestartGapMs/);
+assert.match(activity, /passageStartElapsedMs\s*=\s*passageStartMs/,
+  'each passage must freeze its own monotonic origin before later passages overwrite the activity clock');
+assert.match(activity, /sessionToJson\(s,\s*r\.passageStartElapsedMs\)/,
+  'session start/end telemetry must be relative to the owning passage, not the last passage exported');
+assert.match(activity, /replace\("€",\s*" euros "\)/,
+  'runtime scoring must preserve the euro semantic token before punctuation folding');
 assert.match(accumulator, /PARTIAL_BOUNDARY_FALLBACK/);
 assert.match(accumulator, /USER_FINISH_PARTIAL_FALLBACK/);
 assert.match(accumulator, /overlapTokensRemoved/);
