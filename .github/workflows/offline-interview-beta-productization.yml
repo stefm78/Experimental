@@ -36,3 +36,5 @@ jobs:
         run: node offline-interview/test-beta-productization.mjs
       - name: Android diagnostic export contract
         run: node offline-interview/test-android-diagnostic-export.mjs
+      - name: H6 composite physical qualification analyzer
+        run: node offline-interview/test-h6-composite-qualification.mjs
