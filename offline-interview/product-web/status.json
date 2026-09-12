@@ -1,0 +1,16 @@
+{
+  "schema": "offline-interview.product-web-stream-status.v1",
+  "status": "CANDIDATE",
+  "productBaseline": {
+    "surface": "offline-interview/beta-v41-23",
+    "repositoryMainAtSplit": "4ca38681475282e58d9145c62e894c056528473e"
+  },
+  "sharedContract": "offline-interview.speech-capability-contract.v1",
+  "gates": {
+    "WEB_PRODUCT_READY": "HOLD_W1_PHYSICAL_REQUALIFICATION",
+    "ASR_PROVIDER_QUALIFIED": "INDEPENDENT_SIBLING_GATE",
+    "ANDROID_PRODUCT_INTEGRATION_READY": "NOT_STARTED"
+  },
+  "nativeProductUi": "FORBIDDEN_DUPLICATION",
+  "next": "W1_WEB_PRODUCT_REQUALIFICATION"
+}
