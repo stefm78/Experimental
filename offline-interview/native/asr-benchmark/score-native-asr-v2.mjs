@@ -9,7 +9,7 @@ function uniqueReplacements(corpus, policy) {
     const c = normalizeBase(canonical);
     for (const variant of variants) {
       const v = normalizeBase(variant);
-      if (v && c) rows.push([v, c]);
+      if (v && c && v !== c) rows.push([v, c]);
     }
   };
   for (const a of corpus.scoring?.aliases || []) pushAlias(a.canonical, a.variants);
@@ -31,13 +31,20 @@ export function normalizeForWerV2(raw, corpus, policy) {
   for (const [variant, canonical] of uniqueReplacements(corpus, policy)) {
     const needle = ` ${variant} `;
     const replacement = ` ${canonical} `;
-    while (value.includes(needle)) value = value.replace(needle, replacement);
+    value = value.split(needle).join(replacement);
   }
   return value.trim().replace(/\s+/g, ' ');
 }
 
 function containsNormalized(raw, variant) {
   return (` ${normalizeBase(raw)} `).includes(` ${normalizeBase(variant)} `);
+}
+
+function equivalentEntityHit(raw, entity, corpus, policy) {
+  if ((entity.variants || []).some(v => containsNormalized(raw, v))) return true;
+  const hyp = ` ${normalizeForWerV2(raw, corpus, policy)} `;
+  const canonical = ` ${normalizeForWerV2(entity.canonical, corpus, policy)} `;
+  return hyp.includes(canonical);
 }
 
 function semanticForPassage(passageId, hypothesisRaw, policy) {
@@ -67,7 +74,7 @@ export function scoreV2(corpus, policy, hypotheses) {
     for (const e of p.entities || []) {
       const slot = entities[e.category] ||= { hits: 0, total: 0 };
       slot.total++;
-      if ((e.variants || []).some(v => containsNormalized(hypothesisRaw, v))) slot.hits++;
+      if (equivalentEntityHit(hypothesisRaw, e, corpus, policy)) slot.hits++;
     }
     for (const v of Object.values(entities)) v.accuracy = v.total ? v.hits / v.total : null;
     const semantic = semanticForPassage(p.id, hypothesisRaw, policy);
@@ -105,7 +112,7 @@ export function scoreV2(corpus, policy, hypotheses) {
   const entityPairs = [];
   for (const p of corpus.passages || []) {
     const h = byId.get(p.id)?.hypothesis ?? byId.get(p.id)?.hypothesisRaw ?? '';
-    for (const e of p.entities || []) entityPairs.push((e.variants || []).some(v => containsNormalized(h, v)));
+    for (const e of p.entities || []) entityPairs.push(equivalentEntityHit(h, e, corpus, policy));
   }
   const criticalEntityAccuracy = entityPairs.length ? entityPairs.filter(Boolean).length / entityPairs.length : 1;
   const semanticHits = passages.reduce((n, p) => n + p.semantic.hits, 0);
