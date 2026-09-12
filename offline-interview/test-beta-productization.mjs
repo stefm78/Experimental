@@ -10,7 +10,7 @@ const androidSpec = json('offline-interview/native/android-stt-poc-v1/app/src/ma
 const manifest = read('offline-interview/native/android-stt-poc-v1/app/src/main/AndroidManifest.xml');
 const gradle = read('offline-interview/native/android-stt-poc-v1/app/build.gradle.kts');
 const h4 = read('offline-interview/native/android-stt-poc-v1/app/src/main/java/com/stefm78/offlineinterview/nativepoc/H4MainActivity.kt');
-const h5 = read('offline-interview/native/android-stt-poc-v1/app/src/main/java/com/stefm78/offlineinterview/nativepoc/H5MainActivity.kt');
+const h6 = read('offline-interview/native/android-stt-poc-v1/app/src/main/java/com/stefm78/offlineinterview/nativepoc/H5MainActivity.kt');
 const workflow = read('.github/workflows/android-native-stt-poc.yml');
 const directLink = read('offline-interview/beta/direct-interview-link.js');
 
@@ -26,45 +26,53 @@ for (const [name, spec] of [['web', webSpec], ['beta', betaSpec], ['android', an
 
 assert.match(manifest, /android:name="\.H5MainActivity"/);
 assert.match(manifest, /android:label="00 Offline Interview Native"/);
-assert.match(gradle, /versionCode\s*=\s*10/);
-assert.match(gradle, /versionName\s*=\s*"0\.4\.4-h5-tactical"/);
-assert.match(h5, /offline-interview\.android-native-runtime\.v5\.0/);
-assert.match(h5, /single_AudioRecord_PCM_to_WAV/);
-assert.match(h5, /stt_session_identity/);
-assert.match(h5, /ArrayBlockingQueue/);
-assert.match(h5, /private fun requestFinalization/);
-assert.match(h5, /FINALIZATION_GRACE_MS/);
-assert.match(h5, /finalizationOutcome/);
-assert.match(h5, /partial_snapshot_at_finalize_timeout/);
-assert.match(h5, /provider_final/);
-assert.match(h5, /provider_segment/);
-assert.match(h5, /ERROR_SERVER_DISCONNECTED/);
-assert.match(h5, /droppedSttPcmChunks/);
+assert.match(gradle, /versionCode\s*=\s*11/);
+assert.match(gradle, /versionName\s*=\s*"0\.4\.5-h6-tactical"/);
+assert.match(h6, /offline-interview\.android-native-runtime\.v6\.0/);
+assert.match(h6, /single_AudioRecord_PCM_to_WAV/);
+assert.match(h6, /stt_session_identity/);
+assert.match(h6, /ArrayBlockingQueue/);
+assert.match(h6, /private fun requestFinalization/);
+assert.match(h6, /FINALIZATION_GRACE_MS/);
+assert.match(h6, /PROVIDER_COOLDOWN_MS/);
+assert.match(h6, /pipe_eof_no_stopListening/);
+assert.match(h6, /partial_snapshot_at_eof_timeout/);
+assert.match(h6, /provider_final/);
+assert.match(h6, /provider_segment/);
+assert.match(h6, /ERROR_SERVER_DISCONNECTED/);
+assert.match(h6, /droppedSttPcmChunks/);
 
-const captureH5 = h5.slice(h5.indexOf('private fun captureLoop()'), h5.indexOf('private fun beginPendingWindow'));
-assert.doesNotMatch(captureH5, /sink\.write/,
-  'H5 master capture loop must preserve the H4 rule: never write synchronously to the STT pipe');
-assert.match(captureH5, /wavRaf\?\.write/);
-assert.match(captureH5, /pcmQueue\.offer/);
+const captureH6 = h6.slice(h6.indexOf('private fun captureLoop()'), h6.indexOf('private fun beginPendingWindow'));
+assert.doesNotMatch(captureH6, /sink\.write/,
+  'H6 master capture loop must preserve H4: never write synchronously to the STT pipe');
+assert.match(captureH6, /wavRaf\?\.write/);
+assert.match(captureH6, /pcmQueue\.offer/);
 
-const feederH5 = h5.slice(h5.indexOf('private fun sttFeederLoop'), h5.indexOf('private fun captureLoop'));
-assert.match(feederH5, /s\.sink\.write/,
+const feederH6 = h6.slice(h6.indexOf('private fun sttFeederLoop'), h6.indexOf('private fun captureLoop'));
+assert.match(feederH6, /s\.sink\.write/,
   'Only the disposable feeder may own blocking STT pipe writes');
+assert.match(feederH6, /s\.sink\.close/,
+  'H6 must signal end-of-audio by closing the write side of EXTRA_AUDIO_SOURCE');
 
-const nextTurnH5 = h5.slice(h5.indexOf('private fun nextTurn()'), h5.indexOf('private fun requestFinalization'));
-assert.match(nextTurnH5, /currentTurn = newTurn/,
-  'H5 must advance the user-visible turn immediately at the exact boundary');
-assert.match(nextTurnH5, /beginPendingWindow\(newTurn\)/,
-  'H5 must prebuffer the new turn while the old recognizer finalizes');
-assert.match(nextTurnH5, /requestFinalization\(old/,
-  'H5 must finalize the old recognizer asynchronously rather than cancel immediately');
-assert.doesNotMatch(nextTurnH5, /Thread\.sleep|join\(/,
-  'H5 turn transition must never synchronously wait on the UI thread');
+const requestFinalizationH6 = h6.slice(h6.indexOf('private fun requestFinalization'), h6.indexOf('private fun completeFinalization'));
+assert.doesNotMatch(requestFinalizationH6, /\.stopListening\(/,
+  'H6 must not call SpeechRecognizer.stopListening during external-audio finalization');
+assert.match(requestFinalizationH6, /pcmQueue\.offer\(POISON\)/,
+  'H6 must drain queued PCM and signal EOF to the provider');
 
-// Preserve explicit H4 source as the qualified stability baseline for forensic comparison.
+const nextTurnH6 = h6.slice(h6.indexOf('private fun nextTurn()'), h6.indexOf('private fun requestFinalization'));
+assert.match(nextTurnH6, /currentTurn = newTurn/);
+assert.match(nextTurnH6, /beginPendingWindow\(newTurn\)/);
+assert.match(nextTurnH6, /requestFinalization\(old/);
+assert.doesNotMatch(nextTurnH6, /Thread\.sleep|join\(/,
+  'H6 UI transition must never synchronously wait');
+
+const completeH6 = h6.slice(h6.indexOf('private fun completeFinalization'), h6.indexOf('private fun snapshotPartialAtClose'));
+assert.match(completeH6, /postDelayed\(\{ continuation\.invoke\(\) \}, PROVIDER_COOLDOWN_MS\)/,
+  'H6 must enforce a bounded provider cooldown before the next recognizer');
+
 assert.match(h4, /offline-interview\.android-native-runtime\.v4\.3/);
 assert.match(h4, /private fun sttFeederLoop/);
-
 assert.match(workflow, /offline-interview-android-native-TACTICAL-REINSTALL-ONLY/);
 assert.match(workflow, /INSTALL_MODE=UNINSTALL_THEN_REINSTALL/);
 assert.match(workflow, /offline-interview-android-native-durable-debug/);
@@ -73,4 +81,4 @@ assert.match(directLink, /URLSearchParams|searchParams/);
 const androidQuestionIds = androidSpec.sections.flatMap(s => (s.questions || []).map(q => q.id));
 assert.deepEqual(androidQuestionIds.slice(0, 5), ['Q01', 'Q02', 'Q03', 'Q04', 'Q05']);
 
-console.log('PASS beta productization contract: H5 bounded async STT finalization layered on the physically-qualified H4 nonblocking audio architecture.');
+console.log('PASS beta productization contract: H6 EOF-driven bounded finalization with H4 nonblocking WAV authority and provider cooldown.');
