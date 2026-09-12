@@ -1,0 +1,53 @@
+{
+  "schema": "offline-interview.speech-engine-stream-status.v1",
+  "stream": "SPEECH_ENGINE",
+  "sharedContract": "offline-interview.speech-engine-contract.v1",
+  "productMutationAuthority": false,
+  "currentDecision": "PIVOT_NATIVE_ENGINE",
+  "nativeSystemDefault": {
+    "role": "SYSTEM_NATIVE_DRAFT",
+    "longFormDurableAuthority": "DISQUALIFIED_ON_TESTED_PROVIDER_DEVICE",
+    "evidence": {
+      "pr": 100,
+      "benchmarkSchema": "offline-interview.native-asr-benchmark-result.v3",
+      "corpus": "fr-FR-v1",
+      "globalWer": 0.13569321533923304,
+      "criticalEntityAccuracy": 0.8,
+      "lowCoveragePassages": 4,
+      "criticalMeaningPresent": 1,
+      "criticalMeaningTotal": 2,
+      "blockingErrors": 0,
+      "completedPassages": 6,
+      "verdict": "PIVOT_NATIVE_ENGINE"
+    }
+  },
+  "candidateEvidence": [
+    {
+      "provider": "VOSK_ANDROID",
+      "class": "PCM_DURABLE_PROVIDER",
+      "pr": 96,
+      "architecture": "PASS_EMBEDDED_ASR",
+      "quality": "HOLD_COMPARATIVE"
+    },
+    {
+      "provider": "WHISPER_SHERPA_ONNX",
+      "class": "PCM_DURABLE_PROVIDER",
+      "pr": 97,
+      "architecture": "BENCHMARK_READY_HISTORY",
+      "quality": "HOLD_COMPARATIVE"
+    },
+    {
+      "provider": "ANDROID_EXPLICIT_ON_DEVICE",
+      "class": "SYSTEM_NATIVE_DRAFT",
+      "pr": null,
+      "architecture": "AVAILABLE_ON_TESTED_DEVICE",
+      "quality": "UNQUALIFIED_SEPARATE_CONTROL"
+    }
+  ],
+  "nextGate": {
+    "id": "S1_PROVIDER_DECISION_BENCHMARK",
+    "goal": "Compare replayable PCM-capable engines on the same product-owned audio and retain explicit Android on-device as a bounded draft-provider control where acoustically identical replay is not supported.",
+    "newHumanRecordingPreferred": false,
+    "productIntegrationAllowed": false
+  }
+}
