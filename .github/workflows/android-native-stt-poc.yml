@@ -15,7 +15,7 @@ env:
   VOSK_MODEL_URL: https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip
   VOSK_MODEL_SHA256: cabf6180e177eb9b3a9a9d43a437bd5e549f3a7d09525e5d69a3fed787be12ad
   SHERPA_AAR_URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.13.8/sherpa-onnx-1.13.8.aar
-  SHERPA_AAR_SHA256: 633c9768d7a9519d840d8d8b6b528c6e6fede754e43f32fef3bf2e0acd069021
+  SHERPA_AAR_SHA256: 633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96
   WHISPER_MODEL_URL: https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2
   # First CI run discovers the exact official archive digest. It is pinned in the next commit before any APK is delivered.
   WHISPER_MODEL_SHA256: DISCOVER_FIRST_CI
