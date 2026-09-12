@@ -4,11 +4,12 @@
     <application
         android:name=".RuntimeHealthApplication"
         android:allowBackup="false"
-        android:label="00 Offline Interview Native"
+        android:label="Offline Interview"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
             android:name=".H4MainActivity"
             android:exported="true"
+            android:label="Offline Interview"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,7 +25,7 @@
         <activity
             android:name=".DiagnosticExportActivity"
             android:exported="true"
-            android:label="00 Offline Interview Diagnostic"
+            android:label="Offline Interview Diagnostic"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
