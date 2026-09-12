@@ -22,7 +22,7 @@ assert.doesNotMatch(activity, /lastExportJson/);
 assert.doesNotMatch(activity, /ANDROID_SIGNING_/);
 
 assert.match(manifest, /\.DiagnosticExportActivity/);
-assert.match(manifest, /00 Offline Interview Diagnostic/);
+assert.match(manifest, /Offline Interview Diagnostic/);
 assert.match(manifest, /android\.intent\.action\.MAIN/);
 assert.match(manifest, /android\.intent\.category\.LAUNCHER/);
 
