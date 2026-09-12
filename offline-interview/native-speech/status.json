@@ -1,0 +1,19 @@
+{
+  "schema": "offline-interview.native-speech-stream-status.v1",
+  "status": "CANDIDATE",
+  "repositoryMainAtSplit": "4ca38681475282e58d9145c62e894c056528473e",
+  "sharedContract": "offline-interview.speech-capability-contract.v1",
+  "productSurface": "offline-interview/beta-v41-23",
+  "providerEvidence": {
+    "androidSystemDefault": "DRAFT_ONLY_PIVOT_CONFIRMED",
+    "androidExplicitOnDevice": "CONTROL_CANDIDATE",
+    "vosk": "PCM_ARCHITECTURE_EVIDENCE_QUALITY_HOLD",
+    "whisperSherpa": "PCM_PROVIDER_BENCHMARK_CANDIDATE"
+  },
+  "gates": {
+    "NATIVE_CAPABILITY_READY": "HOLD_N1_HOST_BRIDGE_FEASIBILITY",
+    "ASR_PROVIDER_QUALIFIED": "HOLD_PROVIDER_DECISION_BENCHMARK",
+    "WEB_PRODUCT_READY": "INDEPENDENT_SIBLING_GATE"
+  },
+  "next": "N1_TRUSTED_HOST_BRIDGE_SPIKE"
+}
