@@ -1,0 +1,24 @@
+name: Offline Interview Product Web Stream
+
+on:
+  pull_request:
+    paths:
+      - 'offline-interview/**'
+      - '.github/workflows/offline-interview-product-web-stream.yml'
+      - '.github/workflows/offline-interview-stream-split-v2.yml'
+  workflow_dispatch:
+
+jobs:
+  product-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Corrected split contract
+        run: node offline-interview/test-stream-split-v2.mjs
+      - name: Product Web stream boundary
+        run: node offline-interview/product-web/test-product-web-stream.mjs
+      - name: V41.23 product coherence
+        run: node offline-interview/beta-v41-23/test-product-coherence.mjs

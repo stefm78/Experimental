@@ -1,0 +1,81 @@
+{
+  "schema": "offline-interview.speech-capability-contract.v1",
+  "status": "CANDIDATE",
+  "purpose": "Keep Web product semantics independent from native audio and ASR implementations.",
+  "authorities": {
+    "product": {
+      "owns": [
+        "session_identity",
+        "turn_identity",
+        "question_navigation",
+        "participants",
+        "follow_ups",
+        "interview_completion",
+        "human_authoritative_text",
+        "product_export_semantics"
+      ]
+    },
+    "capability": {
+      "owns": [
+        "device_audio_capture_implementation",
+        "audio_health_measurement",
+        "asr_provider_execution",
+        "platform_diagnostics"
+      ],
+      "forbidden": [
+        "advance_question",
+        "change_active_question_without_product_command",
+        "finalize_human_authoritative_text",
+        "create_or_delete_participant",
+        "create_or_delete_follow_up",
+        "complete_interview"
+      ]
+    }
+  },
+  "audio": {
+    "semanticOwner": "PRODUCT",
+    "physicalProducer": "CAPABILITY_PROVIDER",
+    "asrFailureCannotInvalidateRecordedAudio": true,
+    "recordingMustRemainRetranscribable": true
+  },
+  "commands": [
+    "GET_CAPABILITIES",
+    "START_CAPTURE",
+    "SET_ACTIVE_TURN",
+    "PAUSE_CAPTURE",
+    "RESUME_CAPTURE",
+    "STOP_CAPTURE",
+    "REQUEST_DIAGNOSTIC"
+  ],
+  "events": [
+    "CAPABILITIES",
+    "CAPTURE_STATE",
+    "AUDIO_HEALTH",
+    "TRANSCRIPT_PARTIAL",
+    "TRANSCRIPT_FINAL",
+    "AUDIO_REFERENCE",
+    "DIAGNOSTIC",
+    "ERROR"
+  ],
+  "identity": {
+    "requiredOnProductCommands": ["sessionId"],
+    "requiredOnTurnScopedCommands": ["sessionId", "turnId"],
+    "providerCannotInventProductTurnId": true
+  },
+  "transcript": {
+    "providerTextRole": "DRAFT_UNTIL_PRODUCT_OR_HUMAN_ACCEPTANCE",
+    "partialMayReplacePreviousPartialForSameProviderSession": true,
+    "finalIsProviderFinalNotHumanFinal": true
+  },
+  "runtimeModes": {
+    "standaloneWeb": {
+      "adapter": "BROWSER_CAPABILITY_ADAPTER",
+      "productSurface": "offline-interview/beta-v41-23"
+    },
+    "androidHost": {
+      "adapter": "TRUSTED_LOCAL_NATIVE_BRIDGE",
+      "productSurface": "SAME_WEB_PRODUCT",
+      "bridgeMustRejectUntrustedContent": true
+    }
+  }
+}
