@@ -22,8 +22,8 @@ android {
         applicationId = "com.stefm78.offlineinterview.nativepoc"
         minSdk = 33
         targetSdk = 36
-        versionCode = 16
-        versionName = "0.6.1-native-asr-benchmark-v2-tactical"
+        versionCode = 17
+        versionName = "0.6.2-native-asr-lossless-stitching-v3-tactical"
     }
 
     sourceSets {
@@ -66,6 +66,7 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
+    testImplementation("junit:junit:4.13.2")
 }
 
 kotlin {
