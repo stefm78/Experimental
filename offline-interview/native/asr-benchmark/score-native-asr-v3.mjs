@@ -17,7 +17,7 @@ function uniqueReplacements(corpus, policy) {
   for (const a of policy.surfaceAliases || []) pushAlias(a.canonical, a.variants);
   const seen = new Set();
   return rows
-    .sort((a, b) => b[0].length - a[0].length)
+    .sort((a, b) => b[0].split(' ').length - a[0].split(' ').length || b[0].length - a[0].length)
     .filter(([v, c]) => {
       const key = `${v}=>${c}`;
       if (seen.has(key)) return false;
@@ -26,14 +26,36 @@ function uniqueReplacements(corpus, policy) {
     });
 }
 
-export function normalizeForWerV3(raw, corpus, policy) {
-  let value = ` ${normalizeBase(raw)} `;
-  for (const [variant, canonical] of uniqueReplacements(corpus, policy)) {
-    const needle = ` ${variant} `;
-    const replacement = ` ${canonical} `;
-    value = value.split(needle).join(replacement);
+function phraseAt(tokens, phrase, index) {
+  if (index + phrase.length > tokens.length) return false;
+  for (let i = 0; i < phrase.length; i++) if (tokens[index + i] !== phrase[i]) return false;
+  return true;
+}
+
+function replacePhrase(tokens, variantRaw, canonicalRaw) {
+  const variant = variantRaw.split(' ').filter(Boolean);
+  const canonical = canonicalRaw.split(' ').filter(Boolean);
+  if (!variant.length || !canonical.length) return tokens;
+  const out = [];
+  for (let i = 0; i < tokens.length;) {
+    if (phraseAt(tokens, canonical, i)) {
+      out.push(...canonical);
+      i += canonical.length;
+    } else if (phraseAt(tokens, variant, i)) {
+      out.push(...canonical);
+      i += variant.length;
+    } else {
+      out.push(tokens[i]);
+      i++;
+    }
   }
-  return value.trim().replace(/\s+/g, ' ');
+  return out;
+}
+
+export function normalizeForWerV3(raw, corpus, policy) {
+  let tokens = normalizeBase(raw).split(' ').filter(Boolean);
+  for (const [variant, canonical] of uniqueReplacements(corpus, policy)) tokens = replacePhrase(tokens, variant, canonical);
+  return tokens.join(' ');
 }
 
 function containsNormalized(raw, variant) {
