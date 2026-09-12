@@ -67,12 +67,7 @@ class NativeAsrBenchmarkV3Activity : Activity(), RecognitionListener {
     data class EntityScore(val hits: Int, val total: Int) {
         val accuracy: Double? get() = if (total == 0) null else hits.toDouble() / total
     }
-    data class SemanticDetail(
-        val id: String,
-        val state: String,
-        val hit: Boolean,
-        val contradiction: Boolean
-    )
+    data class SemanticDetail(val id: String, val state: String, val hit: Boolean, val contradiction: Boolean)
     data class SemanticScore(
         val present: Int,
         val missing: Int,
@@ -94,6 +89,7 @@ class NativeAsrBenchmarkV3Activity : Activity(), RecognitionListener {
         val firstPartialMs: Long?,
         val finalAfterUserFinishMs: Long?,
         val totalPassageMs: Long,
+        val passageStartElapsedMs: Long,
         val partialCount: Int,
         val sessionCount: Int,
         val segmentCallbackCount: Int,
@@ -110,7 +106,6 @@ class NativeAsrBenchmarkV3Activity : Activity(), RecognitionListener {
     )
 
     private val handler = Handler(Looper.getMainLooper())
-
     private lateinit var corpusRaw: JSONObject
     private lateinit var policyRaw: JSONObject
     private lateinit var corpusId: String
@@ -341,7 +336,7 @@ class NativeAsrBenchmarkV3Activity : Activity(), RecognitionListener {
         watchdogRunnable?.let(handler::removeCallbacks)
         statusView.text = "Fin confirmée — attente brève du dernier résultat Android…"
         if (sessionActive) {
-            try { recognizer?.stopListening() } catch (_: Exception) { finishWithUserFallback() ; return }
+            try { recognizer?.stopListening() } catch (_: Exception) { finishWithUserFallback(); return }
             userFinishGraceRunnable = Runnable {
                 if (passageActive && userFinishedRequested) finishWithUserFallback()
             }.also { handler.postDelayed(it, USER_FINISH_GRACE_MS) }
@@ -477,6 +472,7 @@ class NativeAsrBenchmarkV3Activity : Activity(), RecognitionListener {
             firstPartialMs = firstPartialMs,
             finalAfterUserFinishMs = finalAfterUserFinishMs,
             totalPassageMs = totalPassageMs,
+            passageStartElapsedMs = passageStartMs,
             partialCount = partialCount,
             sessionCount = sessionCount,
             segmentCallbackCount = segmentCallbackCount,
@@ -624,12 +620,12 @@ class NativeAsrBenchmarkV3Activity : Activity(), RecognitionListener {
         put("autoRearmCount", r.autoRearmCount); put("prematureEndpointCount", r.prematureEndpointCount); put("recoverableErrorCount", r.recoverableErrorCount)
         put("providerFinalSessionCount", providerFinals); put("partialFallbackSessionCount", partialFallbacks); put("emptyTerminalSessionCount", emptyTerminals)
         put("errorCode", r.errorCode ?: JSONObject.NULL); put("errorName", r.errorName ?: JSONObject.NULL)
-        put("sessions", JSONArray().apply { r.sessions.forEach { s -> put(sessionToJson(s)) } })
+        put("sessions", JSONArray().apply { r.sessions.forEach { s -> put(sessionToJson(s, r.passageStartElapsedMs)) } })
         put("punctuation", JSONObject().put("referenceMarks", r.referencePunctuationMarks).put("hypothesisMarks", r.hypothesisPunctuationMarks))
     }
 
-    private fun sessionToJson(s: RecognitionSessionAccumulator.SessionRecord): JSONObject = JSONObject().apply {
-        put("sessionId", s.sessionId); put("startMs", s.startedAtMs - passageStartMs); put("endMs", s.endedAtMs - passageStartMs)
+    private fun sessionToJson(s: RecognitionSessionAccumulator.SessionRecord, passageStartElapsedMs: Long): JSONObject = JSONObject().apply {
+        put("sessionId", s.sessionId); put("startMs", (s.startedAtMs - passageStartElapsedMs).coerceAtLeast(0L)); put("endMs", (s.endedAtMs - passageStartElapsedMs).coerceAtLeast(0L))
         put("terminalReason", s.terminalReason); put("finalText", s.finalText); put("lastPartialText", s.lastPartialText)
         put("segmentResults", JSONArray(s.segmentResults)); put("committedCandidate", s.committedCandidate); put("committedText", s.committedText); put("commitSource", s.commitSource)
         put("overlapTokensRemoved", s.overlapTokensRemoved); put("committedTokenCount", s.committedTokenCount)
@@ -639,7 +635,7 @@ class NativeAsrBenchmarkV3Activity : Activity(), RecognitionListener {
     private fun allAliases(): List<Alias> = aliases + passages.flatMap { p -> p.entities.map { Alias(it.canonical, it.variants) } }
 
     private fun normalizeBase(raw: String): String {
-        val lower = raw.lowercase(Locale.FRANCE).replace('’', '\'').replace('-', ' ')
+        val lower = raw.lowercase(Locale.FRANCE).replace("€", " euros ").replace('’', '\'').replace('-', ' ')
         val decomposed = Normalizer.normalize(lower, Normalizer.Form.NFD)
         return decomposed.replace(Regex("\\p{M}+"), "").replace(Regex("[^a-z0-9%]+"), " ").trim().replace(Regex("\\s+"), " ")
     }
