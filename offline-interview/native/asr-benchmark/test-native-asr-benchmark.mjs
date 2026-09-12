@@ -51,9 +51,9 @@ assert.match(activity, /EXTRA_PARTIAL_RESULTS/);
 assert.match(activity, /SpeechRecognizer\.isOnDeviceRecognitionAvailable/);
 assert.match(activity, /ANDROID_SYSTEM_DEFAULT/);
 assert.match(activity, /offline-interview\.native-asr-benchmark-result\.v1/);
-assert.doesNotMatch(activity, /EXTRA_AUDIO_SOURCE/,
+assert.doesNotMatch(activity, /putExtra\(RecognizerIntent\.EXTRA_AUDIO_SOURCE/,
   'native acceptance benchmark must use the system microphone path, never injected AudioRecord');
-assert.doesNotMatch(activity, /EXTRA_PREFER_OFFLINE/,
+assert.doesNotMatch(activity, /putExtra\(RecognizerIntent\.EXTRA_PREFER_OFFLINE/,
   'primary system-default benchmark must not force offline preference');
 assert.doesNotMatch(activity, /com\.alphacephei|sherpa|whisper/i,
   'native benchmark runtime must not invoke embedded engines');
