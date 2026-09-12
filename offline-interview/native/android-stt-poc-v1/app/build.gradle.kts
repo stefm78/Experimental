@@ -30,6 +30,10 @@ android {
         buildConfig = true
     }
 
+    androidResources {
+        noCompress += "onnx"
+    }
+
     if (durableSigningAvailable) {
         signingConfigs {
             create("durable") {
