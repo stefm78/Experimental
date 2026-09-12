@@ -53,7 +53,7 @@ for (const [a,b] of [
 
 const contradiction = {passages: corpus.passages.map(p=>({
   id:p.id,
-  hypothesis:p.id==='L6_PRODUCT_STRESS' ? p.reference.replace('indisponibilité','disponibilité') : p.reference,
+  hypothesis:p.id==='L6_PRODUCT_STRESS' ? p.reference.replace("en cas d’indisponibilité","en cas de disponibilité") : p.reference,
   finalCount:1,
   errorCode:null,
   userFinished:true
