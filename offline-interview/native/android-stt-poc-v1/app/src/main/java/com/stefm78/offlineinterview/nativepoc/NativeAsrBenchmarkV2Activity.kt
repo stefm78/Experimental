@@ -744,13 +744,13 @@ class NativeAsrBenchmarkV2Activity : Activity(), RecognitionListener {
     private fun normalizeForWer(raw: String): String {
         var value = " ${normalizeBase(raw)} "
         val replacements = allAliases().flatMap { a -> a.variants.map { v -> normalizeBase(v) to normalizeBase(a.canonical) } }
-            .filter { it.first.isNotBlank() && it.second.isNotBlank() }
+            .filter { it.first.isNotBlank() && it.second.isNotBlank() && it.first != it.second }
             .distinct()
             .sortedByDescending { it.first.length }
         replacements.forEach { (variant, canonical) ->
             val needle = " $variant "
             val replacement = " $canonical "
-            while (value.contains(needle)) value = value.replace(needle, replacement)
+            value = value.replace(needle, replacement)
         }
         return value.trim().replace(Regex("\\s+"), " ")
     }
