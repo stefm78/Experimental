@@ -4,21 +4,15 @@
     <application
         android:name=".RuntimeHealthApplication"
         android:allowBackup="false"
-        android:label="00 Offline Interview Embedded ASR Lab"
+        android:label="00 Offline Interview ASR Benchmark"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".EmbeddedAsrLabActivity"
+            android:name=".DualAsrBenchmarkActivity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:mimeType="application/json" />
             </intent-filter>
         </activity>
         <activity

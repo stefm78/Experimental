@@ -22,12 +22,16 @@ android {
         applicationId = "com.stefm78.offlineinterview.nativepoc"
         minSdk = 33
         targetSdk = 36
-        versionCode = 13
-        versionName = "0.5.0-vosk-lab-tactical"
+        versionCode = 14
+        versionName = "0.5.1-dual-asr-benchmark-tactical"
     }
 
     buildFeatures {
         buildConfig = true
+    }
+
+    androidResources {
+        noCompress += "onnx"
     }
 
     if (durableSigningAvailable) {
@@ -62,7 +66,10 @@ android {
 
 dependencies {
     implementation("net.java.dev.jna:jna:5.18.1@aar")
-    implementation("com.alphacephei:vosk-android:0.3.75@aar")
+    implementation("com.alphacephei:vosk-android:0.3.75@aar") {
+        exclude(group = "net.java.dev.jna", module = "jna")
+    }
+    implementation(files("libs/sherpa-onnx-1.13.8.aar"))
 }
 
 kotlin {
