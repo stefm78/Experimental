@@ -1,18 +1,27 @@
 {
   "schema": "offline-interview.beta-status.v1",
-  "generatedFrom": "h4-nonblocking-stt-feed",
+  "generatedFrom": "product-stream-v1-from-h4-stability-baseline",
   "web": {
     "channel": "beta",
     "latestLine": "v41-23",
     "directInterviewLinks": true,
     "contractSchema": "offline-interview.interview-spec.v1"
   },
+  "architecture": {
+    "streamModel": "PRODUCT_PLUS_SPEECH_ENGINE",
+    "sharedContract": "offline-interview.speech-engine-contract.v1",
+    "productOwnsMasterAudio": true,
+    "speechProviderReplaceable": true,
+    "nativeRecognizerRole": "SYSTEM_NATIVE_DRAFT",
+    "nativeRecognizerBlocksProductProgress": false,
+    "humanLockPrecedence": true
+  },
   "android": {
-    "label": "00 Offline Interview Native",
-    "diagnosticLabel": "00 Offline Interview Diagnostic",
+    "label": "Offline Interview",
+    "diagnosticLabel": "Offline Interview Diagnostic",
     "applicationId": "com.stefm78.offlineinterview.nativepoc",
-    "versionName": "0.4.3-h4-tactical",
-    "versionCode": 9,
+    "versionName": "0.7.0-product-stream-alpha-tactical",
+    "versionCode": 18,
     "runtimeSchema": "offline-interview.android-native-runtime.v4.3",
     "diagnosticBundleSchema": "offline-interview.android-diagnostic-bundle.v1",
     "diagnosticExportWithoutAdb": true,
@@ -21,12 +30,13 @@
     "durableSigning": false
   },
   "gates": {
-    "code": "PASS_LOCAL_REPAIR",
+    "appBetaReady": "HOLD_PRODUCT_PHYSICAL_QUALIFICATION",
+    "asrProviderQualified": "HOLD_SEPARATE_SPEECH_STREAM",
+    "productQualified": "HOLD",
+    "code": "PASS_H4_PROTECTED_BASELINE",
     "ci": "PENDING",
     "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
-    "physicalH2": "FAIL_ERROR_RECOGNIZER_BUSY_Q02",
-    "physicalH3": "FAIL_ERROR_SERVER_DISCONNECTED_Q02_ANR",
-    "physicalH4": "HOLD_PHYSICAL_NONBLOCKING_STT_FEED",
+    "masterAudioAuthority": "H4_PROTECTED",
     "durableSigning": "HOLD_DURABLE_SIGNING"
   }
 }
