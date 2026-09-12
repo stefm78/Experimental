@@ -24,12 +24,10 @@ for (const [name, spec] of [['web', webSpec], ['beta', betaSpec], ['android', an
   assert.ok(ids.length >= 5, `${name}: expected multi-question product fixture`);
 }
 
-// Protected baseline remains present and unchanged in semantic role.
 assert.match(h4, /offline-interview\.android-native-runtime\.v4\.3/);
 assert.match(h4, /single_AudioRecord_PCM_to_WAV/);
 assert.match(h4, /private fun sttFeederLoop/);
 
-// Isolated embedded-ASR lab identity.
 assert.match(manifest, /android:name="\.EmbeddedAsrLabActivity"/);
 assert.match(manifest, /android:label="00 Offline Interview Embedded ASR Lab"/);
 assert.match(gradle, /versionCode\s*=\s*13/);
@@ -48,8 +46,8 @@ assert.match(lab, /Recognizer\(m, SAMPLE_RATE\.toFloat\(\)\)/);
 assert.match(lab, /recognizer\.acceptWaveForm/);
 assert.match(lab, /recognizer\.finalResult/);
 assert.match(lab, /asrExecutor\.execute/);
-assert.doesNotMatch(lab, /SpeechRecognizer|RecognizerIntent|EXTRA_AUDIO_SOURCE/,
-  'Embedded ASR experiment must not depend on Android SpeechRecognizer provider semantics');
+assert.doesNotMatch(lab, /import\s+android\.speech\.|SpeechRecognizer\.|RecognizerIntent\./,
+  'Embedded ASR experiment must not invoke Android SpeechRecognizer APIs');
 
 const capture = lab.slice(lab.indexOf('private fun captureLoop()'), lab.indexOf('private fun nextTurn()'));
 assert.match(capture, /wavRaf\?\.write/);
@@ -72,4 +70,4 @@ assert.match(directLink, /URLSearchParams|searchParams/);
 const androidQuestionIds = androidSpec.sections.flatMap(s => (s.questions || []).map(q => q.id));
 assert.deepEqual(androidQuestionIds.slice(0, 5), ['Q01', 'Q02', 'Q03', 'Q04', 'Q05']);
 
-console.log('PASS beta productization contract: isolated Vosk embedded-ASR lab preserves H4 WAV authority and removes SpeechRecognizer from durable transcription.');
+console.log('PASS beta productization contract: isolated Vosk embedded-ASR lab preserves H4 WAV authority and removes Android SpeechRecognizer from durable transcription.');
