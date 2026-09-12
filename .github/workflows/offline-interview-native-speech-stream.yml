@@ -1,0 +1,24 @@
+name: Offline Interview Native Speech Stream
+
+on:
+  pull_request:
+    paths:
+      - 'offline-interview/**'
+      - '.github/workflows/offline-interview-native-speech-stream.yml'
+      - '.github/workflows/offline-interview-stream-split-v2.yml'
+  workflow_dispatch:
+
+jobs:
+  native-speech:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Corrected split contract
+        run: node offline-interview/test-stream-split-v2.mjs
+      - name: Native Speech stream boundary
+        run: node offline-interview/native-speech/test-native-speech-stream.mjs
+      - name: Preserve V41.23 product coherence as external sibling baseline
+        run: node offline-interview/beta-v41-23/test-product-coherence.mjs
