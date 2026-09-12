@@ -7,9 +7,13 @@ const json = (p) => JSON.parse(read(p));
 const webSpec = json('offline-interview/interview.json');
 const betaSpec = json('offline-interview/beta/interview.json');
 const androidSpec = json('offline-interview/native/android-stt-poc-v1/app/src/main/assets/interview.json');
+const betaStatus = json('offline-interview/beta/beta-status.json');
 const manifest = read('offline-interview/native/android-stt-poc-v1/app/src/main/AndroidManifest.xml');
 const gradle = read('offline-interview/native/android-stt-poc-v1/app/build.gradle.kts');
 const h4 = read('offline-interview/native/android-stt-poc-v1/app/src/main/java/com/stefm78/offlineinterview/nativepoc/H4MainActivity.kt');
+const speechContract = read('offline-interview/native/android-stt-poc-v1/app/src/main/java/com/stefm78/offlineinterview/nativepoc/SpeechEngineContract.kt');
+const streamSplit = read('offline-interview/architecture/STREAM_SPLIT_V1.md');
+const productStream = read('offline-interview/PRODUCT_STREAM_V1.md');
 const workflow = read('.github/workflows/android-native-stt-poc.yml');
 const directLink = read('offline-interview/beta/direct-interview-link.js');
 
@@ -24,9 +28,9 @@ for (const [name, spec] of [['web', webSpec], ['beta', betaSpec], ['android', an
 }
 
 assert.match(manifest, /android:name="\.H4MainActivity"/);
-assert.match(manifest, /android:label="00 Offline Interview Native"/);
-assert.match(gradle, /versionCode\s*=\s*9/);
-assert.match(gradle, /versionName\s*=\s*"0\.4\.3-h4-tactical"/);
+assert.match(manifest, /android:label="Offline Interview"/);
+assert.match(gradle, /versionCode\s*=\s*18/);
+assert.match(gradle, /versionName\s*=\s*"0\.7\.0-product-stream-alpha-tactical"/);
 assert.match(h4, /offline-interview\.android-native-runtime\.v4\.3/);
 assert.match(h4, /BuildConfig\.VERSION_NAME/);
 assert.match(h4, /single_AudioRecord_PCM_to_WAV/);
@@ -41,13 +45,29 @@ assert.match(h4, /droppedSttPcmChunks/);
 
 const capture = h4.slice(h4.indexOf('private fun captureLoop()'), h4.indexOf('private fun beginPendingWindow'));
 assert.doesNotMatch(capture, /sink\.write/,
-  'H4 master capture loop must never write synchronously into the SpeechRecognizer pipe');
+  'Product master capture loop must never write synchronously into the SpeechRecognizer pipe');
 assert.match(capture, /wavRaf\?\.write/);
 assert.match(capture, /pcmQueue\.offer/);
 
 const feeder = h4.slice(h4.indexOf('private fun sttFeederLoop'), h4.indexOf('private fun captureLoop'));
 assert.match(feeder, /session\.sink\.write/,
   'Only the disposable STT feeder thread may own the blocking pipe write');
+
+assert.equal(betaStatus.architecture.streamModel, 'PRODUCT_PLUS_SPEECH_ENGINE');
+assert.equal(betaStatus.architecture.sharedContract, 'offline-interview.speech-engine-contract.v1');
+assert.equal(betaStatus.architecture.productOwnsMasterAudio, true);
+assert.equal(betaStatus.architecture.speechProviderReplaceable, true);
+assert.equal(betaStatus.architecture.nativeRecognizerRole, 'SYSTEM_NATIVE_DRAFT');
+assert.equal(betaStatus.architecture.nativeRecognizerBlocksProductProgress, false);
+assert.equal(betaStatus.gates.asrProviderQualified, 'HOLD_SEPARATE_SPEECH_STREAM');
+assert.match(speechContract, /offline-interview\.speech-engine-contract\.v1/);
+assert.match(speechContract, /SYSTEM_MICROPHONE/);
+assert.match(speechContract, /PCM16_PUSH/);
+assert.match(speechContract, /TranscriptRole/);
+assert.match(speechContract, /DURABLE_PROVIDER/);
+assert.match(streamSplit, /STREAM PRODUCT/);
+assert.match(streamSplit, /STREAM SPEECH ENGINE/);
+assert.match(productStream, /P1 does \*\*not\*\* require any WER threshold/);
 
 assert.match(workflow, /offline-interview-android-native-TACTICAL-REINSTALL-ONLY/);
 assert.match(workflow, /INSTALL_MODE=UNINSTALL_THEN_REINSTALL/);
@@ -57,4 +77,4 @@ assert.match(directLink, /URLSearchParams|searchParams/);
 const androidQuestionIds = androidSpec.sections.flatMap(s => (s.questions || []).map(q => q.id));
 assert.deepEqual(androidQuestionIds.slice(0, 5), ['Q01', 'Q02', 'Q03', 'Q04', 'Q05']);
 
-console.log('PASS beta productization contract: H4 nonblocking STT feed, transient provider recovery, WAV authority, routing, direct-link and distribution policy.');
+console.log('PASS Product Stream v1 contract: H4 master-audio stability preserved, native STT draft-only, ASR quality gate decoupled, shared SpeechEngineContract present.');
