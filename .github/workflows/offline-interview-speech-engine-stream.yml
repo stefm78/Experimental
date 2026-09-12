@@ -1,0 +1,26 @@
+name: Offline Interview Speech Engine Stream
+
+on:
+  pull_request:
+    paths:
+      - 'offline-interview/speech-engine/**'
+      - 'offline-interview/architecture/STREAM_SPLIT_V1.md'
+      - 'offline-interview/native/android-stt-poc-v1/app/src/main/java/com/stefm78/offlineinterview/nativepoc/SpeechEngineContract.kt'
+      - '.github/workflows/offline-interview-speech-engine-stream.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Speech Engine Stream boundary and evidence
+        run: node offline-interview/speech-engine/test-speech-engine-stream.mjs
