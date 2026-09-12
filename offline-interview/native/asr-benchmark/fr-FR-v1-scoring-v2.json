@@ -6,7 +6,7 @@
   "purpose": "Normalize semantically equivalent written forms without changing the frozen spoken corpus, and flag meaning reversals separately from lexical WER.",
   "surfaceAliases": [
     {"canonical": "14 heures 35", "variants": ["14 heures 35", "14 h 35", "14h35", "quatorze heures trente cinq"]},
-    {"canonical": "2480 euros", "variants": ["2 480 euros", "2480 euros", "2480 €", "2 480 €", "deux mille quatre cent quatre vingt euros"]},
+    {"canonical": "2480", "variants": ["2 480 euros", "2480 euros", "2480 €", "2 480 €", "deux mille quatre cent quatre vingt euros"]},
     {"canonical": "20 pour cent", "variants": ["20 pour cent", "20 %", "20%", "vingt pour cent"]},
     {"canonical": "12 jours", "variants": ["12 jours", "douze jours"]},
     {"canonical": "7416", "variants": ["7 416", "7416", "sept mille quatre cent seize"]},
