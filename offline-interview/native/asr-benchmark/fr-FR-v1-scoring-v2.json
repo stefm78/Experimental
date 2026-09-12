@@ -1,0 +1,38 @@
+{
+  "schema": "offline-interview.native-asr-benchmark-scoring-policy.v2",
+  "id": "fr-FR-v1-scoring-v2",
+  "corpusId": "fr-FR-v1",
+  "status": "ACTIVE_FOR_V2_BENCHMARK",
+  "purpose": "Normalize semantically equivalent written forms without changing the frozen spoken corpus, and flag meaning reversals separately from lexical WER.",
+  "surfaceAliases": [
+    {"canonical": "14 heures 35", "variants": ["14 heures 35", "14 h 35", "14h35", "quatorze heures trente cinq"]},
+    {"canonical": "2480", "variants": ["2 480 euros", "2480 euros", "2480 €", "2 480 €", "deux mille quatre cent quatre vingt euros"]},
+    {"canonical": "20 pour cent", "variants": ["20 pour cent", "20 %", "20%", "vingt pour cent"]},
+    {"canonical": "12 jours", "variants": ["12 jours", "douze jours"]},
+    {"canonical": "7416", "variants": ["7 416", "7416", "sept mille quatre cent seize"]},
+    {"canonical": "9 heures 10", "variants": ["9 heures 10", "9 h 10", "9h10", "neuf heures dix"]},
+    {"canonical": "4 1 23", "variants": ["4.1.23", "4 1 23", "quatre un vingt trois"]},
+    {"canonical": "8443", "variants": ["8 443", "8443", "huit mille quatre cent quarante trois"]},
+    {"canonical": "128 gigaoctets", "variants": ["128 gigaoctets", "128 go", "cent vingt huit gigaoctets"]},
+    {"canonical": "2 gpu", "variants": ["2 gpu", "deux gpu"]}
+  ],
+  "criticalMeaningChecks": [
+    {
+      "id": "L5_REMOTE_DEPENDENCY_UNAVAILABLE",
+      "passageId": "L5_COMPLEX",
+      "expectedVariants": ["une dépendance distante reste indisponible", "dépendance distante reste indisponible"],
+      "contradictionVariants": ["une dépendance distante reste disponible", "dépendance distante reste disponible"]
+    },
+    {
+      "id": "L6_HTTP_UNAVAILABILITY",
+      "passageId": "L6_PRODUCT_STRESS",
+      "expectedVariants": ["en cas d’indisponibilité", "en cas d'indisponibilité"],
+      "contradictionVariants": ["en cas de disponibilité"]
+    }
+  ],
+  "decisionPolicy": {
+    "pass": "all user-confirmed passages, no blocking error, global WER <= 0.10, critical entities >= 0.90, everyday WER <= 0.08, no semantic contradiction",
+    "limitations": "all user-confirmed passages, no blocking error, global WER <= 0.15, critical entities >= 0.80, no semantic contradiction",
+    "semanticContradiction": "A contradiction forces HOLD even when lexical WER is otherwise acceptable."
+  }
+}

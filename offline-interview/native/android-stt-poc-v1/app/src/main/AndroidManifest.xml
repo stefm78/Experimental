@@ -4,10 +4,10 @@
     <application
         android:name=".RuntimeHealthApplication"
         android:allowBackup="false"
-        android:label="00 Native ASR Benchmark"
+        android:label="00 Native ASR Benchmark v2"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
         <activity
-            android:name=".NativeAsrBenchmarkActivity"
+            android:name=".NativeAsrBenchmarkV2Activity"
             android:exported="true"
             android:screenOrientation="portrait">
             <intent-filter>
@@ -15,6 +15,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".NativeAsrBenchmarkActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
         <activity
             android:name=".DiagnosticExportActivity"
             android:exported="false"
