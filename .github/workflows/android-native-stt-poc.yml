@@ -12,11 +12,13 @@ permissions:
 
 env:
   EXPECTED_ANDROID_SIGNING_CERT_SHA256: D7:C1:15:C8:D9:13:55:BF:E0:8C:B7:DE:7D:DF:CF:69:85:8A:5D:7A:9B:88:22:21:57:FA:4B:B7:3F:F0:41:85
+  VOSK_MODEL_URL: https://alphacephei.com/vosk/models/vosk-model-small-fr-0.22.zip
+  VOSK_MODEL_SHA256: cabf6180e177eb9b3a9a9d43a437bd5e549f3a7d09525e5d69a3fed787be12ad
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     env:
       HAS_DURABLE_SIGNING: ${{ secrets.ANDROID_SIGNING_KEYSTORE_B64 != '' && secrets.ANDROID_SIGNING_STORE_PASSWORD != '' && secrets.ANDROID_SIGNING_KEY_ALIAS != '' && secrets.ANDROID_SIGNING_KEY_PASSWORD != '' }}
     steps:
@@ -33,6 +35,21 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+
+      - name: Fetch pinned Vosk French model
+        run: |
+          set -euo pipefail
+          MODEL_ZIP="$RUNNER_TEMP/vosk-model-small-fr-0.22.zip"
+          curl --fail --location --retry 3 --retry-delay 2 "$VOSK_MODEL_URL" --output "$MODEL_ZIP"
+          printf '%s  %s\n' "$VOSK_MODEL_SHA256" "$MODEL_ZIP" | sha256sum --check --strict
+          ASSET_ROOT="offline-interview/native/android-stt-poc-v1/app/src/main/assets"
+          rm -rf "$ASSET_ROOT/vosk-model-small-fr-0.22"
+          mkdir -p "$ASSET_ROOT"
+          unzip -q "$MODEL_ZIP" -d "$ASSET_ROOT"
+          test -s "$ASSET_ROOT/vosk-model-small-fr-0.22/am/final.mdl"
+          test -s "$ASSET_ROOT/vosk-model-small-fr-0.22/conf/model.conf"
+          echo "VOSK_MODEL_BUNDLED=true"
+          echo "VOSK_MODEL_SHA256=$VOSK_MODEL_SHA256"
 
       - name: Restore durable Android signing key
         if: env.HAS_DURABLE_SIGNING == 'true'
@@ -72,7 +89,7 @@ jobs:
         if: env.HAS_DURABLE_SIGNING != 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-android-native-TACTICAL-REINSTALL-ONLY
+          name: offline-interview-android-embedded-asr-vosk-TACTICAL-REINSTALL-ONLY
           path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 7
@@ -81,7 +98,7 @@ jobs:
         if: env.HAS_DURABLE_SIGNING == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-android-native-durable-debug
+          name: offline-interview-android-embedded-asr-vosk-durable-debug
           path: offline-interview/native/android-stt-poc-v1/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
