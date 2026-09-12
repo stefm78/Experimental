@@ -94,8 +94,14 @@ assert.doesNotMatch(activity, /com\.alphacephei|sherpa|whisper/i,
 const onResultsSlice = activity.slice(activity.indexOf('override fun onResults'), activity.indexOf('override fun onError'));
 assert.match(onResultsSlice, /scheduleRearm/);
 assert.doesNotMatch(onResultsSlice, /advance\(/, 'provider finalization must never advance to the next text');
-const finishSlice = activity.slice(activity.indexOf('private fun finishPassage'), activity.indexOf('private fun scoreCurrent'));
-assert.match(finishSlice, /userFinishedRequested/);
+const finishRequestSlice = activity.slice(activity.indexOf('private fun requestUserFinish'), activity.indexOf('override fun onPartialResults'));
+assert.match(finishRequestSlice, /userFinishedRequested\s*=\s*true/,
+  'only the explicit user finish action establishes normal completion authority');
+assert.match(finishRequestSlice, /recognizer\?\.stopListening\(\)/,
+  'stopListening is reserved for explicit user completion');
+const scoreSlice = activity.slice(activity.indexOf('private fun scoreCurrent'), activity.indexOf('private fun advance'));
+assert.match(scoreSlice, /userFinished\s*=\s*userFinishedRequested/,
+  'exported passage result must preserve whether completion was user-confirmed');
 assert.match(v1Activity, /offline-interview\.native-asr-benchmark-result\.v1/, 'v0.6.0 physical evidence implementation should remain preserved in history/source');
 
 console.log(`PASS native ASR benchmark v2: frozen ${corpus.id}, ${wordCount} words, user-controlled completion, auto-rearm endpointing resilience, normalized surface equivalents and semantic contradiction gate.`);
