@@ -35,6 +35,7 @@ assert.match(gradle, /versionCode\s*=\s*14/);
 assert.match(gradle, /versionName\s*=\s*"0\.5\.1-dual-asr-benchmark-tactical"/);
 assert.match(gradle, /com\.alphacephei:vosk-android:0\.3\.75@aar/);
 assert.match(gradle, /sherpa-onnx-1\.13\.8\.aar/);
+assert.match(gradle, /noCompress\s*\+=\s*"onnx"/);
 
 assert.match(dual, /offline-interview\.android-embedded-asr-benchmark\.v1/);
 assert.match(dual, /single_AudioRecord_PCM_to_WAV/);
@@ -71,14 +72,17 @@ assert.match(workflow, /cabf6180e177eb9b3a9a9d43a437bd5e549f3a7d09525e5d69a3fed7
 assert.match(workflow, /sherpa-onnx-1\.13\.8\.aar/);
 assert.match(workflow, /633c24321e06b1fe79feafa03ea16cbc0f8a286641e2da3559bac91bdb13bd96/);
 assert.match(workflow, /sherpa-onnx-whisper-tiny\.tar\.bz2/);
-assert.match(workflow, /WHISPER_MODEL_SHA256_DISCOVERED/);
+assert.match(workflow, /c46116994e539aa165266d96b325252728429c12535eb9d8b6a2b10f129e66b1/);
+assert.doesNotMatch(workflow, /DISCOVER_FIRST_CI/);
+assert.match(workflow, /sha256sum --check --strict/);
 assert.match(workflow, /tiny-encoder\.int8\.onnx/);
 assert.match(workflow, /tiny-decoder\.int8\.onnx/);
 assert.match(workflow, /offline-interview-android-embedded-asr-dual-benchmark-TACTICAL-REINSTALL-ONLY/);
+assert.match(workflow, /GRADLE_OPTS: -Dorg\.gradle\.jvmargs=-Xmx4g/);
 assert.match(workflow, /INSTALL_MODE=UNINSTALL_THEN_REINSTALL/);
 assert.match(directLink, /URLSearchParams|searchParams/);
 
 const androidQuestionIds = androidSpec.sections.flatMap(s => (s.questions || []).map(q => q.id));
 assert.deepEqual(androidQuestionIds.slice(0, 5), ['Q01', 'Q02', 'Q03', 'Q04', 'Q05']);
 
-console.log('PASS dual embedded-ASR benchmark contract: provider-blind H4 capture, Vosk + Whisper, replayable WAV bundle, no provider promotion.');
+console.log('PASS dual embedded-ASR benchmark contract: H4 capture preserved, Vosk + pinned Whisper, replayable WAV bundle, no provider promotion.');
