@@ -21,9 +21,11 @@ export function analyzeCompositeQualification(result) {
     const segmentCount = ss.reduce((n, s) => n + Number(s.segmentCount || 0), 0);
     const partialCount = ss.reduce((n, s) => n + Number(s.partialCount || 0), 0);
     const droppedPcmChunks = ss.reduce((n, s) => n + Number(s.droppedPcmChunks || 0), 0);
+    const queueHighWaterMark = ss.reduce((n, s) => Math.max(n, Number(s.queueHighWaterMark || 0)), 0);
     const errors = ss.map(s => s.providerError).filter(v => Number.isInteger(v));
     const retryCount = Math.max(0, ss.length - 1);
-    const finalization = ss.findLast?.(s => s.finalizationRequestedAtMs != null) || [...ss].reverse().find(s => s.finalizationRequestedAtMs != null);
+    const finalization = ss.findLast?.(s => s.finalizationRequestedAtMs != null)
+      || [...ss].reverse().find(s => s.finalizationRequestedAtMs != null);
     const finalizationLatencyMs = finalization?.finalizationCompletedAtMs != null && finalization?.finalizationRequestedAtMs != null
       ? Number(finalization.finalizationCompletedAtMs) - Number(finalization.finalizationRequestedAtMs)
       : null;
@@ -40,6 +42,7 @@ export function analyzeCompositeQualification(result) {
       error8: errors.includes(8),
       error11: errors.includes(11),
       droppedPcmChunks,
+      queueHighWaterMark,
       finalizationOutcome: finalization?.finalizationOutcome ?? null,
       finalizationLatencyMs,
       draftSource: findDraftSource(result, questionId)
@@ -52,11 +55,15 @@ export function analyzeCompositeQualification(result) {
   const error11Turns = perTurnMetrics.filter(x => x.error11).length;
   const retriedTurns = perTurnMetrics.filter(x => x.retryCount > 0).length;
   const allQuestionsRepresented = total > 0 && perTurnMetrics.length >= total;
-  const audioHealthy = Number(nc.pcmBytes || 0) > 0 && Number(nc.droppedSttPcmChunks || 0) === 0;
+
+  const masterAudioHealthy = Number(nc.pcmBytes || 0) > 0;
+  const sttDeliveryHealthy = Number(nc.droppedSttPcmChunks || 0) === 0;
   const completionHealthy = total > 0 && answered === total;
-  const stabilityHealthy = completionHealthy && audioHealthy && nc.sttDegraded === false;
+  const runtimeStable = completionHealthy && masterAudioHealthy && nc.sttDegraded === false;
   const systematicFinalizationFailure = total > 0 && finalOrSegmentTurns === 0;
-  const systematicProviderErrors = total > 0 && (error5Turns >= Math.max(2, total - 1) || error11Turns >= Math.max(2, total - 1));
+  const segmentedRestored = String(nc.segmentedSessionMode || '').includes('EXTRA_SEGMENTED_SESSION')
+    || String(nc.finalizationMethod || '').includes('segmented_')
+    || String(nc.schema || '').endsWith('.v7.0');
 
   const providerLifecycleMetrics = {
     questionCount: total,
@@ -67,7 +74,10 @@ export function analyzeCompositeQualification(result) {
     error8Turns,
     error11Turns,
     droppedSttPcmChunks: Number(nc.droppedSttPcmChunks || 0),
-    sttDegraded: Boolean(nc.sttDegraded)
+    sttQueueCapacityChunks: nc.sttQueueCapacityChunks ?? null,
+    maxQueueHighWaterMark: perTurnMetrics.reduce((n, x) => Math.max(n, x.queueHighWaterMark), 0),
+    sttDegraded: Boolean(nc.sttDegraded),
+    segmentedRestored
   };
 
   const finalizationMetrics = {
@@ -82,8 +92,10 @@ export function analyzeCompositeQualification(result) {
 
   const reasonCodes = [];
   let recommendedVerdict = 'HOLD';
+
   if (!completionHealthy) reasonCodes.push('INCOMPLETE_QUESTIONS');
-  if (!audioHealthy) reasonCodes.push('AUDIO_OR_PCM_DROP_FAILURE');
+  if (!masterAudioHealthy) reasonCodes.push('MASTER_AUDIO_FAILURE');
+  if (!sttDeliveryHealthy) reasonCodes.push('STT_PCM_DROP_PRESENT');
   if (nc.sttDegraded === true) reasonCodes.push('STT_DEGRADED');
   if (error5Turns > 0) reasonCodes.push('ERROR5_PRESENT');
   if (error8Turns > 0) reasonCodes.push('ERROR8_PRESENT');
@@ -91,22 +103,27 @@ export function analyzeCompositeQualification(result) {
   if (systematicFinalizationFailure) reasonCodes.push('ZERO_PROVIDER_FINALS_OR_SEGMENTS');
   if (Number(nc.finalizationFallbackCount || 0) === total && total > 0) reasonCodes.push('ALL_TURNS_FALLBACK');
 
-  if (stabilityHealthy && finalOrSegmentTurns >= Math.ceil(total / 2) && error5Turns === 0 && error11Turns <= 1) {
-    recommendedVerdict = 'PASS';
-    reasonCodes.push('H6_MATERIAL_PROVIDER_FINALIZATION_SUCCESS');
-  } else if (stabilityHealthy && systematicFinalizationFailure && systematicProviderErrors) {
+  const durablePassThreshold = Math.ceil(Math.max(1, total) / 2);
+  if (runtimeStable && sttDeliveryHealthy && finalOrSegmentTurns >= durablePassThreshold && error8Turns === 0 && error11Turns <= 1) {
+    recommendedVerdict = 'PASS_SYSTEM_STT_SEGMENTED';
+    reasonCodes.push('MATERIAL_PROVIDER_DURABLE_RESULTS');
+  } else if (runtimeStable && sttDeliveryHealthy && segmentedRestored && systematicFinalizationFailure) {
     recommendedVerdict = 'FAIL_STRATEGY';
-    reasonCodes.push('SPEECHRECOGNIZER_EXTRA_AUDIO_SOURCE_NOT_JUSTIFIED_FOR_FURTHER_INCREMENTAL_PATCHING');
-  } else if (stabilityHealthy && finalOrSegmentTurns > 0) {
+    reasonCodes.push('SEGMENTED_SYSTEM_STT_ZERO_DURABLE_RESULTS');
+    reasonCodes.push('PIVOT_TO_EMBEDDED_ASR_WITH_MASTER_WAV_AUTHORITY');
+  } else if (runtimeStable && finalOrSegmentTurns > 0) {
     recommendedVerdict = 'HOLD';
-    reasonCodes.push('PARTIAL_PROVIDER_FINALIZATION_IMPROVEMENT');
-  } else if (stabilityHealthy && systematicFinalizationFailure) {
+    reasonCodes.push('PARTIAL_PROVIDER_DURABLE_RESULT_IMPROVEMENT');
+  } else if (runtimeStable && systematicFinalizationFailure && !segmentedRestored) {
     recommendedVerdict = 'HOLD';
-    reasonCodes.push('EOF_FINALIZATION_NOT_YET_PROVEN');
+    reasonCodes.push('SEGMENTED_SESSION_REGRESSION_REPAIR_REQUIRED');
+  } else if (runtimeStable && !sttDeliveryHealthy) {
+    recommendedVerdict = 'HOLD';
+    reasonCodes.push('STT_DELIVERY_MUST_BE_REQUALIFIED_WITH_BOUNDED_QUEUE_FIX');
   }
 
   return {
-    schema: 'offline-interview.composite-physical-qualification.v1',
+    schema: 'offline-interview.composite-physical-qualification.v2',
     candidateBuild: result?.provenance?.appBuild ?? nc.appVersion ?? null,
     qualificationRunId: result?.session?.id ?? null,
     sourceRuntimeSchema: nc.schema ?? null,
@@ -114,13 +131,14 @@ export function analyzeCompositeQualification(result) {
     providerLifecycleMetrics,
     finalizationMetrics,
     automaticGateResults: {
-      stability: stabilityHealthy ? 'PASS' : 'FAIL',
-      audioContinuity: Number(nc.pcmBytes || 0) > 0 ? 'PASS' : 'FAIL',
-      pcmDelivery: Number(nc.droppedSttPcmChunks || 0) === 0 ? 'PASS' : 'FAIL',
+      runtimeStability: runtimeStable ? 'PASS' : 'FAIL',
+      masterAudioContinuity: masterAudioHealthy ? 'PASS' : 'FAIL',
+      sttPcmDelivery: sttDeliveryHealthy ? 'PASS' : 'FAIL',
       completion: completionHealthy ? 'PASS' : 'FAIL',
       routingObservability: allQuestionsRepresented ? 'PASS' : 'HOLD',
-      providerFinalization: finalOrSegmentTurns >= Math.ceil(Math.max(1, total) / 2) ? 'PASS' : (finalOrSegmentTurns > 0 ? 'HOLD' : 'FAIL'),
+      providerDurableResults: finalOrSegmentTurns >= durablePassThreshold ? 'PASS' : (finalOrSegmentTurns > 0 ? 'HOLD' : 'FAIL'),
       boundaryProviderHealth: error11Turns <= 1 && error8Turns === 0 ? 'PASS' : 'HOLD',
+      segmentedSessionRestored: segmentedRestored ? 'PASS' : 'NOT_PRESENT',
       strategyDecision: recommendedVerdict
     },
     recommendedVerdict,

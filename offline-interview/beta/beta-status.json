@@ -1,6 +1,6 @@
 {
   "schema": "offline-interview.beta-status.v1",
-  "generatedFrom": "h6-eof-finalization",
+  "generatedFrom": "h7-segmented-session-restoration",
   "web": {
     "channel": "beta",
     "latestLine": "v41-23",
@@ -17,19 +17,26 @@
       "runtimeSchema": "offline-interview.android-native-runtime.v4.3",
       "physicalVerdict": "PASS"
     },
-    "previousCandidate": {
-      "versionName": "0.4.4-h5-tactical",
-      "versionCode": 10,
-      "runtimeSchema": "offline-interview.android-native-runtime.v5.0",
-      "physicalVerdict": "FAIL_FINALIZATION_ERROR5_ALL_TURNS_AND_BOUNDARY_ERROR11_REARMS"
-    },
-    "candidate": {
+    "h6Evidence": {
       "versionName": "0.4.5-h6-tactical",
       "versionCode": 11,
       "runtimeSchema": "offline-interview.android-native-runtime.v6.0",
-      "change": "pipe_eof_no_stopListening_plus_provider_cooldown",
-      "ciHead": "136451efa12ed49b908c1c3789ca5eed2c1385c0",
-      "artifactSha256": "e5f77b2767e29930bf5d655046c97c736b8cd6f527224a0b15f1dff2c4b23551"
+      "physicalVerdict": "HOLD_ZERO_FINALS_ZERO_SEGMENTS_WITH_CLEAN_PROVIDER_LIFECYCLE_AND_Q01_STT_QUEUE_DROP",
+      "answeredQuestions": 5,
+      "totalQuestions": 5,
+      "pcmBytes": 1525120,
+      "droppedSttPcmChunks": 53,
+      "providerFinalOrSegmentTurns": 0,
+      "providerError5Turns": 0,
+      "providerError8Turns": 0,
+      "providerError11Turns": 0,
+      "finalizationFallbackCount": 5
+    },
+    "candidate": {
+      "versionName": "0.4.6-h7-segmented-tactical",
+      "versionCode": 12,
+      "runtimeSchema": "offline-interview.android-native-runtime.v7.0",
+      "change": "restore_EXTRA_SEGMENTED_SESSION_plus_bounded_queue_elasticity_and_partial_telemetry_fix"
     },
     "diagnosticBundleSchema": "offline-interview.android-diagnostic-bundle.v1",
     "diagnosticExportWithoutAdb": true,
@@ -43,10 +50,11 @@
     "h4ProviderFinalization": "FAIL_ZERO_FINAL_RESULTS_5_OF_5_PARTIAL_SNAPSHOT_ONLY",
     "physicalH5": "FAIL_5_OF_5_FINALIZATION_ERROR5_ZERO_FINALS_PLUS_BOUNDARY_ERROR11_REARMS",
     "h5AudioStability": "PASS_5_OF_5_PCM_912640_NO_PCM_DROP_STT_NOT_DEGRADED",
+    "physicalH6": "HOLD_5_OF_5_MASTER_AUDIO_HEALTHY_ZERO_PROVIDER_ERRORS_ZERO_FINALS_ZERO_SEGMENTS_ALL_TIMEOUT_FALLBACK_Q01_STT_QUEUE_DROP_53",
+    "h6SegmentedRegressionFinding": "CONFIRMED_ORIGINAL_V1_SET_EXTRA_SEGMENTED_SESSION_CURRENT_H6_DID_NOT",
     "transcriptionAccuracy": "HOLD_NO_GROUND_TRUTH_OR_WAV_AVAILABLE",
-    "h6Implementation": "PASS_AUTOMATED",
-    "h6Ci": "PASS_PRODUCTIZATION_24_VALIDATE_269_ANDROID_BUILD_39",
-    "h6PhysicalFinalization": "HOLD_PENDING_DEVICE_TEST",
+    "h7Implementation": "IMPLEMENTED_PENDING_CI",
+    "h7PhysicalComposite": "HOLD_PENDING_SINGLE_FIVE_QUESTION_DEVICE_RUN",
     "diagnosticExport": "PASS_AUTOMATED_PENDING_PHYSICAL_USE",
     "durableSigning": "HOLD_DURABLE_SIGNING"
   }
