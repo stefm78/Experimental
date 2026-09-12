@@ -22,8 +22,8 @@ android {
         applicationId = "com.stefm78.offlineinterview.nativepoc"
         minSdk = 33
         targetSdk = 36
-        versionCode = 9
-        versionName = "0.4.3-h4-tactical"
+        versionCode = 13
+        versionName = "0.5.0-vosk-lab-tactical"
     }
 
     buildFeatures {
@@ -58,6 +58,11 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    implementation("net.java.dev.jna:jna:5.18.1@aar")
+    implementation("com.alphacephei:vosk-android:0.3.75@aar")
 }
 
 kotlin {
