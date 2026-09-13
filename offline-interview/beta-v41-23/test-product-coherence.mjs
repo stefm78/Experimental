@@ -57,4 +57,4 @@ for (const token of [
   'nativeCapabilityCache?.available'
 ]) if (!engine.includes(token)) throw new Error(`missing engine boundary token: ${token}`);
 
-console.log('Offline Interview V41.23 Android-host candidate product coherence PASS');
+console.log('Offline Interview V41.23 product coherence contract PASS · Android-host native draft candidate');
