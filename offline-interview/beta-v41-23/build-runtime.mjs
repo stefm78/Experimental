@@ -224,4 +224,4 @@ sw = sw.replace("const VERSION = 'offline-interview-v41.15';", "const VERSION = 
 sw = sw.replace("'./', './index.html', './styles.css?v=41.15', './app.js?v=41.15', './system-stt.js', './audio-window.js', './whisper-quality.js',", "'./', './index.html', './shell.html', './styles.css?v=41.23', './app.js?v=41.23', './transcription-engine.js', './system-stt.js', './audio-window.js', './direct-interview-link.js', './whisper-quality.js',");
 fs.writeFileSync(path.join(here, 'sw.js'), sw);
 
-console.log(`V41.23 Android-host candidate runtime generated: ${outputPath}`);
+console.log(`V41.23 product-coherent runtime generated (Android-host candidate): ${outputPath}`);
