@@ -15,6 +15,13 @@ const replaceExactly = (needle, replacement, expectedCount, label) => {
 };
 
 replaceExactly(
+  "import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';",
+  "import { detectSystemSpeech, createSystemSpeechSession } from './transcription-engine.js';",
+  1,
+  'transcription engine port'
+);
+
+replaceExactly(
   "const BUILD_ID = '2026-09-08.interview-runtime-v41.15';",
   "const BUILD_ID = '2026-09-10.interview-runtime-v41.23';",
   1,
@@ -29,7 +36,22 @@ replaceExactly(
 );
 replaceExactly("t.type === 'answer' && cleanText(t.text)", "turnHasAnswerEvidence(t)", 3, 'answer evidence consumers');
 
+replaceExactly(
+  "    rawTranscript: rawTranscript == null ? null : String(rawTranscript),\n    durationSeconds:",
+  "    rawTranscript: rawTranscript == null ? null : String(rawTranscript),\n    transcriptionStatus: type === 'answer' ? (cleanText(text) ? (/system|speech|whisper/.test(source || '') ? 'DRAFT' : 'NOT_REQUESTED') : (audioRef?.recordingId ? 'UNAVAILABLE' : 'NOT_REQUESTED')) : null,\n    durationSeconds:",
+  1,
+  'turn transcription status'
+);
+
+replaceExactly(
+  "          rawTranscript: turn.rawTranscript,\n          durationSeconds:",
+  "          rawTranscript: turn.rawTranscript,\n          transcriptionStatus: turn.transcriptionStatus || null,\n          durationSeconds:",
+  1,
+  'export transcription status'
+);
+
 // Product truth: saved-audio browser retranscription is not a qualified fallback.
+replaceExactly("transcriptionDefault: 'system',", "transcriptionDefault: 'browser-system-live-draft',", 1, 'export provenance provider');
 replaceExactly("transcriptionFallback: 'whisper-local',", "transcriptionFallback: null,", 1, 'export provenance fallback');
 replaceExactly(
   "La transcription système n’a rien renvoyé. L’audio est conservé : vous pourrez le réécouter et relancer la transcription système après l’entretien.",
@@ -67,7 +89,7 @@ fs.writeFileSync(path.join(here, 'styles.css'), styles);
 
 let sw = fs.readFileSync(path.join(beta, 'sw.js'), 'utf8');
 sw = sw.replace("const VERSION = 'offline-interview-v41.15';", "const VERSION = 'offline-interview-v41.23';");
-sw = sw.replace("'./', './index.html', './styles.css?v=41.15', './app.js?v=41.15', './system-stt.js', './audio-window.js', './whisper-quality.js',", "'./', './index.html', './shell.html', './styles.css?v=41.23', './app.js?v=41.23', './system-stt.js', './audio-window.js', './direct-interview-link.js', './whisper-quality.js',");
+sw = sw.replace("'./', './index.html', './styles.css?v=41.15', './app.js?v=41.15', './system-stt.js', './audio-window.js', './whisper-quality.js',", "'./', './index.html', './shell.html', './styles.css?v=41.23', './app.js?v=41.23', './transcription-engine.js', './system-stt.js', './audio-window.js', './direct-interview-link.js', './whisper-quality.js',");
 fs.writeFileSync(path.join(here, 'sw.js'), sw);
 
 console.log(`V41.23 product-coherent runtime generated: ${outputPath}`);
