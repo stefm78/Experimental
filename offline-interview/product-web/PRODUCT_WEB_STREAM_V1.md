@@ -8,7 +8,9 @@ Product surface: `offline-interview/beta-v41-23`.
 
 Repository baseline at split: `main` `4ca38681475282e58d9145c62e894c056528473e`.
 
-The shared Web shell already provides the real Offline Interview product experience: setup, participants, desktop/mobile question navigation, question intent, follow-ups, conversation/manual entry, capture dock, review and export. V41.23 wraps that surface in the current product-coherent runtime.
+The Web shell is the Offline Interview product: setup, participants, desktop/mobile question navigation, question intent, follow-ups, conversation/manual entry, capture dock, review and export.
+
+A 2026-09-13 physical run established the current causal boundary: the interview completed, Web audio was finalized/decoded/validated with no capture gaps, while browser system transcription returned no text. Product/audio readiness and transcription readiness are therefore independent.
 
 ## Ownership
 
@@ -18,42 +20,43 @@ This stream owns:
 - questionnaire loading and authoring-facing behavior;
 - interview/question state and navigation;
 - participants and follow-ups;
+- current Web audio capture lifecycle and product-owned `audioRef` identity while that path remains healthy;
 - transcript display, manual correction and human truth;
 - review/export UX;
 - browser persistence/PWA/offline behavior;
 - product accessibility and product acceptance.
 
-It consumes `offline-interview.speech-capability-contract.v1` but does not choose or benchmark ASR engines.
+It consumes `offline-interview.transcription-engine-contract.v1` and does not select or benchmark ASR engines.
 
 ## Non-ownership
 
 This stream does not own:
 
-- Android AudioRecord implementation;
-- SpeechRecognizer lifecycle;
-- Vosk/Whisper/sherpa provider internals;
-- native audio focus/device integration;
-- provider WER/CER benchmarking.
+- provider selection or model internals;
+- provider WER/CER benchmarking;
+- Android SpeechRecognizer lifecycle;
+- Vosk/Whisper/sherpa implementation details;
+- provider retry policy beyond Product-visible status/actions.
 
-## W1 gate — Web product requalification
+## Product / transcription invariants
 
-Before new product features, physically re-establish the V41.23 baseline on the intended browser/mobile surfaces.
+- a valid audio answer remains an answer even if transcription is unavailable;
+- Product-owned audio must survive provider failure;
+- provider text is draft until human acceptance;
+- human-edited or human-locked text cannot be silently overwritten;
+- provider identity mismatch must never attach text to another turn;
+- the same recorded audio must remain eligible for later retranscription by a replayable provider.
 
-PASS requires:
+## Current gates
 
-- setup loads;
-- questionnaire navigation works from sidebar and compact/mobile navigation;
-- question intent and follow-ups remain usable;
-- capture interaction does not lose interview state when live transcription is unavailable;
-- manual entry/review remains usable;
-- interview can finish and export JSON/TXT;
-- no product-blocking console/runtime failure;
-- the Web/PWA surface remains usable without any native host.
+`WEB_PRODUCT_READY = PHYSICAL_CORE_PASS_TRANSCRIPTION_INDEPENDENT`
 
-No WER threshold belongs to W1.
+`TRANSCRIPTION_INTEGRATION_READY = CANDIDATE_AUTOMATED`
 
-## Next product work after W1
+`TRANSCRIPTION_PROVIDER_QUALIFIED = HOLD_PROVIDER_DECISION_BENCHMARK`
 
-Product work can then proceed on persistence/resume, interruption-safe UX, stronger review/editing, export ergonomics and other product priorities without waiting for `ASR_PROVIDER_QUALIFIED`.
+The next human gate is intentionally short: one spoken answer in V41.23, verify audio persists, verify transcription success or explicit unavailability is attached to the same turn, and verify provider failure never loses the answer/audio.
 
-An Android host, when introduced, must host this same Web product rather than replace it with a second product UI.
+## Next product work after integration gate
+
+Product work can continue on persistence/resume, interruption-safe UX, stronger review/editing and export ergonomics without waiting for final provider qualification.
