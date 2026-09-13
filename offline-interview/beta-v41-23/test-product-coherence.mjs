@@ -15,23 +15,29 @@ const sw = fs.readFileSync(path.join(here, 'sw.js'), 'utf8');
 const engine = fs.readFileSync(path.join(here, 'transcription-engine.js'), 'utf8');
 
 for (const token of [
-  "2026-09-13.interview-runtime-v41.23-transcription-port-candidate",
+  "2026-09-13.interview-runtime-v41.23-android-host-native-draft1-candidate",
   "from './transcription-engine.js'",
   'function turnHasAnswerEvidence(turn)',
   'recordingAudioUsable(ref.recordingId)',
-  "transcriptionDefault: 'browser-system-live-draft'",
+  "transcriptionDefault: 'transcription-engine-live-draft'",
   'transcriptionFallback: null',
+  'let recordingTurnId = null',
+  "recordingTurnId = uuid('turn')",
+  'sessionId: session?.id',
+  'turnId: recordingTurnId',
   "transcriptionStatus: type === 'answer'",
+  "transcriptionProviderId: source === 'android-native-draft'",
   'transcriptionStatus: turn.transcriptionStatus || null',
+  'transcriptionProviderId: turn.transcriptionProviderId || null',
   'Transcription en direct indisponible pour cette prise',
 ]) if (!app.includes(token)) throw new Error(`missing V41.23 runtime token: ${token}`);
 
 if (app.includes("transcriptionFallback: 'whisper-local'")) throw new Error('obsolete Whisper fallback provenance remains');
 if (shell.includes('Préparer Whisper de secours')) throw new Error('obsolete Whisper preparation CTA remains visible');
-if (!shell.includes('transcrite en direct lorsque le navigateur le permet')) throw new Error('privacy/transcription copy is not best-effort accurate');
+if (!shell.includes('Dans l’APK Android, le brouillon utilise le moteur natif Android')) throw new Error('Android-host transcription copy missing');
 if (!styles.includes('.turn-retranscribe-button{display:none!important}')) throw new Error('unqualified saved-audio action remains visible');
 if (!failfast.includes('blockedAfterNetworkFailure = true')) throw new Error('network fail-stop lost');
-if (!sw.includes("offline-interview-v41.23")) throw new Error('V41.23 service-worker namespace missing');
+if (!sw.includes("offline-interview-v41.23-android-host-native-draft1")) throw new Error('host candidate service-worker namespace missing');
 if (!sw.includes("'./transcription-engine.js'")) throw new Error('transcription engine is not cached with V41.23');
 for (const token of ['./shell.html','./app.js?v=41.23','./speech-network-failfast.js?v=41.23']) {
   if (!html.includes(token)) throw new Error(`missing V41.23 local boot token: ${token}`);
@@ -39,8 +45,16 @@ for (const token of ['./shell.html','./app.js?v=41.23','./speech-network-failfas
 for (const file of ['transcription-engine.js','system-stt.js','audio-window.js','direct-interview-link.js','whisper-quality.js','interview.json','manifest.webmanifest','icon.svg','styles.css','sw.js']) {
   if (!fs.existsSync(path.join(here, file))) throw new Error(`missing V41.23 local dependency: ${file}`);
 }
-for (const token of ['LIVE_DRAFT_ONLY','TRANSCRIBE_FINAL','RECORDED_AUDIO_NOT_SUPPORTED','providerMayOverwriteTurn','scope-mismatch']) {
-  if (!engine.includes(token)) throw new Error(`missing engine boundary token: ${token}`);
-}
+for (const token of [
+  'LIVE_DRAFT_ONLY',
+  'TRANSCRIBE_FINAL',
+  'RECORDED_AUDIO_NOT_SUPPORTED',
+  'providerMayOverwriteTurn',
+  'scope-mismatch',
+  'ANDROID_SYSTEM_DEFAULT_V3_DRAFT',
+  'OfflineInterviewNative',
+  "if (hasNativeBridge())",
+  'nativeCapabilityCache?.available'
+]) if (!engine.includes(token)) throw new Error(`missing engine boundary token: ${token}`);
 
-console.log('Offline Interview V41.23 product coherence contract PASS');
+console.log('Offline Interview V41.23 Android-host candidate product coherence PASS');
