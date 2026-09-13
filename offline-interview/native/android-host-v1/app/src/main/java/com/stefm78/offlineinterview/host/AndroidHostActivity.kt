@@ -22,7 +22,7 @@ class AndroidHostActivity : Activity() {
         private const val REQ_MIC = 1801
         private const val TRUSTED_SCHEME = "https"
         private const val TRUSTED_HOST = "appassets.androidplatform.net"
-        private const val TRUSTED_ORIGIN = "$TRUSTED_SCHEME://$TRUSTED_HOST"
+        private const val TRUSTED_ORIGIN = "https://appassets.androidplatform.net"
         private const val START_URL = "$TRUSTED_ORIGIN/assets/web/index.html"
         private const val BRIDGE_NAME = "OfflineInterviewNative"
     }
