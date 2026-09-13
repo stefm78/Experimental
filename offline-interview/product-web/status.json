@@ -3,14 +3,16 @@
   "status": "CANDIDATE",
   "productBaseline": {
     "surface": "offline-interview/beta-v41-23",
-    "repositoryMainAtSplit": "4ca38681475282e58d9145c62e894c056528473e"
+    "repositoryMainAtSplit": "4ca38681475282e58d9145c62e894c056528473e",
+    "physicalEvidence": "2026-09-13: completed Web interview with validated audio asset and no capture gaps; transcription unavailable"
   },
-  "sharedContract": "offline-interview.speech-capability-contract.v1",
+  "sharedContract": "offline-interview.transcription-engine-contract.v1",
   "gates": {
-    "WEB_PRODUCT_READY": "HOLD_W1_PHYSICAL_REQUALIFICATION",
-    "ASR_PROVIDER_QUALIFIED": "INDEPENDENT_SIBLING_GATE",
-    "ANDROID_PRODUCT_INTEGRATION_READY": "NOT_STARTED"
+    "WEB_PRODUCT_READY": "PHYSICAL_CORE_PASS_TRANSCRIPTION_INDEPENDENT",
+    "TRANSCRIPTION_INTEGRATION_READY": "CANDIDATE_AUTOMATED",
+    "TRANSCRIPTION_PROVIDER_QUALIFIED": "HOLD_PROVIDER_DECISION_BENCHMARK"
   },
-  "nativeProductUi": "FORBIDDEN_DUPLICATION",
-  "next": "W1_WEB_PRODUCT_REQUALIFICATION"
+  "audioAuthority": "PRODUCT_WEB_CAPTURE",
+  "providerTextAuthority": "DRAFT_ONLY_UNTIL_HUMAN_ACCEPTANCE",
+  "next": "T1_PRODUCT_TRANSCRIPTION_INTEGRATION_PHYSICAL"
 }
