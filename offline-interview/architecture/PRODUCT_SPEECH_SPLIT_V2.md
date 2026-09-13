@@ -1,94 +1,87 @@
-# Offline Interview — Product / Native Speech split V2
+# Offline Interview — Product / Transcription split V3
 
 Status: CANDIDATE FOUNDATION
 
-## Correction
+## Physical finding driving this correction
 
-The previous split incorrectly treated the Android H4 runtime as the Product application. The repository evidence shows that the product experience already exists as the Web/PWA runtime under `offline-interview/beta-v41-23`, generated from the richer shared Web shell in `offline-interview/beta`.
+A real V41.23 run on 2026-09-13 completed the interview and preserved a validated Web audio asset with no capture gaps, while `system_boundary_live_missing` / `system_transcription_missing` left answer text empty. The observed failure boundary is therefore `AUDIO -> TEXT`, not Product navigation/state/audio capture.
 
-The corrected trajectory has exactly two active streams.
+The active trajectory has exactly two streams.
 
 ## STREAM PRODUCT / WEB APP
 
-Baseline surface: `offline-interview/beta-v41-23`.
+Protected product surface: `offline-interview/beta-v41-23`.
 
-Owns product semantics and UX:
+Owns:
 
 - setup/questionnaire loading;
 - participants;
-- question navigation on desktop/mobile;
+- desktop/mobile question navigation;
 - question intent and follow-ups;
-- interview state and progression;
-- conversation/review/correction surfaces;
+- interview lifecycle and state;
+- current Web MediaRecorder capture and IndexedDB audio asset while it remains healthy;
+- semantic `sessionId`, `turnId` and `audioRef` identity;
+- review/correction and human-authoritative text;
 - end-of-interview export;
 - Web/PWA persistence/offline/accessibility;
-- human-authoritative text state;
 - product acceptance.
 
-The Product stream may consume transcript/audio capability events but no capability provider may navigate the interview or finalize human truth.
+A captured audio answer remains a valid answer even when transcription is unavailable. The Product must degrade explicitly rather than erase audio or interview state.
 
-## STREAM NATIVE SPEECH CAPABILITY
+## STREAM TRANSCRIPTION ENGINE
 
-Owns device/platform mechanisms:
+Owns one product capability: `AUDIO -> TEXT`.
 
-- Android microphone permission/lifecycle;
-- continuous PCM/WAV capture implementation in a native host;
-- audio integrity, audio focus and platform interruption handling;
-- ASR adapters/providers and provider qualification;
-- latency/resource/device diagnostics;
-- lab APKs;
-- a thin Android host/bridge only when needed to expose native capabilities to the Web product.
+Owns:
 
-Does not own questionnaire UX, navigation, participants, follow-ups, final review/export UX or product truth.
+- provider discovery/selection;
+- provider adapters and execution;
+- live-draft transcription where supported;
+- recorded-audio transcription/retranscription where supported;
+- provider status/error/diagnostics;
+- WER/CER, critical-entity/meaning, latency, resource and offline/network qualification.
+
+Does not own:
+
+- audio capture lifecycle;
+- question navigation;
+- participants/follow-ups;
+- interview lifecycle;
+- human-final text authority;
+- Product export semantics.
+
+Browser/system SpeechRecognition is currently `LIVE_DRAFT_ONLY`. It is connected behind the engine port but does not support qualified saved-audio replay on the tested Edge path. Android system-default evidence remains draft-only/pivot-confirmed. Replayable PCM providers such as Vosk/Whisper/sherpa remain provider candidates, not Product architecture.
 
 ## Shared boundary — not a third stream
 
-`offline-interview.speech-capability-contract.v1` is the only shared interface.
+`offline-interview.transcription-engine-contract.v1` is the shared interface.
 
-Product owns semantic session/turn identities and commands. Capability implementations return state, audio references, transcript suggestions and diagnostics.
+The Product passes a product-owned audio asset or optional live stream together with `sessionId` / `turnId`. The engine returns scoped status/results. Mismatched turn identity is rejected. Provider text is always draft until Product/human acceptance. Human-edited or human-locked text cannot be silently overwritten.
 
-Physical audio storage may live behind the capability implementation, but the provider cannot silently discard audio because ASR failed. Recorded audio must remain replayable/retranscribable independently of the current ASR provider.
-
-## Runtime topology
-
-### Standalone browser/PWA
-
-V41.23 continues to run with browser-backed capture/STT behavior. ASR is best-effort and does not define product readiness.
-
-### Android
-
-Preferred integration direction is a thin native host for the same Web product, not a second Android product UI.
-
-A host proof must establish:
-
-1. trusted local Web product assets boot;
-2. capability discovery round-trip works;
-3. at least one bounded native command/event round-trip works;
-4. native code cannot mutate question navigation directly;
-5. bridge is exposed only to trusted content;
-6. browser/PWA mode remains independent.
-
-No full wrapper is authorized merely by this architecture document; the first host work is a bounded feasibility spike.
+The engine can fail while the interview and audio stay valid. A future replayable provider must be able to retry the same `audioRef` without re-recording.
 
 ## Independent gates
 
-- `WEB_PRODUCT_READY`: Web application product behavior is qualified independently of final ASR quality.
-- `NATIVE_CAPABILITY_READY`: Android capability adapter/bridge and audio integrity are qualified independently of provider WER.
-- `ASR_PROVIDER_QUALIFIED`: one provider separately satisfies quality/performance/offline requirements.
-- `ANDROID_PRODUCT_INTEGRATION_READY`: same Web product plus native capability host passes integrated physical validation.
+- `WEB_PRODUCT_READY`: Product behavior and audio preservation; independent of WER.
+- `TRANSCRIPTION_INTEGRATION_READY`: Product can invoke the engine boundary, receive status/result, preserve audio on provider failure and maintain turn isolation.
+- `TRANSCRIPTION_PROVIDER_QUALIFIED`: a provider separately meets quality/performance/offline requirements.
+
+Do not collapse these gates.
 
 ## Historical evidence treatment
 
-- V41.23: protected Web product baseline.
-- Android H4/H5/H6/H7: native capability / SpeechRecognizer engineering evidence, not Product UX baseline.
-- #96 Vosk: embedded PCM architecture evidence.
-- #97 Vosk/Whisper: replay/provider comparison evidence.
-- #98/#99/#100: system-default Android benchmark evidence; final direction remains pivot away from more timing/rearm micro-tuning.
-- #101/#102: superseded split framing once corrected successor PRs are established.
+- V41.23: protected Product baseline.
+- 2026-09-13 physical Web result: Product/audio path works; browser system transcription missing.
+- #96 Vosk: embedded PCM architecture evidence, quality HOLD.
+- #97 Vosk/Whisper: replayable comparison evidence.
+- #98/#99/#100: Android system-default long-form evidence; do not reopen endpoint/rearm micro-tuning.
+- #101/#102: superseded first split.
+- #106: Native Speech Capability framing is too broad for the immediate causal boundary and should be superseded rather than merged.
 
 ## Anti-coupling rules
 
-- Product PRs must not introduce/benchmark ASR models.
-- Native Speech PRs must not redesign or duplicate Web product UX.
-- A provider PASS is not permission to copy prototype architecture into Product; integration gets a fresh solve against the current Product baseline.
-- Product remains usable when ASR is unavailable; audio/text recovery semantics must degrade explicitly rather than destroying interview state.
+- Product changes must not benchmark or select ASR models.
+- Engine changes must not own Product navigation/state/audio lifecycle.
+- Product-owned audio survives engine/provider failure.
+- A provider PASS is not permission to replace Product capture or Product truth.
+- Android host/device work is downstream and must consume this same Product/Transcription boundary if later required.
