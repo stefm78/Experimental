@@ -1,0 +1,14 @@
+{
+  "schema": "offline-interview.transcription-engine-stream-status.v1",
+  "status": "CANDIDATE",
+  "repositoryMainAtSplit": "4ca38681475282e58d9145c62e894c056528473e",
+  "sharedContract": "offline-interview.transcription-engine-contract.v1",
+  "productSurface": "offline-interview/beta-v41-23",
+  "currentConnectedProvider": "browser-system-live",
+  "gates": {
+    "TRANSCRIPTION_INTEGRATION_READY": "CANDIDATE_AUTOMATED",
+    "TRANSCRIPTION_PROVIDER_QUALIFIED": "HOLD_PROVIDER_DECISION_BENCHMARK",
+    "WEB_PRODUCT_READY": "INDEPENDENT_PRODUCT_GATE"
+  },
+  "next": "S1_REPLAYABLE_PROVIDER_DECISION"
+}
