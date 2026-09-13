@@ -1,0 +1,47 @@
+{
+  "schema": "offline-interview.transcription-provider-catalog.v1",
+  "status": "CANDIDATE",
+  "providers": [
+    {
+      "id": "browser-system-live",
+      "role": "LIVE_DRAFT_ONLY",
+      "integration": "CONNECTED_IN_V41_23_PORT",
+      "recordedAudioReplay": false,
+      "qualification": "UNQUALIFIED",
+      "evidence": "2026-09-13 V41.23 physical run: audio captured/validated; system transcription unavailable"
+    },
+    {
+      "id": "android-system-default",
+      "role": "LIVE_DRAFT_ONLY",
+      "integration": "EXPERIMENTAL_EVIDENCE_ONLY",
+      "recordedAudioReplay": false,
+      "qualification": "PIVOT_CONFIRMED",
+      "evidence": "PR #98/#99/#100 native long-form benchmark"
+    },
+    {
+      "id": "android-explicit-on-device",
+      "role": "LIVE_DRAFT_ONLY",
+      "integration": "CONTROL_CANDIDATE",
+      "recordedAudioReplay": false,
+      "qualification": "NOT_RUN"
+    },
+    {
+      "id": "vosk-pcm",
+      "role": "REPLAYABLE_DURABLE_CANDIDATE",
+      "integration": "LAB_EVIDENCE",
+      "recordedAudioReplay": true,
+      "qualification": "ARCHITECTURE_PASS_QUALITY_HOLD",
+      "evidence": "PR #96"
+    },
+    {
+      "id": "whisper-sherpa-pcm",
+      "role": "REPLAYABLE_DURABLE_CANDIDATE",
+      "integration": "BENCHMARK_CANDIDATE",
+      "recordedAudioReplay": true,
+      "qualification": "HOLD",
+      "evidence": "PR #97 and existing browser/PCM labs"
+    }
+  ],
+  "nextGate": "S1_REPLAYABLE_PROVIDER_DECISION",
+  "decisionRule": "Prefer one product-owned recorded audio asset replayed through PCM-capable providers; browser/system live remains a draft control only."
+}
