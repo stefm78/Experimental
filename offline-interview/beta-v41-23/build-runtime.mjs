@@ -23,7 +23,7 @@ replaceExactly(
 
 replaceExactly(
   "const BUILD_ID = '2026-09-08.interview-runtime-v41.15';",
-  "const BUILD_ID = '2026-09-10.interview-runtime-v41.23';",
+  "const BUILD_ID = '2026-09-13.interview-runtime-v41.23-transcription-port-candidate';",
   1,
   'build identity'
 );
