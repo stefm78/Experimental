@@ -12,12 +12,17 @@ const shell = fs.readFileSync(path.join(here, 'shell.html'), 'utf8');
 const styles = fs.readFileSync(path.join(here, 'styles.css'), 'utf8');
 const failfast = fs.readFileSync(path.join(here, 'speech-network-failfast.js'), 'utf8');
 const sw = fs.readFileSync(path.join(here, 'sw.js'), 'utf8');
+const engine = fs.readFileSync(path.join(here, 'transcription-engine.js'), 'utf8');
 
 for (const token of [
   "2026-09-10.interview-runtime-v41.23",
+  "from './transcription-engine.js'",
   'function turnHasAnswerEvidence(turn)',
   'recordingAudioUsable(ref.recordingId)',
+  "transcriptionDefault: 'browser-system-live-draft'",
   'transcriptionFallback: null',
+  "transcriptionStatus: type === 'answer'",
+  'transcriptionStatus: turn.transcriptionStatus || null',
   'Transcription en direct indisponible pour cette prise',
 ]) if (!app.includes(token)) throw new Error(`missing V41.23 runtime token: ${token}`);
 
@@ -27,11 +32,15 @@ if (!shell.includes('transcrite en direct lorsque le navigateur le permet')) thr
 if (!styles.includes('.turn-retranscribe-button{display:none!important}')) throw new Error('unqualified saved-audio action remains visible');
 if (!failfast.includes('blockedAfterNetworkFailure = true')) throw new Error('network fail-stop lost');
 if (!sw.includes("offline-interview-v41.23")) throw new Error('V41.23 service-worker namespace missing');
+if (!sw.includes("'./transcription-engine.js'")) throw new Error('transcription engine is not cached with V41.23');
 for (const token of ['./shell.html','./app.js?v=41.23','./speech-network-failfast.js?v=41.23']) {
   if (!html.includes(token)) throw new Error(`missing V41.23 local boot token: ${token}`);
 }
-for (const file of ['system-stt.js','audio-window.js','direct-interview-link.js','whisper-quality.js','interview.json','manifest.webmanifest','icon.svg','styles.css','sw.js']) {
+for (const file of ['transcription-engine.js','system-stt.js','audio-window.js','direct-interview-link.js','whisper-quality.js','interview.json','manifest.webmanifest','icon.svg','styles.css','sw.js']) {
   if (!fs.existsSync(path.join(here, file))) throw new Error(`missing V41.23 local dependency: ${file}`);
+}
+for (const token of ['LIVE_DRAFT_ONLY','TRANSCRIBE_FINAL','RECORDED_AUDIO_NOT_SUPPORTED','providerMayOverwriteTurn','scope-mismatch']) {
+  if (!engine.includes(token)) throw new Error(`missing engine boundary token: ${token}`);
 }
 
 console.log('Offline Interview V41.23 product coherence contract PASS');
