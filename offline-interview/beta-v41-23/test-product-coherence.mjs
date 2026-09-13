@@ -15,7 +15,7 @@ const sw = fs.readFileSync(path.join(here, 'sw.js'), 'utf8');
 const engine = fs.readFileSync(path.join(here, 'transcription-engine.js'), 'utf8');
 
 for (const token of [
-  "2026-09-10.interview-runtime-v41.23",
+  "2026-09-13.interview-runtime-v41.23-transcription-port-candidate",
   "from './transcription-engine.js'",
   'function turnHasAnswerEvidence(turn)',
   'recordingAudioUsable(ref.recordingId)',
