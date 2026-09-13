@@ -1,0 +1,35 @@
+name: Offline Interview Transcription Engine Stream
+
+on:
+  pull_request:
+    paths:
+      - 'offline-interview/transcription-engine/**'
+      - 'offline-interview/architecture/transcription-engine-contract.v1.json'
+      - '.github/workflows/offline-interview-transcription-engine-stream.yml'
+  workflow_dispatch:
+
+jobs:
+  transcription-engine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Transcription Engine contract
+        run: node offline-interview/transcription-engine/test-transcription-engine-stream.mjs
+      - name: Enforce Product boundary
+        shell: bash
+        run: |
+          changed="$(git diff --name-only origin/main...HEAD)"
+          echo "$changed"
+          if echo "$changed" | grep -E '^offline-interview/(beta|beta-v41-23)/' >/dev/null; then
+            echo 'FAIL: Transcription Engine PR must not mutate Product Web runtime/capture.' >&2
+            exit 1
+          fi
+          if echo "$changed" | grep -E '^offline-interview/native/android-stt-poc-v1/' >/dev/null; then
+            echo 'FAIL: this stream is not an Android host/runtime rewrite.' >&2
+            exit 1
+          fi
