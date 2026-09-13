@@ -1,0 +1,7 @@
+{
+  "schema": "offline-interview.speech-capability-contract.v1",
+  "status": "SUPERSEDED",
+  "supersededBy": "offline-interview.transcription-engine-contract.v1",
+  "reason": "Physical V41.23 evidence localizes the current failure to AUDIO -> TEXT while Product Web capture/state remain healthy. The broader native speech/capture boundary mixed responsibilities not needed for the immediate integration.",
+  "historicalOnly": true
+}
