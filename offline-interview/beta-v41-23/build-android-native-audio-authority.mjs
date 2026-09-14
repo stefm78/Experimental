@@ -94,6 +94,11 @@ replaceExactly(
 source = source.split('ANDROID_SYSTEM_DEFAULT_V3_DRAFT').join('ANDROID_SYSTEM_DEFAULT_V3_DRAFT_PCM_BRIDGE');
 fs.writeFileSync(appPath, source);
 
+const enginePath = path.join(here, 'transcription-engine.js');
+let engine = fs.readFileSync(enginePath, 'utf8');
+engine = engine.split('ANDROID_SYSTEM_DEFAULT_V3_DRAFT').join('ANDROID_SYSTEM_DEFAULT_V3_DRAFT_PCM_BRIDGE');
+fs.writeFileSync(enginePath, engine);
+
 let shell = fs.readFileSync(path.join(here, 'shell.html'), 'utf8');
 shell = shell.replace(
   'Dans l’APK Android, le brouillon utilise le moteur natif Android. L’audio de la session reste sous l’autorité du produit.',
