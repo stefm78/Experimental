@@ -42,8 +42,14 @@ function install(state) {
       try { listener(message); } catch (error) { console.warn('native bridge listener failed', error); }
     }
   };
-  if (typeof bridge.addEventListener === 'function') bridge.addEventListener('message', dispatch);
-  else bridge.onmessage = dispatch;
+  if (typeof bridge.addEventListener === 'function') {
+    bridge.addEventListener('message', dispatch);
+  } else {
+    const previous = typeof bridge.onmessage === 'function' ? bridge.onmessage : null;
+    bridge.onmessage = event => {
+      try { previous?.(event); } finally { dispatch(event); }
+    };
+  }
   state.installedBridge = bridge;
 }
 
