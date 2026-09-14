@@ -16,6 +16,8 @@ import androidx.webkit.WebMessageCompat
 import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewCompat
 import org.json.JSONObject
+import java.io.File
+import java.io.FileInputStream
 
 class AndroidHostActivity : Activity() {
     companion object {
@@ -29,19 +31,23 @@ class AndroidHostActivity : Activity() {
 
     private lateinit var webView: WebView
     private lateinit var speechProvider: AndroidSpeechDraftProvider
+    private lateinit var nativeAudioCapture: NativeAudioCapture
     private var activeReplyProxy: JavaScriptReplyProxy? = null
-    private var pendingWebPermission: PermissionRequest? = null
     private lateinit var webProvenance: JSONObject
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         webProvenance = loadWebProvenance()
-        speechProvider = AndroidSpeechDraftProvider(this) { event ->
-            runOnUiThread { sendToWeb(event) }
-        }
+        speechProvider = AndroidSpeechDraftProvider(this) { event -> runOnUiThread { sendToWeb(event) } }
+        nativeAudioCapture = NativeAudioCapture(
+            context = this,
+            onPcm = { pcm -> speechProvider.offerPcm(pcm) },
+            emit = { event -> runOnUiThread { sendToWeb(event) } }
+        )
 
         val assetLoader = WebViewAssetLoader.Builder()
             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(this))
+            .addPathHandler("/recordings/", RecordingPathHandler(nativeAudioCapture.recordingsDir))
             .build()
 
         webView = WebView(this)
@@ -71,22 +77,11 @@ class AndroidHostActivity : Activity() {
             }
         }
 
+        // V0.9 invariant: the WebView is never a physical microphone owner. RECORD_AUDIO is
+        // consumed only by NativeAudioCapture; any accidental Web getUserMedia request is denied.
         webView.webChromeClient = object : WebChromeClient() {
             override fun onPermissionRequest(request: PermissionRequest) {
-                runOnUiThread {
-                    val wantsAudio = request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
-                    if (!isTrustedOrigin(request.origin) || !wantsAudio) {
-                        request.deny()
-                        return@runOnUiThread
-                    }
-                    if (hasMicPermission()) {
-                        request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-                    } else {
-                        pendingWebPermission?.deny()
-                        pendingWebPermission = request
-                        requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQ_MIC)
-                    }
-                }
+                runOnUiThread { request.deny() }
             }
         }
 
@@ -114,17 +109,37 @@ class AndroidHostActivity : Activity() {
     }
 
     private fun handleBridgeMessage(raw: String?, replyProxy: JavaScriptReplyProxy) {
-        val message = try {
-            JSONObject(raw ?: "")
-        } catch (error: Exception) {
+        val message = try { JSONObject(raw ?: "") } catch (error: Exception) {
             replyProxy.postMessage(errorEvent("INVALID_JSON", error.message ?: "Invalid bridge JSON").toString())
             return
         }
 
         val type = message.optString("type")
+        val requestId = message.optString("requestId").takeIf { it.isNotBlank() }
         when (type) {
+            "GET_AUDIO_CAPTURE_CAPABILITIES" -> {
+                val response = nativeAudioCapture.capabilities(requestId)
+                response.put("hostBuild", BuildConfig.VERSION_NAME)
+                response.put("webBuildId", webProvenance.optString("webBuildId"))
+                replyProxy.postMessage(response.toString())
+            }
+
+            "START_AUDIO_CAPTURE" -> {
+                val sessionId = message.optString("sessionId")
+                val captureId = message.optString("captureId")
+                if (!hasMicPermission()) {
+                    replyProxy.postMessage(audioErrorEvent("MIC_PERMISSION_REQUIRED", "RECORD_AUDIO is not granted", sessionId, captureId, requestId).toString())
+                    requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQ_MIC)
+                } else {
+                    replyProxy.postMessage(nativeAudioCapture.start(sessionId, captureId, requestId).toString())
+                }
+            }
+
+            "STOP_AUDIO_CAPTURE" -> nativeAudioCapture.stop(message.optString("sessionId"), message.optString("captureId"))
+            "CANCEL_AUDIO_CAPTURE" -> nativeAudioCapture.cancel(message.optString("sessionId"), message.optString("captureId"))
+
             "GET_TRANSCRIPTION_CAPABILITIES" -> {
-                val response = speechProvider.capabilities(message.optString("requestId").takeIf { it.isNotBlank() })
+                val response = speechProvider.capabilities(requestId)
                 response.put("hostBuild", BuildConfig.VERSION_NAME)
                 response.put("productSourceHead", BuildConfig.PRODUCT_SOURCE_HEAD)
                 response.put("webBuildId", webProvenance.optString("webBuildId"))
@@ -138,7 +153,6 @@ class AndroidHostActivity : Activity() {
                 val language = message.optString("language", "fr-FR")
                 if (!hasMicPermission()) {
                     replyProxy.postMessage(errorEvent("MIC_PERMISSION_REQUIRED", "RECORD_AUDIO is not granted", sessionId, turnId).toString())
-                    requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), REQ_MIC)
                 } else {
                     speechProvider.start(sessionId, turnId, language)
                 }
@@ -158,12 +172,22 @@ class AndroidHostActivity : Activity() {
         JSONObject().apply {
             put("type", "TRANSCRIPTION_ERROR")
             put("providerId", BuildConfig.TRANSCRIPTION_PROVIDER_ID)
-            put("providerMode", "android-system-default-v3-draft")
+            put("providerMode", "android-system-default-v3-draft-pcm")
             put("status", "FAILED")
             put("code", code)
             put("message", message)
             if (!sessionId.isNullOrBlank()) put("sessionId", sessionId)
             if (!turnId.isNullOrBlank()) put("turnId", turnId)
+        }
+
+    private fun audioErrorEvent(code: String, message: String, sessionId: String?, captureId: String?, requestId: String?): JSONObject =
+        JSONObject().apply {
+            put("type", "AUDIO_CAPTURE_ERROR")
+            if (!requestId.isNullOrBlank()) put("requestId", requestId)
+            put("code", code)
+            put("message", message)
+            if (!sessionId.isNullOrBlank()) put("sessionId", sessionId)
+            if (!captureId.isNullOrBlank()) put("captureId", captureId)
         }
 
     private fun loadWebProvenance(): JSONObject = try {
@@ -180,24 +204,30 @@ class AndroidHostActivity : Activity() {
 
     private fun hasMicPermission(): Boolean = checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != REQ_MIC) return
-        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
-        pendingWebPermission?.let { request ->
-            if (granted && isTrustedOrigin(request.origin)) request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
-            else request.deny()
-        }
-        pendingWebPermission = null
-    }
-
     override fun onDestroy() {
-        pendingWebPermission?.deny()
-        pendingWebPermission = null
         speechProvider.destroy()
+        nativeAudioCapture.destroy()
         activeReplyProxy = null
         webView.stopLoading()
         webView.destroy()
         super.onDestroy()
+    }
+
+    private class RecordingPathHandler(private val root: File) : WebViewAssetLoader.PathHandler {
+        override fun handle(path: String): WebResourceResponse? {
+            if (!path.matches(Regex("[A-Za-z0-9._-]+\\.wav"))) return null
+            val file = File(root, path)
+            return try {
+                val canonicalRoot = root.canonicalFile
+                val canonicalFile = file.canonicalFile
+                if (!canonicalFile.path.startsWith(canonicalRoot.path + File.separator)) return null
+                if (!canonicalFile.exists() || !canonicalFile.isFile) return null
+                WebResourceResponse("audio/wav", null, FileInputStream(canonicalFile)).apply {
+                    responseHeaders = mapOf("Cache-Control" to "no-store")
+                }
+            } catch (_: Exception) {
+                null
+            }
+        }
     }
 }
