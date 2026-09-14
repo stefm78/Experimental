@@ -1,4 +1,4 @@
-name: Offline Interview Android Host Native Draft
+name: Offline Interview Android Native Audio Authority
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 jobs:
-  android-host:
+  android-native-audio-authority:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -41,25 +41,27 @@ jobs:
       - name: Product transcription port regression
         run: node offline-interview/beta-v41-23/test-transcription-engine-boundary.mjs
 
-      - name: Android host responsibility and security contract
+      - name: Android native audio authority contract
         run: node offline-interview/native/android-host-v1/test-host-contract.mjs
 
       - name: Build tactical Android host APK
         working-directory: offline-interview/native/android-host-v1
         run: gradle --no-daemon --stacktrace :app:assembleDebug
 
-      - name: Verify APK and embedded V41.23 provenance
+      - name: Verify APK and embedded V41.24 provenance
         run: |
           APK=offline-interview/native/android-host-v1/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
           unzip -l "$APK" | grep -q 'assets/web/host-provenance.json'
+          unzip -l "$APK" | grep -q 'assets/web/native-host-bridge.js'
+          unzip -l "$APK" | grep -q 'assets/web/native-audio-capture.js'
           unzip -l "$APK" | grep -q 'assets/web/transcription-engine.js'
           sha256sum "$APK" | tee offline-interview/native/android-host-v1/app-debug.sha256
 
       - name: Upload tactical APK
         uses: actions/upload-artifact@v4
         with:
-          name: offline-interview-0.8.0-android-native-draft1-tactical
+          name: offline-interview-0.9.0-android-native-audio-authority1-tactical
           path: |
             offline-interview/native/android-host-v1/app/build/outputs/apk/debug/app-debug.apk
             offline-interview/native/android-host-v1/app-debug.sha256
