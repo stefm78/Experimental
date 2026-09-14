@@ -11,10 +11,11 @@ android {
         applicationId = "com.stefm78.offlineinterview"
         minSdk = 33
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.8.0-android-native-draft1-tactical"
+        versionCode = 21
+        versionName = "0.9.0-android-native-audio-authority1-tactical"
         buildConfigField("String", "PRODUCT_SOURCE_HEAD", "\"25493983644b3fecbc36c3483b1d11c48f268c09\"")
-        buildConfigField("String", "TRANSCRIPTION_PROVIDER_ID", "\"ANDROID_SYSTEM_DEFAULT_V3_DRAFT\"")
+        buildConfigField("String", "TRANSCRIPTION_PROVIDER_ID", "\"ANDROID_SYSTEM_DEFAULT_V3_DRAFT_PCM_BRIDGE\"")
+        buildConfigField("String", "AUDIO_CAPTURE_PROVIDER_ID", "\"ANDROID_AUDIORECORD_WAV_V1\"")
     }
 
     buildFeatures {
