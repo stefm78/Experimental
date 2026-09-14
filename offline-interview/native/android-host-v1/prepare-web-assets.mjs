@@ -9,9 +9,10 @@ const offlineInterview = path.resolve(here, '../..');
 const productDir = path.join(offlineInterview, 'beta-v41-23');
 const targetDir = path.join(here, 'app', 'src', 'main', 'assets', 'web');
 const productSourceHead = '25493983644b3fecbc36c3483b1d11c48f268c09';
-const providerId = 'ANDROID_SYSTEM_DEFAULT_V3_DRAFT';
+const providerId = 'ANDROID_SYSTEM_DEFAULT_V3_DRAFT_PCM_BRIDGE';
+const audioCaptureId = 'ANDROID_AUDIORECORD_WAV_V1';
 
-execFileSync(process.execPath, [path.join(productDir, 'build-runtime.mjs')], { stdio: 'inherit' });
+execFileSync(process.execPath, [path.join(productDir, 'build-android-native-audio-authority.mjs')], { stdio: 'inherit' });
 
 const files = [
   'index.html',
@@ -19,6 +20,8 @@ const files = [
   'app.js',
   'styles.css',
   'transcription-engine.js',
+  'native-host-bridge.js',
+  'native-audio-capture.js',
   'system-stt.js',
   'speech-network-failfast.js',
   'audio-window.js',
@@ -39,7 +42,7 @@ fs.mkdirSync(targetDir, { recursive: true });
 const hashes = {};
 for (const name of files) {
   const source = path.join(productDir, name);
-  if (!fs.existsSync(source)) throw new Error(`Missing V41.23 runtime asset: ${name}`);
+  if (!fs.existsSync(source)) throw new Error(`Missing V41.24 runtime asset: ${name}`);
   const bytes = fs.readFileSync(source);
   fs.writeFileSync(path.join(targetDir, name), bytes);
   hashes[name] = crypto.createHash('sha256').update(bytes).digest('hex');
@@ -47,16 +50,18 @@ for (const name of files) {
 
 const app = fs.readFileSync(path.join(productDir, 'app.js'), 'utf8');
 const buildMatch = app.match(/const BUILD_ID = '([^']+)'/);
-if (!buildMatch) throw new Error('Unable to resolve V41.23 BUILD_ID');
+if (!buildMatch) throw new Error('Unable to resolve V41.24 BUILD_ID');
 
 const provenance = {
-  schema: 'offline-interview.android-host-web-assets.v1',
+  schema: 'offline-interview.android-host-web-assets.v2',
   productSourceHead,
   webBuildId: buildMatch[1],
   providerId,
+  audioCaptureId,
+  microphoneAuthority: 'ANDROID_AUDIORECORD',
   origin: 'https://appassets.androidplatform.net',
   entrypoint: '/assets/web/index.html',
   files: hashes
 };
 fs.writeFileSync(path.join(targetDir, 'host-provenance.json'), `${JSON.stringify(provenance, null, 2)}\n`);
-console.log(`Prepared ${files.length} V41.23 assets for Android host: ${buildMatch[1]}`);
+console.log(`Prepared ${files.length} V41.24 assets for Android host: ${buildMatch[1]}`);
