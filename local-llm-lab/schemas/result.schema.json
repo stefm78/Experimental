@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R1 Result",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "case_id",
+    "family",
+    "language",
+    "difficulty",
+    "model_id",
+    "lane",
+    "parse_valid",
+    "semantic_exact_pass",
+    "closed_world_id_pass",
+    "required_items_covered",
+    "forbidden_items_absent",
+    "raw_output_preserved",
+    "raw_output_sha256",
+    "error_code"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string"
+    },
+    "model_id": {
+      "type": "string"
+    },
+    "lane": {
+      "enum": [
+        "constrained",
+        "unconstrained"
+      ]
+    },
+    "parse_valid": {
+      "type": "boolean"
+    },
+    "schema_valid": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "semantic_exact_pass": {
+      "type": "boolean"
+    },
+    "latency_ms": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "prompt_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "completion_tokens": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "error_code": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}
