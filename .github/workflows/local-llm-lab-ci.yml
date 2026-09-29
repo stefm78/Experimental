@@ -1,0 +1,23 @@
+name: Local LLM Lab CI
+on:
+  pull_request:
+    paths:
+      - 'local-llm-lab/**'
+      - '.github/workflows/local-llm-lab-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'local-llm-lab/**'
+      - '.github/workflows/local-llm-lab-ci.yml'
+permissions:
+  contents: read
+jobs:
+  off-nuc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - name: Deterministic off-NUC qualification
+        run: cd local-llm-lab && sh scripts/off_nuc_qualify.sh

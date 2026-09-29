@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R1 Summary",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "summary_version",
+    "groups"
+  ],
+  "properties": {
+    "summary_version": {
+      "const": "local-llm-lab.summary.v1"
+    },
+    "groups": {
+      "type": "array"
+    }
+  }
+}

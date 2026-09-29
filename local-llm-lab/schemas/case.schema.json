@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "R1 Case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "case_id",
+    "family",
+    "language",
+    "difficulty",
+    "prompt",
+    "allowed_ids",
+    "closed_world_ids",
+    "expected",
+    "forbidden_items"
+  ],
+  "properties": {
+    "case_id": {
+      "type": "string",
+      "pattern": "^r1-"
+    },
+    "family": {
+      "enum": [
+        "FACT_VS_INFERENCE",
+        "CONTRADICTION_DETECTION",
+        "CLOSED_WORLD_ID_FIDELITY",
+        "EVIDENCE_COVERAGE",
+        "FALSE_PASS_CHALLENGE",
+        "OPTION_DISCRIMINATION"
+      ]
+    },
+    "language": {
+      "enum": [
+        "en",
+        "fr"
+      ]
+    },
+    "difficulty": {
+      "enum": [
+        "simple",
+        "adversarial"
+      ]
+    },
+    "prompt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "allowed_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "closed_world_ids": {
+      "type": "boolean"
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "ids",
+        "items"
+      ],
+      "properties": {
+        "verdict": {
+          "type": "string"
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "forbidden_items": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}
