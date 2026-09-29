@@ -1,0 +1,41 @@
+{
+  "schema_version": "local-llm-lab.models.v1",
+  "models": [
+    {
+      "model_id": "violet-1b4-chat-q4_k_m",
+      "role": "probe",
+      "source_provider": "huggingface",
+      "source_repository": "zakarth/violet-1b4-chat-gguf",
+      "source_revision": "e9774e0bd70a8bc30673a34ff813c4a8a782c7e6",
+      "source_filename": "violet-1b4-chat-Q4_K_M.gguf",
+      "quantization": "Q4_K_M",
+      "expected_or_observed_sha256": "770076932c279de35c442db23112a4980ed0f00da269c3459b5bceb56b1d28d0",
+      "file_size_bytes": 906145920,
+      "license_identifier": "CC0-1.0",
+      "chat_template_strategy": "embedded_jinja_with_explicit_neutral_system_message",
+      "context_limit_used": 2048,
+      "source_declared_context_limit": 4096,
+      "request_overrides": {}
+    },
+    {
+      "model_id": "qwen3-1.7b-q4_k_m",
+      "role": "control",
+      "source_provider": "huggingface",
+      "source_repository": "ggml-org/Qwen3-1.7B-GGUF",
+      "source_revision": "daeb8e2d528a760970442092f6bf1e55c3b659eb",
+      "source_filename": "Qwen3-1.7B-Q4_K_M.gguf",
+      "quantization": "Q4_K_M",
+      "expected_or_observed_sha256": "d2387ca2dbfee2ffabce7120d3770dadca0b293052bc2f0e138fdc940d9bc7b5",
+      "file_size_bytes": 1282439264,
+      "license_identifier": "Apache-2.0",
+      "chat_template_strategy": "embedded_jinja_direct_answer_mode",
+      "context_limit_used": 2048,
+      "request_overrides": {
+        "chat_template_kwargs": {
+          "enable_thinking": false
+        },
+        "reasoning_effort": "none"
+      }
+    }
+  ]
+}
