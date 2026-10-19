@@ -1,0 +1,29 @@
+{
+  "schema_version": "local-llm-lab.runtime.v1",
+  "runtime": "llama.cpp",
+  "reference_release": {
+    "tag": "v0.5.0",
+    "tag_object_sha": "c13fcbf684171d5e0bca3fc5c34be6a99174b05f",
+    "commit_sha": "7fe450e19305b828c199d602c23a8337aaa1f03b",
+    "server_readme_blob_sha": "e665904ba2c15b4159f0e6e5d1efab09b3a284ca",
+    "bench_readme_blob_sha": "8adc56514d10b85d4ce6d02b2162abe6716de81c"
+  },
+  "required_features": [
+    "v1_chat_completions",
+    "model_chat_template_jinja",
+    "response_format_json_schema",
+    "chat_template_kwargs_enable_thinking_false",
+    "reasoning_effort_none",
+    "llama_bench_jsonl_output",
+    "device_listing",
+    "version_build_identity"
+  ],
+  "identity_policy": "Record exact installed llama-server and llama-bench --version output for every prepared environment and run; reference_release is documentation baseline, not a substitute for observed binary identity.",
+  "default_execution_mode": "cpu_only",
+  "default_gpu_layers": 0,
+  "common_context_size": 2048,
+  "temperature": 0.0,
+  "top_p": 1.0,
+  "seed": 1,
+  "max_tokens": 256
+}

@@ -1,0 +1,28 @@
+{
+  "campaign_id": "r1-primitives-v1",
+  "fixture": "fixtures/r1-cases.jsonl",
+  "lanes": [
+    "constrained",
+    "unconstrained"
+  ],
+  "case_order": "lexicographic_case_id",
+  "single_turn_cases": true,
+  "system_message_version": "r1-neutral-system-v1",
+  "inference": {
+    "context_size": 2048,
+    "temperature": 0.0,
+    "top_p": 1.0,
+    "seed": 1,
+    "max_tokens": 256
+  },
+  "warmup": {
+    "enabled": true,
+    "count_per_model": 1,
+    "excluded_from_semantic_metrics": true
+  },
+  "performance": {
+    "llama_bench_prompt_tokens": 256,
+    "llama_bench_generation_tokens": 64,
+    "repetitions": 3
+  }
+}
