@@ -1,0 +1,91 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v41-6-field-stabilization",
+  "version": "1.0",
+  "title": "Test V41.6 — stabilisation terrain",
+  "context": "Qualification humaine avant promotion.",
+  "objective": "Vérifier ownership de question, frontières locuteur, replay pause et retranscription système stable.",
+  "language": "fr-FR",
+  "estimatedDurationMinutes": 8,
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "Stabilisation",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Navigation et ownership",
+          "text": "Démarrez Testeur sur cette question. Sans arrêter l'enregistrement, ouvrez la question 2. Vérifiez que la question affichée change mais que le bandeau dit clairement que l'enregistrement reste sur la question 1. Cliquez ensuite sur Basculer sur la question 2 et vérifiez seulement alors que l'enregistrement change de question.",
+          "intent": "Séparer navigation et propriété de captation.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Changements de personne",
+          "text": "Pendant une seule captation continue, alternez plusieurs fois Testeur et Interviewer en disant des suites courtes distinctes : alpha bravo charlie ; delta echo foxtrot ; golf hotel india ; juliet kilo lima. Après la fin, vérifiez qu'aucun groupe n'a disparu et qu'aucun groupe n'est attribué à la mauvaise personne.",
+          "intent": "Vérifier les frontières sans trou de redémarrage du moteur système.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P1",
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Lecture et pause",
+          "text": "Terminez puis choisissez Relire / corriger. Sur une prise audio, cliquez sur ▶ : le bouton doit devenir pause. Cliquez pause puis lecture et vérifiez que l'écoute reprend sans devoir attendre la fin de la piste.",
+          "intent": "Qualifier le contrôle lecture/pause.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Retranscription stable Windows",
+          "text": "Sur Windows Chrome ou Edge récent, cliquez une seule fois sur ↻ Système. Pendant le traitement, le bouton doit afficher clairement qu'il travaille. À la fin il devient ✓ Système ou × Système et ne doit plus pouvoir être relancé. Vérifiez que des clics supplémentaires ne changent plus le texte.",
+          "intent": "Une piste audio donne au plus un résultat système stabilisé.",
+          "estimatedMinutes": 2,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q5",
+          "label": "Téléphone",
+          "text": "Sur téléphone, vérifiez la navigation avec un enregistrement actif, le bandeau de question propriétaire et lecture/pause. Si ↻ Système n'est pas pris en charge, il doit rester indisponible avec une explication claire. Aucun Whisper automatique ne doit démarrer.",
+          "intent": "Qualification mobile fail-closed.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

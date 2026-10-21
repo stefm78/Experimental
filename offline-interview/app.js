@@ -1,6 +1,9 @@
-import { detectSystemSpeech, createSystemSpeechSession, supportsSystemAudioTrackRecognition, transcribeSystemAudioTrack } from './system-stt.js';
+import { detectSystemSpeech, createSystemSpeechSession } from './system-stt.js';
+import { turnAudioWindow } from './audio-window.js';
+import { resolveDirectInterviewLink } from './direct-interview-link.js';
+import { assessWhisperTranscript } from './whisper-quality.js';
 
-const BUILD_ID = '2026-09-06.interview-runtime-v41.5';
+const BUILD_ID = '2026-09-08.interview-runtime-v41.15';
 const SPEC_SCHEMA = 'offline-interview.interview-spec.v1';
 const RESULT_SCHEMA = 'offline-interview.interview-result.v1';
 const TRANSFORMERS_VERSION = '4.2.0';
@@ -25,7 +28,7 @@ const ui = {
   captureDock: $('captureDock'), captureModeLabel: $('captureModeLabel'), recordState: $('recordState'), timer: $('timer'), liveTranscriptPreview: $('liveTranscriptPreview'), transcribing: $('transcribing'), micPreviewBtn: $('micPreviewBtn'), micMeterFill: $('micMeterFill'), micMeterState: $('micMeterState'), captureQuestionContext: $('captureQuestionContext'), captureQuestionStatus: $('captureQuestionStatus'), captureQuestionLabel: $('captureQuestionLabel'), moveCaptureBtn: $('moveCaptureBtn'), captureIntegrityAlert: $('captureIntegrityAlert'),
   answerText: $('answerText'), answerMeta: $('answerMeta'), composerSpeaker: $('composerSpeaker'), addTurnBtn: $('addTurnBtn'), clearComposerBtn: $('clearComposerBtn'),
   followUpsPanel: $('followUpsPanel'), followUpsSummary: $('followUpsSummary'), plannedFollowUps: $('plannedFollowUps'), adHocFollowUpText: $('adHocFollowUpText'), addAdHocFollowUpBtn: $('addAdHocFollowUpBtn'),
-  interviewError: $('interviewError'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
+  interviewError: $('interviewError'), audioRecoveryBar: $('audioRecoveryBar'), audioRecoveryStatus: $('audioRecoveryStatus'), audioRecoveryBtn: $('audioRecoveryBtn'), simulateAudioFaultBtn: $('simulateAudioFaultBtn'), interviewDiagnosticPanel: $('interviewDiagnosticPanel'), interviewSimulateAudioFaultBtn: $('interviewSimulateAudioFaultBtn'), interviewAudioHealth: $('interviewAudioHealth'), prevBtn: $('prevBtn'), validateBtn: $('validateBtn'), homeBtn: $('homeBtn'),
   doneSummary: $('doneSummary'), doneQuestionStat: $('doneQuestionStat'), doneTurnStat: $('doneTurnStat'), doneTimeStat: $('doneTimeStat'), reviewBtn: $('reviewBtn'), exportTxtBtn: $('exportTxtBtn'), exportJsonBtn: $('exportJsonBtn'), deleteAudioBtn: $('deleteAudioBtn'), newSessionBtn: $('newSessionBtn'),
   diagBuild: $('diagBuild'), diagNetwork: $('diagNetwork'), diagSw: $('diagSw'), diagPersist: $('diagPersist'), diagStt: $('diagStt'), copyDiagBtn: $('copyDiagBtn'), copyDiagStatus: $('copyDiagStatus'), diagnosticOutput: $('diagnosticOutput'),
   copyAuthoringKitBtn: $('copyAuthoringKitBtn'), authoringKitStatus: $('authoringKitStatus')
@@ -41,6 +44,7 @@ let stream = null;
 let chunks = [];
 let masterAudioChunks = [];
 let startedRecordingAt = 0;
+let recordingMasterStartedAt = 0;
 let timerHandle = null;
 let composerDurationSeconds = 0;
 let composerSource = 'keyboard';
@@ -67,13 +71,18 @@ let lastDeletedTurn = null;
 let completionInProgress = false;
 let pendingInterviewCompletion = false;
 let recordingAudioOffsetMs = 0;
+let recordingStopRequestedMs = 0;
 let audioContext = null;
 let audioAnalyser = null;
 let audioSourceNode = null;
 let audioMeterFrame = 0;
 let activeReplayAudio = null;
-let activeReplayUrl = null;
-let failedAudioCaptureIds = new Set();
+let activeReplayContext = null;
+let activeReplayTurnId = null;
+let activeReplayButton = null;
+let audioHealth = 'HEALTHY';
+let audioHealthReason = '';
+const activeSystemRetranscriptions = new Set();
 
 function boundedWait(promise, timeoutMs, label) {
   let timer = null;
@@ -91,12 +100,6 @@ function persistSessionLater(stage = 'session') {
   if (!session) return;
   const snapshot = clone(session);
   boundedWait(dbPut(STATE_KEY, snapshot), 2500, stage).catch(error => recordRuntimeWarning('storage_warning', error));
-}
-function clearAudioRefs(recordingId) {
-  if (!session || !recordingId) return;
-  for (const response of Object.values(session.responses || {})) {
-    for (const turn of response.turns || []) if (turn.audioRef?.recordingId === recordingId) turn.audioRef = null;
-  }
 }
 
 function show(el, visible = true) {
@@ -116,6 +119,46 @@ function formatTime(seconds) {
 }
 function safeFilePart(value) { return String(value || 'interview').replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'interview'; }
 
+
+function audioIntegrityMap() {
+  if (!session) return {};
+  if (!session.audioIntegrity || typeof session.audioIntegrity !== 'object') session.audioIntegrity = {};
+  return session.audioIntegrity;
+}
+function recordingIntegrity(recordingId) { return recordingId ? audioIntegrityMap()[recordingId] || null : null; }
+function recordingAudioUsable(recordingId) { return Boolean(recordingId) && recordingIntegrity(recordingId)?.status !== 'invalid'; }
+function audioFault(code, message, cause = null) {
+  const error = new Error(message);
+  error.code = code;
+  if (cause) error.cause = cause;
+  return error;
+}
+function setAudioHealth(state, reason = '') {
+  const next = ['HEALTHY', 'DEGRADED', 'RECOVERING'].includes(state) ? state : 'DEGRADED';
+  const why = cleanText(reason);
+  const changed = audioHealth !== next || audioHealthReason !== why;
+  audioHealth = next;
+  audioHealthReason = why;
+  show(ui.audioRecoveryBar, next !== 'HEALTHY');
+  if (ui.audioRecoveryStatus) ui.audioRecoveryStatus.textContent = next === 'RECOVERING' ? 'Réinitialisation audio…' : 'Audio dégradé · la session reste disponible.';
+  if (ui.audioRecoveryBtn) ui.audioRecoveryBtn.disabled = next === 'RECOVERING';
+  if (ui.interviewAudioHealth) ui.interviewAudioHealth.textContent = next;
+  if (ui.interviewDiagnosticPanel && next === 'DEGRADED') ui.interviewDiagnosticPanel.open = true;
+  if (changed && session) logRuntimeEvent(`audio_health_${next.toLowerCase()}`, { reason: why || undefined });
+}
+function markRecordingInvalid(recordingId, error, stage = 'decode') {
+  if (!session || !recordingId) return;
+  audioIntegrityMap()[recordingId] = { status: 'invalid', stage, error: String(error?.message || error || 'audio invalid'), at: nowIso() };
+  setAudioHealth('DEGRADED', stage);
+  persistSessionLater('audio-integrity');
+}
+function markRecordingValid(recordingId, details = {}) {
+  if (!session || !recordingId) return;
+  audioIntegrityMap()[recordingId] = { status: 'valid', ...details, at: nowIso() };
+  persistSessionLater('audio-integrity');
+}
+
+
 function updateMicMeter(level = 0, peak = 0) {
   const rms = Math.max(0, Math.min(1, Number(level) || 0));
   const pk = Math.max(0, Math.min(1, Number(peak) || 0));
@@ -127,7 +170,9 @@ function updateMicMeter(level = 0, peak = 0) {
   else if (db >= -30) { state = 'Bon niveau'; key = 'good'; }
   else if (db >= -50) { state = 'Faible'; key = 'low'; }
   if (ui.micMeterFill) ui.micMeterFill.style.setProperty('--level', visual.toFixed(3));
-  if (ui.micMeterState) { ui.micMeterState.textContent = state; ui.micMeterState.dataset.levelState = key; }
+  if (ui.micMeterState) { ui.micMeterState.textContent = ''; ui.micMeterState.dataset.levelState = key; }
+  const meter = ui.micMeterFill?.parentElement;
+  if (meter) { meter.dataset.levelState = key; meter.title = `Niveau micro : ${state}`; meter.setAttribute('aria-valuetext', state); meter.setAttribute('aria-valuenow', String(Math.round(visual * 100))); }
 }
 
 async function startMicrophoneMeter(targetStream) {
@@ -168,7 +213,6 @@ async function ensureMicrophoneStream() {
   const reusable = stream && stream.getAudioTracks?.().some(track => track.readyState === 'live');
   if (!reusable) stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
   if (!audioAnalyser) await startMicrophoneMeter(stream);
-  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = isRecording() ? 'Micro actif' : 'Couper le test micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'true'); }
   return stream;
 }
 
@@ -176,7 +220,6 @@ function releaseMicrophone() {
   stopMicrophoneMeter();
   stream?.getTracks().forEach(track => track.stop());
   stream = null;
-  if (ui.micPreviewBtn) { ui.micPreviewBtn.textContent = 'Tester le micro'; ui.micPreviewBtn.setAttribute('aria-pressed', 'false'); }
 }
 
 async function toggleMicrophonePreview() {
@@ -189,98 +232,207 @@ async function toggleMicrophonePreview() {
   }
 }
 
-function stopReplay() {
-  try { activeReplayAudio?.pause(); } catch {}
-  activeReplayAudio = null;
-  if (activeReplayUrl) URL.revokeObjectURL(activeReplayUrl);
-  activeReplayUrl = null;
+function updateReplayButton(button, playing) {
+  if (!button) return;
+  button.textContent = playing ? '■' : '▶';
+  button.title = playing ? 'Arrêter cette prise de parole' : 'Réécouter cette prise de parole';
+  button.setAttribute('aria-label', button.title);
+  button.setAttribute('aria-pressed', playing ? 'true' : 'false');
 }
 
-async function replayTurnAudio(turn) {
-  const ref = turn?.audioRef;
-  if (!ref?.recordingId) return;
+function stopReplay(expectedSource = null) {
+  if (expectedSource && activeReplayAudio !== expectedSource) return;
+  const source = activeReplayAudio, context = activeReplayContext, button = activeReplayButton;
+  activeReplayAudio = null; activeReplayContext = null; activeReplayButton = null; activeReplayTurnId = null;
+  updateReplayButton(button, false);
+  if (source) source.onended = null;
+  try { source?.stop(); } catch {}
+  if (context?.state !== 'closed') context?.close().catch(() => {});
+}
+
+async function replayTurnAudio(turn, button) {
+  if (activeReplayTurnId === turn?.id && activeReplayAudio) { stopReplay(); return; }
   stopReplay();
-  const record = await dbAudioGet(ref.recordingId);
-  if (!record?.blob) { showError(ui.interviewError, 'Audio local introuvable pour cette prise de parole.'); return; }
-  const url = URL.createObjectURL(record.blob);
-  const audio = new Audio(url);
-  activeReplayAudio = audio; activeReplayUrl = url;
-  const end = Math.max(0, Number(ref.endMs) || 0) / 1000;
-  audio.addEventListener('loadedmetadata', () => { audio.currentTime = Math.max(0, Number(ref.startMs) || 0) / 1000; audio.play().catch(() => stopReplay()); }, { once: true });
-  audio.addEventListener('timeupdate', () => { if (end && audio.currentTime >= end) stopReplay(); });
-  audio.addEventListener('ended', stopReplay, { once: true });
-}
-
-async function buildTurnRecognitionTrack(turn) {
-  const ref = turn?.audioRef;
-  if (!ref?.recordingId) throw new Error('Audio local absent pour cette prise.');
-  const record = await dbAudioGet(ref.recordingId);
-  if (!record?.blob) throw new Error('Audio local introuvable pour cette prise.');
-  const Context = window.AudioContext || window.webkitAudioContext;
-  if (!Context) throw new Error('Web Audio indisponible.');
-  const context = new Context();
-  await context.resume();
-  const decoded = await context.decodeAudioData((await record.blob.arrayBuffer()).slice(0));
-  const startSeconds = Math.max(0, Number(ref.startMs) || 0) / 1000;
-  const requestedEnd = Math.max(startSeconds, Number(ref.endMs) || 0) / 1000;
-  const endSeconds = Math.min(decoded.duration, requestedEnd > startSeconds ? requestedEnd : decoded.duration);
-  const durationSeconds = Math.max(0.05, endSeconds - startSeconds);
-  const destination = context.createMediaStreamDestination();
-  const source = context.createBufferSource();
-  source.buffer = decoded;
-  source.connect(destination);
-  const track = destination.stream.getAudioTracks()[0];
-  if ('contentHint' in track) track.contentHint = 'speech-recognition';
-  let started = false;
-  return {
-    track,
-    durationMs: Math.ceil(durationSeconds * 1000),
-    start() { if (!started) { started = true; source.start(0, startSeconds, durationSeconds); } },
-    cleanup() { try { if (started) source.stop(); } catch {} try { track.stop(); } catch {} context.close().catch(() => {}); }
-  };
-}
-
-async function retranscribeTurnWithSystem(turn, button) {
-  showError(ui.interviewError, '');
-  if (!supportsSystemAudioTrackRecognition()) {
-    showError(ui.interviewError, 'La retranscription système d’un enregistrement est disponible dans Chrome/Edge de bureau récents, mais pas encore dans les navigateurs mobiles. L’audio reste réécoutable et le texte modifiable.');
-    return;
-  }
-  if (systemSpeechCapability.mode === 'unavailable') {
-    showError(ui.interviewError, 'La transcription système n’est pas disponible dans ce navigateur.');
-    return;
-  }
-  const previousLabel = button?.textContent || '↻ Système';
-  if (button) { button.disabled = true; button.textContent = '…'; }
-  stopReplay();
-  let input = null;
   try {
-    input = await buildTurnRecognitionTrack(turn);
-    const result = await transcribeSystemAudioTrack(input.track, {
-      lang: interview?.language || 'fr-FR',
-      mode: systemSpeechCapability.mode,
-      durationMs: input.durationMs,
-      onStart: () => input.start()
-    });
-    const text = cleanText(result?.text);
-    if (!meaningfulTranscript(text)) throw new Error('Aucun texte reconnu par le système pour cet extrait.');
-    if (!Array.isArray(turn.transcriptionHistory)) turn.transcriptionHistory = [];
-    if (cleanText(turn.text)) turn.transcriptionHistory.push({ text: turn.text, source: turn.source || null, at: nowIso() });
-    turn.text = text;
-    turn.rawTranscript = text;
-    turn.source = result.mode === 'local' ? 'system-local-retranscribed' : 'system-retranscribed';
-    turn.updatedAt = nowIso();
-    session.updatedAt = nowIso();
-    logRuntimeEvent('system_retranscription_succeeded', { turnId: turn.id, mode: result.mode });
-    renderTurns();
-    persistSessionLater('system-retranscription');
+    const { ref, context, buffer } = await loadTurnAudioWindow(turn);
+    const source = context.createBufferSource();
+    source.buffer = buffer; source.connect(context.destination);
+    activeReplayAudio = source; activeReplayContext = context; activeReplayTurnId = turn.id; activeReplayButton = button || null;
+    source.onended = () => {
+      logRuntimeEvent('replay_ended', { turnId: turn.id, recordingId: ref.recordingId });
+      stopReplay(source);
+    };
+    source.start();
+    updateReplayButton(activeReplayButton, true);
+    logRuntimeEvent('replay_started', { turnId: turn.id, recordingId: ref.recordingId, durationMs: Math.round(buffer.duration * 1000) });
   } catch (error) {
-    recordRuntimeWarning('system_retranscription_error', error);
-    showError(ui.interviewError, `Retranscription système impossible : ${error.message || error}`);
-  } finally {
-    input?.cleanup();
-    if (button?.isConnected) { button.disabled = false; button.textContent = previousLabel; }
+    stopReplay();
+    logRuntimeEvent('replay_failed', { turnId: turn?.id, code: error?.code || 'REPLAY_FAILED', error: String(error?.message || error) });
+    showError(ui.interviewError, `Replay impossible : ${error.message || error}`);
   }
+}
+
+async function decodeStoredRecording(recordingId) {
+  const record = await dbAudioGet(recordingId);
+  if (!record?.blob) throw audioFault('AUDIO_MISSING', 'Audio local introuvable pour cette prise.');
+  if (!record.blob.size) throw audioFault('AUDIO_BLOB_EMPTY', 'Audio enregistré vide.');
+  const Context = window.AudioContext || window.webkitAudioContext;
+  if (!Context) throw audioFault('AUDIO_CONTEXT_UNAVAILABLE', 'Web Audio indisponible.');
+  let context = null;
+  logRuntimeEvent('audio_decode_started', { recordingId, bytes: record.blob.size });
+  try {
+    context = new Context();
+    const data = await record.blob.arrayBuffer();
+    if (!data.byteLength) throw audioFault('AUDIO_BLOB_EMPTY', 'Audio enregistré vide.');
+    const decoded = await context.decodeAudioData(data.slice(0));
+    if (!decoded?.length || !decoded.sampleRate) throw audioFault('AUDIO_DECODE_FAILED', 'Audio enregistré illisible.');
+    logRuntimeEvent('audio_decode_succeeded', { recordingId, durationMs: Math.round(decoded.duration * 1000) });
+    return { record, context, decoded };
+  } catch (error) {
+    if (context?.state !== 'closed') await context.close().catch(() => {});
+    const wrapped = error?.code ? error : audioFault('AUDIO_DECODE_FAILED', 'Audio enregistré illisible.', error);
+    if (wrapped.code === 'AUDIO_DECODE_FAILED' || wrapped.code === 'AUDIO_BLOB_EMPTY') markRecordingInvalid(recordingId, wrapped, 'decode');
+    else setAudioHealth('DEGRADED', wrapped.code || 'audio-context');
+    logRuntimeEvent('audio_decode_failed', { recordingId, code: wrapped.code || 'AUDIO_DECODE_FAILED', error: String(wrapped.message || wrapped) });
+    throw wrapped;
+  }
+}
+
+async function validateStoredRecording(recordingId) {
+  const { record, context, decoded } = await decodeStoredRecording(recordingId);
+  try {
+    const details = { bytes: record.blob.size, mime: record.blob.type || record.mimeType || '', durationMs: Math.round(decoded.duration * 1000) };
+    markRecordingValid(recordingId, details);
+    logRuntimeEvent('audio_blob_validated', { recordingId, bytes: details.bytes, durationMs: details.durationMs });
+    return details;
+  } finally {
+    if (context?.state !== 'closed') await context.close().catch(() => {});
+  }
+}
+
+async function loadTurnAudioWindow(turn) {
+  const ref = turnAudioWindow(turn, 'canonical');
+  if (!ref?.recordingId) throw audioFault('AUDIO_MISSING', 'Audio local absent pour cette prise.');
+  if (!recordingAudioUsable(ref.recordingId)) throw audioFault('AUDIO_RECORDING_INVALID', 'Cette prise audio est signalée comme illisible. Réinitialisez l’audio.');
+  const { context, decoded } = await decodeStoredRecording(ref.recordingId);
+  try {
+    const start = Math.max(0, Math.floor(ref.startMs * decoded.sampleRate / 1000));
+    const end = Math.min(decoded.length, Math.max(start + 1, Math.ceil(ref.endMs * decoded.sampleRate / 1000)));
+    const buffer = context.createBuffer(decoded.numberOfChannels, end - start, decoded.sampleRate);
+    for (let c = 0; c < decoded.numberOfChannels; c += 1) buffer.copyToChannel(decoded.getChannelData(c).subarray(start, end), c);
+    return { ref, context, buffer };
+  } catch (error) {
+    if (context?.state !== 'closed') await context.close().catch(() => {});
+    throw error;
+  }
+}
+
+async function buildTurnWhisperPcm(turn) {
+  const { ref, context, buffer } = await loadTurnAudioWindow(turn);
+  try {
+    const rate = 16000, frames = Math.max(1, Math.ceil(buffer.duration * rate));
+    const offline = new OfflineAudioContext(1, frames, rate);
+    const source = offline.createBufferSource(); source.buffer = buffer; source.connect(offline.destination); source.start();
+    const rendered = await offline.startRendering();
+    return { ref, durationMs: Math.round(rendered.duration * 1000), pcm: rendered.getChannelData(0).slice() };
+  } finally {
+    if (context?.state !== 'closed') await context.close().catch(() => {});
+  }
+}
+
+async function retranscribeTurnWithSystem(turn, button, reason = 'manual') {
+  showError(ui.interviewError, '');
+  const ref = turn?.audioRef;
+  const audioKey = ref?.recordingId ? `${ref.recordingId}:${Math.round(ref.startMs || 0)}:${Math.round(ref.endMs || 0)}` : null;
+  if (!audioKey) return;
+  const previous = turn.systemRetranscription;
+  const attempt = (Number(previous?.attempt) || 0) + 1;
+  if (activeSystemRetranscriptions.has(audioKey)) return;
+  activeSystemRetranscriptions.add(audioKey);
+  if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
+  stopReplay();
+  try {
+    logRuntimeEvent('manual_whisper_started', { turnId: turn.id, recordingId: ref.recordingId, attempt });
+    const { pcm } = await buildTurnWhisperPcm(turn);
+    const model = await prepareModel();
+    const run = typeof model === 'function' ? model : model?._call?.bind(model);
+    if (!run) throw new Error('Pipeline Whisper non exécutable.');
+    const result = await run(pcm, { language: 'french', task: 'transcribe' });
+    const text = cleanText(result?.text || '');
+    if (!text) throw new Error('Aucun texte reconnu dans cette fenêtre audio.');
+    const quality = assessWhisperTranscript(text);
+    if (!quality.ok) {
+      turn.systemRetranscription = { audioKey, status: 'rejected', text, reason: quality.reason, mode: 'whisper-local', at: nowIso(), attempt };
+      turn.updatedAt = nowIso(); session.updatedAt = nowIso();
+      logRuntimeEvent('manual_whisper_rejected', { turnId: turn.id, recordingId: ref.recordingId, attempt, qualityReason: quality.reason });
+      showError(ui.interviewError, 'Retranscription rejetée : sortie répétitive ou manifestement dégénérée. Vous pouvez réessayer.');
+      persistSessionLater('manual-whisper-rejected');
+      return;
+    }
+    const humanProtected = Boolean(turn.humanEdited);
+    if (!humanProtected) { turn.text = text; turn.source = 'whisper-local-retranscribed'; }
+    turn.rawTranscript = text;
+    turn.systemRetranscription = { audioKey, status: 'succeeded', text, mode: 'whisper-local', at: nowIso(), attempt, humanProtected };
+    turn.updatedAt = nowIso(); session.updatedAt = nowIso();
+    logRuntimeEvent('manual_whisper_succeeded', { turnId: turn.id, recordingId: ref.recordingId, stable: true, reason, attempt, humanProtected });
+    if (humanProtected) showError(ui.interviewError, 'Nouvelle retranscription disponible ; votre correction manuelle a été conservée.');
+    persistSessionLater('manual-whisper-retranscription');
+  } catch (error) {
+    if (!String(error?.code || '').startsWith('AUDIO_')) {
+      turn.systemRetranscription = { audioKey, status: 'failed', error: String(error?.message || error), mode: 'whisper-local', at: nowIso(), attempt };
+    }
+    logRuntimeEvent('manual_whisper_failed', { turnId: turn.id, recordingId: ref.recordingId, attempt, code: error?.code || 'WHISPER_FAILED', error: String(error?.message || error) });
+    if (String(error?.code || '').startsWith('AUDIO_')) showError(ui.interviewError, `Audio indisponible pour retranscription : ${error.message || error}`);
+    else showError(ui.interviewError, `Retranscription locale impossible : ${error.message || error}`);
+  } finally {
+    activeSystemRetranscriptions.delete(audioKey);
+    if (button) { button.disabled = false; button.removeAttribute('aria-busy'); }
+    renderTurns();
+  }
+}
+
+async function recoverAudioSubsystem() {
+  if (audioHealth === 'RECOVERING') return;
+  setAudioHealth('RECOVERING', 'manual-recovery');
+  logRuntimeEvent('audio_recovery_started');
+  try {
+    stopReplay();
+    try { systemSpeechSession?.abort(); } catch {}
+    systemSpeechSession = null;
+    queuedSpeakerId = null;
+    queuedRecordingQuestionId = null;
+    if (isRecording()) {
+      stopRecording();
+      if (recordingCompletionPromise) await boundedWait(recordingCompletionPromise, 6000, 'finalisation audio avant récupération');
+    }
+    releaseMicrophone();
+    if (db) { try { db.close(); } catch {} }
+    db = null; dbReadyPromise = null;
+    await ensureDb();
+    let recovered = 0;
+    const invalidIds = Object.entries(audioIntegrityMap()).filter(([, value]) => value?.status === 'invalid').map(([id]) => id);
+    for (const recordingId of invalidIds) {
+      try { await validateStoredRecording(recordingId); recovered += 1; } catch {}
+    }
+    const remaining = Object.values(audioIntegrityMap()).filter(value => value?.status === 'invalid').length;
+    if (remaining) setAudioHealth('DEGRADED', 'recordings-invalid');
+    else setAudioHealth('HEALTHY', '');
+    logRuntimeEvent('audio_recovery_succeeded', { recovered, remaining });
+    showError(ui.interviewError, remaining ? `Audio réinitialisé — la session est conservée. ${remaining} prise(s) restent illisibles.` : 'Audio réinitialisé — la session est conservée.');
+  } catch (error) {
+    setAudioHealth('DEGRADED', 'recovery-failed');
+    logRuntimeEvent('audio_recovery_failed', { error: String(error?.message || error) });
+    showError(ui.interviewError, `Réinitialisation audio impossible : ${error.message || error}`);
+  } finally {
+    renderTurns();
+    renderSpeakerButtons();
+  }
+}
+
+function simulateAudioFault() {
+  setAudioHealth('DEGRADED', 'diagnostic-injected');
+  logRuntimeEvent('audio_health_degraded', { reason: 'diagnostic-injected' });
+  showError(ui.interviewError, 'Panne audio simulée. Utilisez « Réinitialiser l’audio » : la session doit rester intacte.');
 }
 
 function setView(name) {
@@ -540,7 +692,8 @@ function newSession() {
     participantHistory: Object.fromEntries(interview.participants.map(p => [p.id, { ...clone(p), removedAt: null }])),
     responses: {},
     runtimeEvents: [],
-    captureGaps: []
+    captureGaps: [],
+    audioIntegrity: {}
   };
 }
 
@@ -566,6 +719,7 @@ function unresolvedCaptureGaps() {
 function registerCaptureGap(questionId, speakerId, error) {
   if (!session || !questionId || !speakerId) return;
   if (!Array.isArray(session.captureGaps)) session.captureGaps = [];
+  if (!session.audioIntegrity || typeof session.audioIntegrity !== 'object') session.audioIntegrity = {};
   const duplicate = session.captureGaps.find(gap => !gap.resolvedAt && gap.questionId === questionId && gap.speakerId === speakerId);
   if (!duplicate) {
     session.captureGaps.push({
@@ -938,22 +1092,19 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   if (!isRecording() || !recordingSpeakerId || !recordingQuestionId) return false;
   if (!nextSpeakerId || !nextQuestionId) return false;
   if (nextSpeakerId === recordingSpeakerId && nextQuestionId === recordingQuestionId) return true;
-  if (!systemSpeechSession?.cutSegment) return false;
+  if (!systemSpeechSession?.takeSegment) return false;
 
   const previousSpeakerId = recordingSpeakerId;
   const previousQuestionId = recordingQuestionId;
-  const durationSeconds = Math.max(0, (performance.now() - startedRecordingAt) / 1000);
   const recordingId = recordingCaptureId;
   const segmentStartMs = recordingAudioOffsetMs;
-  const segmentEndMs = segmentStartMs + durationSeconds * 1000;
-  const cut = systemSpeechSession.cutSegment();
+  const segmentEndMs = Math.max(segmentStartMs, recordingMasterStartedAt ? performance.now() - recordingMasterStartedAt : segmentStartMs);
+  const durationSeconds = Math.max(0, (segmentEndMs - segmentStartMs) / 1000);
+  logRuntimeEvent('audio_boundary_observed', { recordingId, startMs: Math.round(segmentStartMs), endMs: Math.round(segmentEndMs), monotonicElapsedMs: Math.round(segmentEndMs) });
+  const cut = systemSpeechSession.takeSegment();
   if (!cut) return false;
   recordingAudioOffsetMs = segmentEndMs;
   recordingHadCuts = true;
-
-  // UI ownership changes immediately, but ON AIR is briefly replaced by PASSAGE until
-  // the fresh SpeechRecognition session is listening. This makes the semantic boundary
-  // real instead of guessing from late result indexes.
   recordingSpeakerId = nextSpeakerId;
   recordingQuestionId = nextQuestionId;
   session.activeSpeakerId = nextSpeakerId;
@@ -961,51 +1112,45 @@ async function rotateLiveSegment(nextSpeakerId, nextQuestionId) {
   startedRecordingAt = performance.now();
   composerDurationSeconds = 0;
   chunks = [];
-  captureHandoffPending = true;
+  captureHandoffPending = false;
   ui.timer.textContent = '00:00';
   if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
   renderSpeakerButtons();
   renderQuestionNav();
   updateCaptureUi();
 
-  const baseSource = systemSpeechCapability.mode === 'local' ? 'system-local-cut' : 'system-cut';
   const commit = async () => {
-    let settled = null;
-    try { settled = await cut.settled; } catch {}
-    const text = cleanText(settled?.text || cut.text);
-    if (!meaningfulTranscript(text)) {
-      await appendAudioOnlyTurn({
+    const provisionalText = cleanText(cut.text);
+    const audioRef = { recordingId, startMs: segmentStartMs, endMs: segmentEndMs };
+    if (meaningfulTranscript(provisionalText)) {
+      await appendAnswerTurn({
         questionId: previousQuestionId,
         speakerId: previousSpeakerId,
+        text: provisionalText,
+        source: systemSpeechCapability.mode === 'local' ? 'system-local-boundary-draft' : 'system-boundary-draft',
+        rawTranscript: provisionalText,
         durationSeconds,
-        audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }
+        audioRef
       });
-      logRuntimeEvent('system_transcription_missing', { questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true });
+      logRuntimeEvent('system_boundary_live_committed', {
+        questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true, textLength: provisionalText.length
+      });
       return;
     }
-    await appendAnswerTurn({
+    await appendAudioOnlyTurn({
       questionId: previousQuestionId,
       speakerId: previousSpeakerId,
-      text,
-      source: baseSource,
-      rawTranscript: settled?.finalText || text,
       durationSeconds,
-      audioRef: failedAudioCaptureIds.has(recordingId) ? null : { recordingId, startMs: segmentStartMs, endMs: segmentEndMs }
+      audioRef,
+      source: 'audio-system-boundary-pending',
+      rawTranscript: null
     });
-    await persistSession();
+    logRuntimeEvent('system_boundary_live_missing', {
+      questionId: previousQuestionId, speakerId: previousSpeakerId, boundary: true
+    });
   };
   semanticBoundaryCommitQueue = semanticBoundaryCommitQueue.then(commit, commit);
 
-  Promise.resolve(cut.ready).then(info => {
-    latestHandoffCalibration = info?.calibration || latestHandoffCalibration;
-    captureHandoffPending = false;
-    renderSpeakerButtons();
-    renderQuestionNav();
-    updateCaptureUi();
-  }).catch(() => {
-    captureHandoffPending = false;
-    updateCaptureUi();
-  });
   return true;
 }
 
@@ -1100,10 +1245,9 @@ async function goToQuestion(index) {
   sessionClockLastMs = Date.now();
   renderQuestion();
 
-  const targetQuestionId = all[index]?.question?.id || null;
-  if (isRecording() && targetQuestionId && recordingQuestionId !== targetQuestionId) {
-    moveRecordingToViewedQuestion().catch(error => recordRuntimeWarning('question_capture_transfer_warning', error));
-  }
+  // Navigation changes only the viewed question. Capture ownership remains explicit until
+  // the interviewer uses the visible transfer action in the capture banner.
+  renderCaptureQuestionContext();
   persistSessionLater('question-navigation');
 }
 
@@ -1490,10 +1634,10 @@ async function appendAnswerTurn({ questionId, speakerId, text, source, rawTransc
   return true;
 }
 
-async function appendAudioOnlyTurn({ questionId, speakerId, durationSeconds = 0, audioRef = null }) {
+async function appendAudioOnlyTurn({ questionId, speakerId, durationSeconds = 0, audioRef = null, source = 'audio-system-pending', rawTranscript = null }) {
   if (!questionId || !speakerId || !audioRef?.recordingId) return false;
   const response = responseFor(questionId);
-  response.turns.push(createTurn({ type: 'answer', speakerId, text: '', source: 'audio-system-pending', durationSeconds, audioRef }));
+  response.turns.push(createTurn({ type: 'answer', speakerId, text: '', source, rawTranscript, durationSeconds, audioRef }));
   response.status = 'answered';
   session.updatedAt = nowIso();
   await persistSession();
@@ -1562,8 +1706,11 @@ function renderTurns() {
   }
 
   for (const turn of turns) {
+    const hasText = Boolean(cleanText(turn.text));
+    const hasAudio = Boolean(turn.audioRef?.recordingId);
+    if (turn.type === 'answer' && !hasText && !hasAudio) continue;
     const card = document.createElement('article');
-    card.className = `turn-card ${turn.type === 'follow_up' ? 'follow-up-turn' : ''}`;
+    card.className = `turn-card ${turn.type === 'follow_up' ? 'follow-up-turn' : ''}${turn.type === 'answer' && !hasText && hasAudio ? ' audio-only-turn' : ''}`;
     const head = document.createElement('div');
     head.className = 'turn-head';
 
@@ -1627,17 +1774,28 @@ function renderTurns() {
     replay.textContent = '▶';
     replay.title = 'Réécouter cette prise de parole';
     replay.setAttribute('aria-label', replay.title);
-    replay.disabled = !turn.audioRef?.recordingId;
-    replay.addEventListener('click', () => replayTurnAudio(turn));
+    const audioReady = Boolean(turn.audioRef?.recordingId) && recordingAudioUsable(turn.audioRef.recordingId) && !isRecording() && !captureFinalizing;
+    const audioInvalid = Boolean(turn.audioRef?.recordingId) && !recordingAudioUsable(turn.audioRef.recordingId);
+    replay.disabled = !audioReady;
+    if (audioInvalid) replay.title = 'Audio à réinitialiser';
+    replay.addEventListener('click', () => replayTurnAudio(turn, replay));
     const retranscribe = document.createElement('button');
     retranscribe.type = 'button';
     retranscribe.className = 'ghost small turn-retranscribe-button';
-    retranscribe.textContent = '↻ Système';
-    const trackSupported = supportsSystemAudioTrackRecognition();
-    retranscribe.disabled = !turn.audioRef?.recordingId || !trackSupported || systemSpeechCapability.mode === 'unavailable';
-    retranscribe.title = trackSupported
-      ? 'Relancer la transcription système directement depuis cet audio'
-      : 'Retranscription système depuis un audio enregistré non prise en charge sur ce navigateur mobile ou ancien';
+    const trackSupported = true;
+    const stableRetranscription = turn.systemRetranscription?.status;
+    const transcriptionGlyph = stableRetranscription === 'succeeded' ? '✓' : stableRetranscription === 'rejected' ? '!' : stableRetranscription === 'failed' ? '×' : '<svg class="audio-to-text-svg" viewBox="0 0 34 18" aria-hidden="true"><path d="M2 9h2m2-4v8m3-11v14m3-9v4"/><path class="audio-to-text-arrow" d="M16 9h6m-2-2 2 2-2 2"/><path d="M25 5h7M25 9h7M25 13h5"/></svg>';
+    retranscribe.innerHTML = `<span class="audio-to-text-icon" aria-hidden="true">${transcriptionGlyph}</span>`;
+    retranscribe.disabled = !audioReady;
+    retranscribe.title = stableRetranscription === 'succeeded'
+      ? 'Retranscrire cet audio'
+      : stableRetranscription === 'rejected'
+        ? 'Transcription rejetée — réessayer'
+        : stableRetranscription === 'failed'
+          ? 'Aucun texte reconnu — réessayer'
+        : trackSupported
+          ? 'Transcrire cet audio en texte'
+          : 'Transcription depuis un audio enregistré non prise en charge sur ce navigateur';
     retranscribe.setAttribute('aria-label', retranscribe.title);
     retranscribe.addEventListener('click', () => retranscribeTurnWithSystem(turn, retranscribe));
     if (turn.type === 'answer') head.append(select, type, meta, replay, retranscribe, remove);
@@ -1653,7 +1811,9 @@ function renderTurns() {
     };
     text.addEventListener('input', resizeTurnText);
     text.addEventListener('change', async () => {
-      turn.text = cleanText(text.value);
+      const nextText = cleanText(text.value);
+      if (nextText !== turn.text) { turn.humanEdited = true; turn.humanEditedAt = nowIso(); }
+      turn.text = nextText;
       turn.updatedAt = nowIso();
       text.value = turn.text;
       await persistSession();
@@ -1661,9 +1821,13 @@ function renderTurns() {
       renderInterviewMetrics();
     });
 
-    card.append(head, text);
+    if (turn.type === 'answer' && !hasText && hasAudio) {
+      card.append(head);
+    } else {
+      card.append(head, text);
+      requestAnimationFrame(resizeTurnText);
+    }
     ui.turnsList.append(card);
-    requestAnimationFrame(resizeTurnText);
   }
 }
 
@@ -2040,6 +2204,7 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     recordingQuestionId = questionId;
     recordingCaptureId = uuid('capture');
     recordingAudioOffsetMs = 0;
+    recordingStopRequestedMs = 0;
     recordingCompletionPromise = new Promise(resolve => { resolveRecordingCompletion = resolve; });
     await ensureMicrophoneStream();
     const mimeType = preferredMimeType();
@@ -2052,7 +2217,8 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
       masterAudioChunks.push(event.data);
     };
     recorder.onstop = handleRecordingStopped;
-    recorder.start(500);
+    recorder.start();
+    recordingMasterStartedAt = performance.now();
 
     systemSpeechSession = createSystemSpeechSession({
       lang: interview?.language || 'fr-FR',
@@ -2071,7 +2237,7 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
     const usingSystem = Boolean(systemSpeechSession?.start());
 
     recordingHadCuts = false;
-    startedRecordingAt = performance.now();
+    startedRecordingAt = recordingMasterStartedAt || performance.now();
     if (ui.liveTranscriptPreview) ui.liveTranscriptPreview.textContent = '';
     if (!usingSystem) ui.recordState.textContent = 'Transcription système indisponible';
     renderSpeakerButtons();
@@ -2089,7 +2255,9 @@ async function startRecording(speakerId = session?.activeSpeakerId, questionId =
 }
 function stopRecording() {
   if (!recorder || recorder.state === 'inactive') return;
-  composerDurationSeconds = (performance.now() - startedRecordingAt) / 1000;
+  const masterEndMs = recordingMasterStartedAt ? Math.max(recordingAudioOffsetMs, performance.now() - recordingMasterStartedAt) : recordingAudioOffsetMs + Math.max(0, performance.now() - startedRecordingAt);
+  recordingStopRequestedMs = masterEndMs;
+  composerDurationSeconds = Math.max(0, (masterEndMs - recordingAudioOffsetMs) / 1000);
   clearInterval(timerHandle);
   try { systemSpeechSession?.stop(); } catch {}
   ui.recordState.textContent = 'Finalisation…';
@@ -2097,22 +2265,6 @@ function stopRecording() {
   setTimeout(() => {
     if (recorder && recorder.state !== 'inactive') recorder.stop();
   }, 280);
-}
-async function blobTo16kMono(blob) {
-  const arrayBuffer = await blob.arrayBuffer();
-  const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
-  const context = new AudioContextCtor();
-  const decoded = await context.decodeAudioData(arrayBuffer.slice(0));
-  const frames = Math.max(1, Math.ceil(decoded.duration * 16000));
-  const offline = new OfflineAudioContext(1, frames, 16000);
-  const source = offline.createBufferSource();
-  source.buffer = decoded;
-  source.connect(offline.destination);
-  source.start(0);
-  const rendered = await offline.startRendering();
-  const samples = new Float32Array(rendered.getChannelData(0));
-  await context.close();
-  return samples;
 }
 async function handleRecordingStopped() {
   const captureId = recordingCaptureId;
@@ -2132,16 +2284,27 @@ async function handleRecordingStopped() {
   updateCaptureUi();
   renderQuestionNav();
   try {
-    if (!chunks.length) return;
-    const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
     const masterBlob = new Blob(masterAudioChunks, { type: recorder.mimeType || 'audio/webm' });
-    let audioStored = false;
-    try {
+    logRuntimeEvent('audio_blob_finalized', { recordingId: captureId, bytes: masterBlob.size, mime: masterBlob.type || 'audio/webm', chunkCount: masterAudioChunks.length });
+    let audioStored = false, audioValid = false;
+    if (!masterBlob.size) {
+      const error = audioFault('AUDIO_BLOB_EMPTY', 'Le navigateur a finalisé un audio vide.');
+      markRecordingInvalid(captureId, error, 'finalize');
+      logRuntimeEvent('audio_blob_invalid', { recordingId: captureId, stage: 'finalize', bytes: 0, error: error.message });
+    } else try {
       await boundedWait(dbAudioPut({ id: captureId, sessionId: session.id, blob: masterBlob, mimeType: masterBlob.type || 'audio/webm', createdAt: nowIso() }), 5000, 'stockage audio');
       audioStored = true;
+      try {
+        const timeline = await validateStoredRecording(captureId);
+        audioValid = true;
+        const logicalStopMs = Math.round(recordingStopRequestedMs || 0);
+        logRuntimeEvent('audio_timeline_measured', { recordingId: captureId, logicalStopMs, decodedDurationMs: timeline.durationMs, tailMs: timeline.durationMs - logicalStopMs, ratio: logicalStopMs > 0 ? Number((timeline.durationMs / logicalStopMs).toFixed(6)) : null });
+      } catch (error) {
+        logRuntimeEvent('audio_blob_invalid', { recordingId: captureId, stage: 'decode-probe', bytes: masterBlob.size, error: String(error?.message || error) });
+      }
     } catch (error) {
-      failedAudioCaptureIds.add(captureId);
-      clearAudioRefs(captureId);
+      markRecordingInvalid(captureId, error, 'storage');
+      logRuntimeEvent('audio_blob_invalid', { recordingId: captureId, stage: 'storage', bytes: masterBlob.size, error: String(error?.message || error) });
       recordRuntimeWarning('audio_storage_warning', error);
     }
     const systemSnapshot = systemSpeechSession?.snapshot() || { text: '', finalText: '', mode: systemSpeechCapability.mode };
@@ -2156,7 +2319,6 @@ async function handleRecordingStopped() {
 
     try { await boundedWait(semanticBoundaryCommitQueue, 3000, 'frontière de transcription'); }
     catch (error) { recordRuntimeWarning('semantic_boundary_timeout', error); }
-    if (!audioStored) clearAudioRefs(captureId);
 
     if (text) {
       await appendAnswerTurn({
@@ -2187,6 +2349,8 @@ async function handleRecordingStopped() {
       ui.recordState.textContent = 'Audio non conservé';
       showError(ui.interviewError, 'La transcription système n’a rien renvoyé et l’audio local n’a pas pu être conservé.');
     }
+    if (audioStored && audioValid) logRuntimeEvent('boundary_audio_ready', { captureId });
+    else if (audioStored) ui.recordState.textContent = 'Audio conservé mais illisible · réinitialisez l’audio';
   } catch (error) {
     diagnosticError = String(error?.message || error);
     logRuntimeEvent('transcription_error', {
@@ -2203,8 +2367,10 @@ async function handleRecordingStopped() {
     ui.validateBtn.disabled = false;
     recordingSpeakerId = null;
     recordingQuestionId = null;
+    recordingMasterStartedAt = 0;
     recorder = null;
     captureFinalizing = false;
+    renderTurns();
     const keepMicrophoneOpen = Boolean(nextSpeakerId && participantById(nextSpeakerId));
     if (!keepMicrophoneOpen) releaseMicrophone();
     try { resolveRecordingCompletion?.(); } catch {}
@@ -2333,6 +2499,9 @@ async function copyDiagnosticReport() {
       modelReady: Boolean(transcriber),
       systemSpeech: systemSpeechCapability,
       systemSpeechLastError: systemSpeechSession?.snapshot?.().lastError || null,
+      audioHealth,
+      audioHealthReason,
+      invalidAudioRecordings: Object.values(session?.audioIntegrity || {}).filter(value => value?.status === 'invalid').length,
       lastError: diagnosticError,
       runtimeEvents: clone(session?.runtimeEvents || []).slice(-20)
     },
@@ -2349,6 +2518,17 @@ async function copyDiagnosticReport() {
   }
 }
 
+
+async function loadDirectInterviewFromLocation(){
+  const direct=await resolveDirectInterviewLink(window.location);
+  if(!direct)return null;
+  interview=normalizeSpec(direct.raw);
+  ensureInterviewParticipants();
+  await persistSpec();
+  session=null;
+  return direct;
+}
+
 async function init() {
   ui.diagBuild.textContent = BUILD_ID;
   if (ui.runtimeVersion) ui.runtimeVersion.textContent = BUILD_ID;
@@ -2357,8 +2537,11 @@ async function init() {
   window.addEventListener('offline', updateNetwork);
   await ensureDb();
 
+  let directLaunch = null;
+  try { directLaunch = await loadDirectInterviewFromLocation(); }
+  catch (error) { showError(ui.loadError, error.message || String(error)); }
   const [savedSpec, savedSession] = await Promise.all([dbGet(SPEC_KEY), dbGet(STATE_KEY)]);
-  if (savedSpec) {
+  if (!directLaunch && savedSpec) {
     try { interview = normalizeSpec(savedSpec); } catch { interview = null; }
   }
   if (!interview) {
@@ -2374,6 +2557,7 @@ async function init() {
 
   await Promise.allSettled([registerServiceWorker(), requestPersistentStorage(), detectRuntimeSystemSpeech()]);
   renderSetup();
+  if (directLaunch?.view === 'interview') await startInterview();
 }
 
 ui.interviewFile.addEventListener('change', () => {
@@ -2436,6 +2620,9 @@ ui.exportJsonBtn.addEventListener('click', exportJson);
 ui.newSessionBtn.addEventListener('click', resetSession);
 ui.copyDiagBtn.addEventListener('click', copyDiagnosticReport);
 ui.copyAuthoringKitBtn.addEventListener('click', copyAuthoringKit);
+ui.audioRecoveryBtn?.addEventListener('click', recoverAudioSubsystem);
+ui.simulateAudioFaultBtn?.addEventListener('click', simulateAudioFault);
+ui.interviewSimulateAudioFaultBtn?.addEventListener('click', simulateAudioFault);
 
 document.addEventListener('keydown', event => {
   if (ui.interviewView?.classList.contains('hidden')) return;

@@ -1,8 +1,8 @@
 ---
 kit: offline-interview-ai-generator
-kitVersion: "1.2"
+kitVersion: "1.3"
 outputSchema: offline-interview.interview-spec.v1
-outputFormat: json
+outputFormat: direct-link
 languageDefault: fr-FR
 ---
 
@@ -28,9 +28,21 @@ Ne mène pas l'interview. Ne réponds pas aux questions. Ne fais pas de synthès
 
 ## Réponse attendue
 
-Retourne uniquement le JSON final, sans Markdown, sans explication avant ou après.
+La cible canonique de l’application est `https://stefm78.github.io/Experimental/`.
 
-Le JSON doit respecter le contrat `offline-interview.interview-spec.v1`.
+Construis d’abord en interne un JSON conforme à `offline-interview.interview-spec.v1`, puis transforme ce JSON UTF-8 en Base64URL sans padding et produis un lien direct conforme au contrat `DIRECT_INTERVIEW_LINK v1` :
+
+`https://stefm78.github.io/Experimental/#oi=1&view=setup&spec=<BASE64URL_JSON>`
+
+Par défaut, retourne uniquement ce lien `view=setup`. Si l’utilisateur demande un démarrage direct, utilise `view=interview`. Ce mode ouvre directement l’interview mais ne doit jamais être interprété comme une autorisation de démarrer le microphone sans action utilisateur.
+
+Si le payload Base64URL dépasse environ 12000 caractères, préfère un JSON hébergé publiquement en HTTPS avec CORS puis utilise :
+
+`https://stefm78.github.io/Experimental/#oi=1&view=setup&url=<URL_HTTPS_ENCODEE>`
+
+Si tu ne peux pas publier le JSON, retourne alors le JSON lui-même comme fallback explicite.
+
+Le JSON sous-jacent doit respecter le contrat `offline-interview.interview-spec.v1`.
 
 Règles essentielles :
 - `schema` vaut exactement `offline-interview.interview-spec.v1` ;
@@ -182,4 +194,4 @@ Avant de rendre le JSON :
 - vérifie que les relances restent facultatives ;
 - vérifie que rien n'a été inventé.
 
-Ensuite, retourne uniquement le JSON final.
+Ensuite, retourne le lien direct demandé ; n’utilise le JSON brut qu’en fallback lorsque le lien ne peut pas être produit.
