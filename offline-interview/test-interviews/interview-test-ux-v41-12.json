@@ -1,0 +1,80 @@
+{
+  "schema": "offline-interview.interview-spec.v1",
+  "id": "test-ux-v41-12-segment-isolation",
+  "version": "1.0",
+  "title": "Test V41.12 — segments audio isolés",
+  "estimatedDurationMinutes": 4,
+  "context": "Qualification ciblée après le terrain V41.11.",
+  "objective": "Vérifier isolation des segments, replay, live-first et vue intermédiaire.",
+  "language": "fr-FR",
+  "tags": [],
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Interviewer",
+      "role": "interviewer"
+    },
+    {
+      "id": "P2",
+      "name": "Testeur",
+      "role": "interviewee"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "V41.12",
+      "questions": [
+        {
+          "id": "Q1",
+          "label": "Préflight",
+          "text": "Ouvrez Diagnostic. La version doit être exactement 2026-09-08.interview-runtime-v41.12. Sinon arrêtez le test.",
+          "intent": "Cible exacte.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q2",
+          "label": "Segments isolés",
+          "text": "Alternez rapidement six fois entre les deux personnes. Terminez chaque phrase par un nombre différent. Retranscrivez ensuite trois prises : chacune doit rester limitée à sa phrase, avec au plus un très court début de la suivante.",
+          "intent": "Vérifier que la retranscription audio ne déborde plus sur plusieurs interventions.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P1",
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q3",
+          "label": "Replay après texte",
+          "text": "Après une retranscription réussie, arrêtez toute prise en cours puis appuyez sur lecture, pause et reprise de cette même ligne. Vérifiez que le son reste disponible et s’arrête à la fin attendue.",
+          "intent": "Séparer disponibilité audio et statut de transcription.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        },
+        {
+          "id": "Q4",
+          "label": "Vue intermédiaire",
+          "text": "Redimensionnez la fenêtre jusqu’à faire disparaître le menu de gauche sans passer en vue téléphone. Vérifiez que les barres bleues et rappels redondants de progression ont disparu, tandis que le numéro de question, le chrono et le temps restant restent visibles.",
+          "intent": "Densité responsive sans perte d’information.",
+          "estimatedMinutes": 1,
+          "required": true,
+          "audience": [
+            "P2"
+          ],
+          "followUps": []
+        }
+      ]
+    }
+  ]
+}

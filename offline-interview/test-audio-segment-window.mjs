@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {turnAudioWindow,sliceAudioBuffer} from './audio-window.js';
+const turn={audioRef:{recordingId:'r1',startMs:1000,endMs:2000}};
+const recovery=turnAudioWindow(turn,'recovery',10000);
+assert.equal(recovery.startMs,1000);assert.equal(recovery.endMs,2250);assert.equal(recovery.canonicalEndMs,2000);
+const source=[Float32Array.from({length:1000},(_,i)=>i),Float32Array.from({length:1000},(_,i)=>-i)];
+const decoded={sampleRate:1000,length:1000,duration:1,numberOfChannels:2,getChannelData:i=>source[i]};
+const context={createBuffer(channels,length,rate){const data=Array.from({length:channels},()=>new Float32Array(length));return{numberOfChannels:channels,length,sampleRate:rate,duration:length/rate,copyToChannel(src,ch){data[ch].set(src)},getChannelData:ch=>data[ch]}}};
+const segment=sliceAudioBuffer(context,decoded,100,350);
+assert.equal(segment.length,250);assert.equal(segment.duration,.25);assert.equal(segment.getChannelData(0)[0],100);assert.equal(segment.getChannelData(0)[249],349);
+console.log('PASS isolated recovery audio window');
