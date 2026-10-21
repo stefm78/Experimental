@@ -1,0 +1,87 @@
+{
+  "schema": "offline-interview.transcription-engine-contract.v1",
+  "status": "CANDIDATE",
+  "purpose": "Keep Offline Interview product/audio authority independent from interchangeable audio-to-text providers.",
+  "authorities": {
+    "product": {
+      "owns": [
+        "session_identity",
+        "turn_identity",
+        "question_navigation",
+        "participants",
+        "follow_ups",
+        "interview_lifecycle",
+        "audio_capture_lifecycle",
+        "audio_asset_reference",
+        "human_authoritative_text",
+        "product_export_semantics"
+      ]
+    },
+    "engine": {
+      "owns": [
+        "provider_selection",
+        "provider_execution",
+        "provider_status",
+        "draft_transcript_generation",
+        "provider_diagnostics",
+        "provider_benchmarking"
+      ],
+      "forbidden": [
+        "advance_question",
+        "change_active_question",
+        "create_or_delete_participant",
+        "create_or_delete_follow_up",
+        "complete_interview",
+        "finalize_human_authoritative_text",
+        "delete_or_invalidate_audio_asset"
+      ]
+    }
+  },
+  "audio": {
+    "owner": "PRODUCT",
+    "captureImplementation": "PRODUCT_CURRENT_WEB_CAPTURE_UNCHANGED_UNLESS_CAUSE_PROVEN",
+    "engineConsumesAudio": true,
+    "engineNeverOwnsAudio": true,
+    "transcriptionFailureCannotInvalidateRecordedAudio": true,
+    "sameAudioMustRemainRetranscribable": true
+  },
+  "commands": [
+    "GET_TRANSCRIPTION_CAPABILITIES",
+    "TRANSCRIBE_FINAL",
+    "START_LIVE_DRAFT",
+    "STOP_LIVE_DRAFT",
+    "CANCEL_TRANSCRIPTION"
+  ],
+  "events": [
+    "TRANSCRIPTION_STATUS",
+    "TRANSCRIPT_PARTIAL",
+    "TRANSCRIPT_FINAL",
+    "TRANSCRIPTION_ERROR",
+    "PROVIDER_DIAGNOSTIC"
+  ],
+  "identity": {
+    "requiredOnTurnScopedCommands": ["sessionId", "turnId"],
+    "requiredOnTurnScopedEvents": ["sessionId", "turnId", "providerId"],
+    "providerCannotInventOrChangeProductIdentity": true,
+    "mismatchedTurnResultMustBeRejected": true
+  },
+  "status": {
+    "audio": ["NONE", "CAPTURED", "FAILED"],
+    "transcription": ["NOT_REQUESTED", "PENDING", "DRAFT", "FINAL", "FAILED", "UNAVAILABLE"]
+  },
+  "humanAuthority": {
+    "providerTextRole": "DRAFT",
+    "providerFinalIsNotHumanFinal": true,
+    "humanEditedTextCannotBeSilentlyOverwritten": true,
+    "humanLockCannotBeSilentlyOverwritten": true
+  },
+  "providerRoles": {
+    "LIVE_DRAFT_ONLY": "Provider may supply opportunistic live text but is not required to replay a saved audio asset.",
+    "REPLAYABLE_DURABLE_CANDIDATE": "Provider can transcribe product-owned recorded audio and can be benchmarked on the same asset."
+  },
+  "gates": {
+    "WEB_PRODUCT_READY": "Independent from transcription provider quality.",
+    "TRANSCRIPTION_INTEGRATION_READY": "Product can invoke engine, receive scoped status/results, preserve audio on failure and retry the same audio asset when a replayable provider exists.",
+    "TRANSCRIPTION_PROVIDER_QUALIFIED": "Separate quality/performance/offline provider decision."
+  }
+}
