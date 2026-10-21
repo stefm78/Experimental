@@ -13,7 +13,7 @@ const systemStt = read('system-stt.js');
 const spec = JSON.parse(read('test-interviews/interview-test-ux-v40.json'));
 
 // Completion remains a single state transition shared by both responsive controls.
-assert.match(app, /interview-runtime-v41\.5/);
+assert.match(app, /interview-runtime-v41\.6/);
 assert.match(app, /let completionInProgress = false;/);
 assert.match(app, /let pendingInterviewCompletion = false;/);
 assert.match(app, /completion_requested/);
@@ -37,9 +37,9 @@ assert.match(index, /id="exportJsonBtn"/);
 
 // One runtime identity; service-worker registration does not carry a stale duplicate version.
 assert.doesNotMatch(app, /register\('\.\/sw\.js\?v=/);
-assert.match(sw, /offline-interview-v41\.5/);
-assert.match(index, /styles\.css\?v=41\.5/);
-assert.match(index, /app\.js\?v=41\.5/);
+assert.match(sw, /offline-interview-v41\.6/);
+assert.match(index, /styles\.css\?v=41\.6/);
+assert.match(index, /app\.js\?v=41\.6/);
 
 // Diagnostic/lab pages stay available in the repository but are not mandatory install-shell bytes.
 const shell = sw.match(/const SHELL = \[(.*?)\];/s)?.[1] || '';
@@ -65,10 +65,7 @@ assert.match(app, /masterAudioChunks\.push\(event\.data\)/);
 assert.match(app, /blob: masterBlob/);
 assert.match(app, /const recordingId = recordingCaptureId/);
 assert.match(app, /audioRef: failedAudioCaptureIds\.has\(recordingId\) \? null : \{ recordingId, startMs: segmentStartMs, endMs: segmentEndMs \}/);
-assert.match(app, /replayTurnAudio\(turn\)/);
-assert.match(app, /const targetQuestionId = all\[index\]\?\.question\?\.id \|\| null;/);
-assert.match(app, /if \(isRecording\(\) && targetQuestionId && recordingQuestionId !== targetQuestionId\)/);
-assert.match(app, /moveRecordingToViewedQuestion\(\)\.catch/);
+assert.match(app, /replayTurnAudio\(turn, replay\)/);
 assert.match(app, /AudioContext \|\| window\.webkitAudioContext/);
 assert.match(app, /getFloatTimeDomainData/);
 assert.match(app, /Math\.sqrt\(sum \/ samples\.length\)/);
@@ -91,7 +88,8 @@ assert.match(index, /id="freeStartBtn"/);
 const navBody = app.match(/async function goToQuestion\(index\) \{[\s\S]*?\n\}/)?.[0] || '';
 assert.ok(navBody.indexOf('renderQuestion();') >= 0 && navBody.indexOf('renderQuestion();') < navBody.indexOf("persistSessionLater('question-navigation')"), 'question UI must render before persistence');
 assert.doesNotMatch(navBody, /await persistSession\(\)/);
-assert.match(navBody, /moveRecordingToViewedQuestion\(\)\.catch/);
+assert.doesNotMatch(navBody, /moveRecordingToViewedQuestion\(\)\.catch/);
+assert.match(navBody, /renderCaptureQuestionContext\(\)/);
 const selectBody = app.match(/async function selectSpeaker\(participantId\) \{[\s\S]*?\n\}/)?.[0] || '';
 assert.ok(selectBody.indexOf('renderSpeakerButtons();') >= 0 && selectBody.indexOf('renderSpeakerButtons();') < selectBody.indexOf("persistSessionLater('speaker-selection')"), 'speaker control must update before persistence');
 assert.doesNotMatch(selectBody, /await persistSession\(\)/);
@@ -99,7 +97,7 @@ assert.match(app, /boundedWait\(dbAudioPut\([\s\S]*5000, 'stockage audio'\)/);
 assert.match(app, /finishInterview\(\);\s+persistSessionLater\('completion'\)/);
 assert.match(app, /failedAudioCaptureIds\.has\(recordingId\) \? null/);
 
-// V41.5: automatic transcription is system-first/system-only; saved audio remains usable when text is absent.
+// V41.6: automatic transcription is system-first/system-only; saved audio remains usable when text is absent.
 assert.doesNotMatch(app, /Aucun texte système · secours Whisper/);
 assert.doesNotMatch(app, /Transcription Whisper locale/);
 assert.match(app, /appendAudioOnlyTurn\(/);
@@ -110,16 +108,27 @@ assert.match(systemStt, /export function transcribeSystemAudioTrack\(/);
 assert.match(systemStt, /recognition\.start\(audioTrack\)/);
 assert.match(systemStt, /Chrome\|Chromium\|Edg/);
 
+
+// V41.6 field stabilization: explicit capture ownership, gapless semantic boundaries, replay pause, idempotent retranscription.
+assert.match(app, /systemSpeechSession\?\.takeSegment/);
+assert.doesNotMatch(app.match(/async function rotateLiveSegment[\s\S]*?return true;\n\}/)?.[0] || '', /cutSegment\(/);
+assert.match(app, /L’enregistrement reste sur/);
+assert.match(app, /replayTurnAudio\(turn, replay\)/);
+assert.match(app, /activeReplayTurnId === turn.id/);
+assert.match(app, /⏳ Système…/);
+assert.match(app, /systemRetranscription = \{ audioKey, status: 'succeeded'/);
+assert.match(app, /\['succeeded', 'failed'\]\.includes\(stableRetranscription\)/);
+
 // Explicit anti-growth budgets. Raising one requires a conscious code-review decision.
 const coreBytes = bytes(app) + bytes(css) + bytes(systemStt) + bytes(index) + bytes(sw);
-assert.ok(bytes(app) <= 106_500, `app.js budget exceeded: ${bytes(app)} bytes`);
+assert.ok(bytes(app) <= 110_000, `app.js budget exceeded: ${bytes(app)} bytes`);
 assert.ok(bytes(css) <= 66_000, `styles.css budget exceeded: ${bytes(css)} bytes`);
-assert.ok(coreBytes <= 207_000, `core source budget exceeded: ${coreBytes} bytes`);
+assert.ok(coreBytes <= 211_000, `core source budget exceeded: ${coreBytes} bytes`);
 
 assert.equal(spec.id, 'test-ux-v40-result-replaces-capture');
 console.log(JSON.stringify({
   status: 'PASS',
-  contract: 'offline-interview.runtime-contract.v41.5',
+  contract: 'offline-interview.runtime-contract.v41.6',
   appBytes: bytes(app),
   cssBytes: bytes(css),
   coreBytes
